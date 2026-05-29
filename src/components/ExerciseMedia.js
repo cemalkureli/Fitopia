@@ -3,15 +3,19 @@ import { StyleSheet } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { C } from '../utils/theme';
 
-// URL (string) veya local require() kabul eder
 export default function ExerciseMedia({ source, style }) {
-  const src = typeof source === 'string' ? { uri: source } : source;
+  const src = source
+    ? (typeof source === 'string' ? { uri: source } : source)
+    : null;
 
   const player = useVideoPlayer(src, p => {
+    if (!src) return;
     p.loop  = true;
     p.muted = true;
     p.play();
   });
+
+  if (!src) return <View style={[s.video, style]} />;
 
   return (
     <VideoView

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  TextInput, Modal, Dimensions,
+  TextInput, Modal, Dimensions, Platform,
 } from 'react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import ExerciseMedia from '../components/ExerciseMedia';
@@ -109,47 +109,53 @@ export default function ExercisesScreen() {
     return matchCat && matchSearch;
   }), [search, cat]);
 
-  const openExercise = useCallback((ex) => setSelected(ex), []);
-  const renderItem   = useCallback(({ item }) => <ExerciseRow ex={item} onPress={openExercise} />, [openExercise]);
+  const openExercise   = useCallback((ex) => setSelected(ex), []);
+  const renderItem     = useCallback(({ item }) => <ExerciseRow ex={item} onPress={openExercise} />, [openExercise]);
+  const renderCatItem  = useCallback(({ item: c }) => (
+    <TouchableOpacity
+      style={[s.catBtn, cat === c && { backgroundColor: (CAT_COLOR[c] ?? C.lime) + '20', borderColor: CAT_COLOR[c] ?? C.lime }]}
+      onPress={() => setCat(c)}
+    >
+      <Text style={[s.catText, cat === c && { color: CAT_COLOR[c] ?? C.lime, fontWeight: '700' }]}>{c}</Text>
+    </TouchableOpacity>
+  ), [cat]);
 
   const color = selected ? (CAT_COLOR[selected.cat] ?? C.lime) : C.lime;
 
   return (
     <View style={s.fill}>
-      {/* Arama + filtre */}
-      <View style={s.header}>
-        <Animated.View entering={FadeInDown.duration(300)} style={s.searchWrap}>
-          <Ionicons name="search-outline" size={18} color={C.dim} />
-          <TextInput
-            style={s.searchInput}
-            placeholder="Egzersiz ara..."
-            placeholderTextColor={C.dim}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color={C.dim} />
-            </TouchableOpacity>
-          )}
-        </Animated.View>
+      {/* Arama */}
+      <Animated.View entering={FadeInDown.duration(300)} style={s.searchWrap}>
+        <Ionicons name="search-outline" size={18} color={C.dim} />
+        <TextInput
+          style={s.searchInput}
+          placeholder="Egzersiz ara..."
+          placeholderTextColor={C.dim}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={18} color={C.dim} />
+          </TouchableOpacity>
+        )}
+      </Animated.View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll} contentContainerStyle={{ gap: 8 }} nestedScrollEnabled={false}>
-          {CATS.map(c => (
-            <TouchableOpacity
-              key={c}
-              style={[s.catBtn, cat === c && { backgroundColor: (CAT_COLOR[c] ?? C.lime) + '20', borderColor: CAT_COLOR[c] ?? C.lime }]}
-              onPress={() => setCat(c)}
-            >
-              <Text style={[s.catText, cat === c && { color: CAT_COLOR[c] ?? C.lime, fontWeight: '700' }]}>{c}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+      {/* Kategori filtresi — FlatList horizontal (ScrollView kullanmıyoruz) */}
+      <FlatList
+        data={CATS}
+        keyExtractor={c => c}
+        renderItem={renderCatItem}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={s.catList}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+      />
 
-        <Text style={s.countText}>{filtered.length} egzersiz</Text>
-      </View>
+      {/* Sayaç */}
+      <Text style={s.countText}>{filtered.length} egzersiz</Text>
 
-      {/* Liste — FlatList: sadece görünen item'lar render edilir */}
+      {/* Ana liste */}
       <FlatList
         data={filtered}
         keyExtractor={item => item.name}
@@ -160,8 +166,7 @@ export default function ExercisesScreen() {
         initialNumToRender={12}
         maxToRenderPerBatch={10}
         windowSize={5}
-        removeClippedSubviews={true}
-        getItemLayout={(_, i) => ({ length: 78, offset: 78 * i, index: i })}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
 
       {/* Detay Modal */}
@@ -189,15 +194,13 @@ export default function ExercisesScreen() {
 }
 
 const s = StyleSheet.create({
-  fill:    { flex: 1, backgroundColor: C.bg },
-
-  header:  { padding: 16, paddingBottom: 8 },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.s1, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, height: 46, marginBottom: 12 },
-  searchInput: { flex: 1, color: C.text, fontSize: 14 },
-  catScroll:  { marginBottom: 10 },
-  catBtn:   { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
-  catText:  { color: C.muted, fontSize: 12, fontWeight: '600' },
-  countText: { color: C.dim, fontSize: 11, fontWeight: '600', marginBottom: 4 },
+  fill:       { flex: 1, backgroundColor: C.bg },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.s1, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, height: 46, margin: 16, marginBottom: 10 },
+  searchInput:{ flex: 1, color: C.text, fontSize: 14 },
+  catList:    { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
+  catBtn:     { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
+  catText:    { color: C.muted, fontSize: 12, fontWeight: '600' },
+  countText:  { color: C.dim, fontSize: 11, fontWeight: '600', paddingHorizontal: 16, marginBottom: 4 },
 
   list:    { paddingHorizontal: 16, paddingBottom: 32 },
   exRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.s1, borderRadius: 14, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: C.border },
