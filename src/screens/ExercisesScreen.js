@@ -8,68 +8,61 @@ import ExerciseMedia from '../components/ExerciseMedia';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '../utils/theme';
+import { EXERCISE_URLS } from '../utils/exerciseUrls';
 
 const { width } = Dimensions.get('window');
 
-// Egzersiz kataloğu — kas grubu + kategori etiketleri
 const EXERCISES = [
-  // Göğüs
-  { name:'Barbell Bench Press',          muscle:'Göğüs',   cat:'Göğüs',   gif: require('../../assets/exercises/barbell-bench-press.webm') },
-  { name:'Dumbbell Bench Press',         muscle:'Göğüs',   cat:'Göğüs',   gif: require('../../assets/exercises/dumbbell-bench-press.webm') },
-  { name:'Incline Dumbbell Bench Press', muscle:'Üst Göğüs', cat:'Göğüs', gif: require('../../assets/exercises/incline-dumbbell-bench-press.webm') },
-  { name:'Pec Deck Fly Machine',         muscle:'Göğüs',   cat:'Göğüs',   gif: require('../../assets/exercises/pec-deck-fly-machine.webm') },
-  { name:'Chest Press Machine',          muscle:'Göğüs',   cat:'Göğüs',   gif: require('../../assets/exercises/chest-press-machine.webm') },
-  { name:'Dumbbell Fly',                 muscle:'Göğüs',   cat:'Göğüs',   gif: require('../../assets/exercises/dumbbell-fly.webm') },
-  { name:'Push Up',                      muscle:'Göğüs',   cat:'Göğüs',   gif: require('../../assets/exercises/push-up.webm') },
-  { name:'Close Grip Bench Press',       muscle:'Göğüs/Tris', cat:'Göğüs', gif: require('../../assets/exercises/close-grip-bench-press.webm') },
-  // Sırt
-  { name:'Lat Pull Down',                muscle:'Sırt',    cat:'Sırt',    gif: require('../../assets/exercises/lat-pull-down.webm') },
-  { name:'Seated Cable Row',             muscle:'Sırt',    cat:'Sırt',    gif: require('../../assets/exercises/seated-cable-row.webm') },
-  { name:'Pull Up',                      muscle:'Sırt',    cat:'Sırt',    gif: require('../../assets/exercises/pull-up.webm') },
-  { name:'Dumbbell Row',                 muscle:'Sırt',    cat:'Sırt',    gif: require('../../assets/exercises/dumbbell-row.webm') },
-  { name:'High Row Machine',             muscle:'Sırt',    cat:'Sırt',    gif: require('../../assets/exercises/high-row-machine.webm') },
-  { name:'Romanian Deadlift',            muscle:'Sırt/Bacak', cat:'Sırt', gif: require('../../assets/exercises/romanian-deadlift.webm') },
-  { name:'Conventional Deadlift',        muscle:'Sırt',    cat:'Sırt',    gif: require('../../assets/exercises/conventional-deadlift.webm') },
-  { name:'Cable Straight Arm Pulldown',  muscle:'Sırt',    cat:'Sırt',    gif: require('../../assets/exercises/cable-straight-arm-pulldown.webm') },
-  // Omuz
-  { name:'Shoulder Press Machine',       muscle:'Omuz',    cat:'Omuz',    gif: require('../../assets/exercises/shoulder-press-machine.webm') },
-  { name:'Dumbbell Lateral Raise',       muscle:'Omuz',    cat:'Omuz',    gif: require('../../assets/exercises/dumbbell-lateral-raise.webm') },
-  { name:'Dumbbell Shoulder Press',      muscle:'Omuz',    cat:'Omuz',    gif: require('../../assets/exercises/dumbbell-shoulder-press.webm') },
-  { name:'Cable Lateral Raise',          muscle:'Omuz',    cat:'Omuz',    gif: require('../../assets/exercises/cable-lateral-raise.webm') },
-  { name:'Face Pull',                    muscle:'Arka Omuz', cat:'Omuz',  gif: require('../../assets/exercises/face-pull.webm') },
-  { name:'Cable Reverse Fly',            muscle:'Arka Omuz', cat:'Omuz',  gif: require('../../assets/exercises/cable-reverse-fly.webm') },
-  { name:'Overhead Press',               muscle:'Omuz',    cat:'Omuz',    gif: require('../../assets/exercises/overhead-press.webm') },
-  // Kol
-  { name:'Cable Curl',                   muscle:'Biceps',  cat:'Kol',     gif: require('../../assets/exercises/cable-curl.webm') },
-  { name:'Dumbbell Bicep Curl',          muscle:'Biceps',  cat:'Kol',     gif: require('../../assets/exercises/dumbbell-bicep-curl.webm') },
-  { name:'Incline Dumbbell Curl',        muscle:'Biceps',  cat:'Kol',     gif: require('../../assets/exercises/incline-dumbbell-curl.webm') },
-  { name:'Dumbbell Hammer Curl',         muscle:'Biceps',  cat:'Kol',     gif: require('../../assets/exercises/dumbbell-hammer-curl.webm') },
-  { name:'Cable Push Down',              muscle:'Triceps', cat:'Kol',     gif: require('../../assets/exercises/cable-push-down.webm') },
-  { name:'Cable Overhead Tricep Extension', muscle:'Triceps', cat:'Kol',  gif: require('../../assets/exercises/cable-overhead-tricep-extension.webm') },
-  { name:'Skull Crusher',                muscle:'Triceps', cat:'Kol',     gif: require('../../assets/exercises/skull-crusher.webm') },
-  { name:'Dips',                         muscle:'Triceps', cat:'Kol',     gif: require('../../assets/exercises/dips.webm') },
-  // Bacak
-  { name:'Back Squat',                   muscle:'Bacak',   cat:'Bacak',   gif: require('../../assets/exercises/back-squat.webm') },
-  { name:'Leg Press',                    muscle:'Bacak',   cat:'Bacak',   gif: require('../../assets/exercises/leg-press.webm') },
-  { name:'Smith Machine Squat',          muscle:'Bacak',   cat:'Bacak',   gif: require('../../assets/exercises/smith-machine-squat.webm') },
-  { name:'Leg Extension',                muscle:'Quadriceps', cat:'Bacak', gif: require('../../assets/exercises/leg-extension.webm') },
-  { name:'Seated Leg Curl',              muscle:'Hamstring', cat:'Bacak',  gif: require('../../assets/exercises/seated-leg-curl.webm') },
-  { name:'Barbell Hip Thrust',           muscle:'Glute',   cat:'Bacak',   gif: require('../../assets/exercises/barbell-hip-thrust.webm') },
-  { name:'Bulgarian Split Squat',        muscle:'Bacak',   cat:'Bacak',   gif: require('../../assets/exercises/barbell-bulgarian-split-squat.webm') },
-  { name:'Hack Squat Machine',           muscle:'Bacak',   cat:'Bacak',   gif: require('../../assets/exercises/hack-squat-machine.webm') },
-  { name:'Seated Calf Raise',            muscle:'Baldır',  cat:'Bacak',   gif: require('../../assets/exercises/seated-calf-raise.webm') },
-  // Core
-  { name:'Crunch',                       muscle:'Core',    cat:'Core',    gif: require('../../assets/exercises/crunch.webm') },
-  { name:'Leg Raise',                    muscle:'Core',    cat:'Core',    gif: require('../../assets/exercises/leg-raise.webm') },
-  { name:'Hanging Knee Raise',           muscle:'Core',    cat:'Core',    gif: require('../../assets/exercises/hanging-knee-raise.webm') },
-  { name:'Plank',                        muscle:'Core',    cat:'Core',    gif: require('../../assets/exercises/plank.webm') },
-  { name:'Reverse Crunch',               muscle:'Core',    cat:'Core',    gif: require('../../assets/exercises/reverse-crunch.webm') },
-  // Cardio
-  { name:'Running',                      muscle:'Kardio',  cat:'Kardio',  gif: require('../../assets/exercises/running.webm') },
-  { name:'Jump Squat',                   muscle:'Tüm vücut', cat:'Kardio', gif: require('../../assets/exercises/jump-squat.webm') },
-  { name:'Burpee',                       muscle:'Tüm vücut', cat:'Kardio', gif: require('../../assets/exercises/burpee.webm') },
-  { name:'Mountain Climber',             muscle:'Core/Kardio', cat:'Kardio', gif: require('../../assets/exercises/mountain-climber.webm') },
-];
+  { name:'Barbell Bench Press',             muscle:'Göğüs',      cat:'Göğüs'  },
+  { name:'Dumbbell Bench Press',            muscle:'Göğüs',      cat:'Göğüs'  },
+  { name:'Incline Dumbbell Bench Press',    muscle:'Üst Göğüs',  cat:'Göğüs'  },
+  { name:'Pec Deck Fly Machine',            muscle:'Göğüs',      cat:'Göğüs'  },
+  { name:'Chest Press Machine',             muscle:'Göğüs',      cat:'Göğüs'  },
+  { name:'Dumbbell Fly',                    muscle:'Göğüs',      cat:'Göğüs'  },
+  { name:'Push Up',                         muscle:'Göğüs',      cat:'Göğüs'  },
+  { name:'Close Grip Bench Press',          muscle:'Göğüs/Tris', cat:'Göğüs'  },
+  { name:'Lat Pull Down',                   muscle:'Sırt',       cat:'Sırt'   },
+  { name:'Seated Cable Row',                muscle:'Sırt',       cat:'Sırt'   },
+  { name:'Pull Up',                         muscle:'Sırt',       cat:'Sırt'   },
+  { name:'Dumbbell Row',                    muscle:'Sırt',       cat:'Sırt'   },
+  { name:'High Row Machine',                muscle:'Sırt',       cat:'Sırt'   },
+  { name:'Romanian Deadlift',               muscle:'Sırt/Bacak', cat:'Sırt'   },
+  { name:'Conventional Deadlift',           muscle:'Sırt',       cat:'Sırt'   },
+  { name:'Cable Straight Arm Pulldown',     muscle:'Sırt',       cat:'Sırt'   },
+  { name:'Shoulder Press Machine',          muscle:'Omuz',       cat:'Omuz'   },
+  { name:'Dumbbell Lateral Raise',          muscle:'Omuz',       cat:'Omuz'   },
+  { name:'Dumbbell Shoulder Press',         muscle:'Omuz',       cat:'Omuz'   },
+  { name:'Cable Lateral Raise',             muscle:'Omuz',       cat:'Omuz'   },
+  { name:'Face Pull',                       muscle:'Arka Omuz',  cat:'Omuz'   },
+  { name:'Cable Reverse Fly',               muscle:'Arka Omuz',  cat:'Omuz'   },
+  { name:'Overhead Press',                  muscle:'Omuz',       cat:'Omuz'   },
+  { name:'Cable Curl',                      muscle:'Biceps',     cat:'Kol'    },
+  { name:'Dumbbell Bicep Curl',             muscle:'Biceps',     cat:'Kol'    },
+  { name:'Incline Dumbbell Curl',           muscle:'Biceps',     cat:'Kol'    },
+  { name:'Dumbbell Hammer Curl',            muscle:'Biceps',     cat:'Kol'    },
+  { name:'Cable Push Down',                 muscle:'Triceps',    cat:'Kol'    },
+  { name:'Cable Overhead Tricep Extension', muscle:'Triceps',    cat:'Kol'    },
+  { name:'Skull Crusher',                   muscle:'Triceps',    cat:'Kol'    },
+  { name:'Dips',                            muscle:'Triceps',    cat:'Kol'    },
+  { name:'Back Squat',                      muscle:'Bacak',      cat:'Bacak'  },
+  { name:'Leg Press',                       muscle:'Bacak',      cat:'Bacak'  },
+  { name:'Smith Machine Squat',             muscle:'Bacak',      cat:'Bacak'  },
+  { name:'Leg Extension',                   muscle:'Quadriceps', cat:'Bacak'  },
+  { name:'Seated Leg Curl',                 muscle:'Hamstring',  cat:'Bacak'  },
+  { name:'Barbell Hip Thrust',              muscle:'Glute',      cat:'Bacak'  },
+  { name:'Bulgarian Split Squat',           muscle:'Bacak',      cat:'Bacak'  },
+  { name:'Hack Squat Machine',              muscle:'Bacak',      cat:'Bacak'  },
+  { name:'Seated Calf Raise',               muscle:'Baldır',     cat:'Bacak'  },
+  { name:'Crunch',                          muscle:'Core',       cat:'Core'   },
+  { name:'Leg Raise',                       muscle:'Core',       cat:'Core'   },
+  { name:'Hanging Knee Raise',              muscle:'Core',       cat:'Core'   },
+  { name:'Plank',                           muscle:'Core',       cat:'Core'   },
+  { name:'Reverse Crunch',                  muscle:'Core',       cat:'Core'   },
+  { name:'Running',                         muscle:'Kardio',     cat:'Kardio' },
+  { name:'Jump Squat',                      muscle:'Tüm vücut',  cat:'Kardio' },
+  { name:'Burpee',                          muscle:'Tüm vücut',  cat:'Kardio' },
+  { name:'Mountain Climber',                muscle:'Core/Kardio',cat:'Kardio' },
+].map(ex => ({ ...ex, url: EXERCISE_URLS[ex.name] ?? null }));
 
 const CATS = ['Tümü', 'Göğüs', 'Sırt', 'Omuz', 'Kol', 'Bacak', 'Core', 'Kardio'];
 
@@ -178,7 +171,7 @@ export default function ExercisesScreen() {
             <Animated.View entering={FadeIn.duration(200)} style={s.detailModal}>
               {/* GIF büyük */}
               <View style={[s.gifContainer, { borderColor: color + '40' }]}>
-                <ExerciseMedia source={selected.gif} style={{ width: '100%', height: '100%' }} />
+                <ExerciseMedia source={selected.url} style={{ width: '100%', height: '100%' }} />
               </View>
               <Text style={s.detailName}>{selected.name}</Text>
               <View style={[s.muscleBadge, { backgroundColor: color + '15', alignSelf: 'center', marginBottom: 16 }]}>

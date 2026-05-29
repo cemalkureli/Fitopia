@@ -1,3 +1,5 @@
+assets/exercises/*.webm
+assets/exercises/*.gif
 node_modules/
 .expo/
 android/

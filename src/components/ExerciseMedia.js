@@ -1,10 +1,13 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { C } from '../utils/theme';
 
+// URL (string) veya local require() kabul eder
 export default function ExerciseMedia({ source, style }) {
-  const player = useVideoPlayer(source, p => {
+  const src = typeof source === 'string' ? { uri: source } : source;
+
+  const player = useVideoPlayer(src, p => {
     p.loop  = true;
     p.muted = true;
     p.play();

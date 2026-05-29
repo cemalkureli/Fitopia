@@ -9,6 +9,7 @@ import ExerciseMedia from '../components/ExerciseMedia';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../utils/theme';
+import { MEDIA_URLS } from '../utils/exerciseUrls';
 import { getBarfiksReps, saveWorkoutSession, getAllWorkoutLogs } from '../utils/storage';
 
 const { width } = Dimensions.get('window');
@@ -21,31 +22,7 @@ const TERIMLER = {
   'Finisher': 'Finisher → Antrenman sonunda yapılan tamamlayıcı set. Kası tamamen tüketmek için.',
 };
 
-const MEDIA_MAP = {
-  'Plate Loaded Chest Press':        require('../../assets/exercises/chest-press-machine.webm'),
-  'Smith Machine Low Incline Press': require('../../assets/exercises/smith-machine-incline-bench-press.webm'),
-  'Chest Fly Machine':               require('../../assets/exercises/pec-deck-fly-machine.webm'),
-  'Shoulder Press Machine':          require('../../assets/exercises/shoulder-press-machine.webm'),
-  'Lateral Raise':                   require('../../assets/exercises/dumbbell-lateral-raise.webm'),
-  'Triceps Pushdown':                require('../../assets/exercises/cable-push-down.webm'),
-  'Overhead Rope Extension':         require('../../assets/exercises/cable-overhead-tricep-extension.webm'),
-  'Cable Crunch':                    require('../../assets/exercises/crunch.webm'),
-  '*Finisher: Cable Crunch':         require('../../assets/exercises/crunch.webm'),
-  'Lat Pulldown':                    require('../../assets/exercises/lat-pull-down.webm'),
-  'Plate Loaded Wide Grip Row':      require('../../assets/exercises/high-row-machine.webm'),
-  'Cable Row':                       require('../../assets/exercises/seated-cable-row.webm'),
-  'Incline Dumbbell Curl':           require('../../assets/exercises/incline-dumbbell-curl.webm'),
-  'Cable Curl':                      require('../../assets/exercises/cable-curl.webm'),
-  'Hammer Curl':                     require('../../assets/exercises/dumbbell-hammer-curl.webm'),
-  'Leg Press':                       require('../../assets/exercises/leg-press.webm'),
-  'Smith Machine Squat':             require('../../assets/exercises/smith-machine-squat.webm'),
-  'Leg Extension':                   require('../../assets/exercises/leg-extension.webm'),
-  'Seated Leg Curl':                 require('../../assets/exercises/seated-leg-curl.webm'),
-  'Wrist Curl':                      require('../../assets/exercises/barbell-wrist-curl.webm'),
-  'Reverse Wrist Curl':              require('../../assets/exercises/reverse-barbell-wrist-curl.webm'),
-  'Romanian Deadlift':               require('../../assets/exercises/romanian-deadlift.webm'),
-  'Cable Rear Delt Fly':             require('../../assets/exercises/cable-reverse-fly.webm'),
-};
+const MEDIA_MAP = MEDIA_URLS;
 
 const GUNLER = [
   { gun:'Pazartesi', tip:'DİNLENME',    renk:C.muted,   emoji:'🛌', hareketler:['Vakum hareketi 3×15 sn','Ev içi yürüyüş (öğünler sonrası 1000 adım × 3)'] },
