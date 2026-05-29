@@ -106,11 +106,12 @@ const ExerciseRow = memo(({ item, onPress, lang }) => {
 
 // ─── Detay bottom sheet ───────────────────────────────────────────────────────
 function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lang }) {
-  const [userRating, setUserRating] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted,  setSubmitted]  = useState(false);
-  const [liveAvg,    setLiveAvg]    = useState(0);
-  const [liveVotes,  setLiveVotes]  = useState(0);
+  const [userRating,    setUserRating]    = useState(0);
+  const [submitting,    setSubmitting]    = useState(false);
+  const [submitted,     setSubmitted]     = useState(false);
+  const [liveAvg,       setLiveAvg]       = useState(0);
+  const [liveVotes,     setLiveVotes]     = useState(0);
+  const [activeMuscle,  setActiveMuscle]  = useState(null);
   const color = CAT_COLOR[item?.category] ?? C.lime;
   const DIFF  = [t('diff1',lang), t('diff2',lang), t('diff3',lang), t('diff4',lang), t('diff5',lang)];
 
@@ -132,8 +133,7 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
 
   useEffect(() => {
     if (!visible || !item) return;
-    setUserRating(0); setSubmitted(false);
-    // Her açılışta DB'den güncel summary çek
+    setUserRating(0); setSubmitted(false); setActiveMuscle(null);
     refreshSummary(item.id);
     supabase.auth.getUser().then(({ data }) => {
       if (!data?.user) return;
@@ -206,20 +206,51 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
                 </>
               ) : null}
 
-              {/* Kaslar */}
+              {/* Kaslar — tıklanabilir */}
               <Text style={det.sectionTitle}>{t('muscleGroups', lang)}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-                <View style={[det.muscleTag, { backgroundColor: C.teal+'22', borderColor: C.teal }]}>
-                  <Text style={[det.muscleTxt, { color: C.teal }]}>
-                    {MUSCLE_LABELS[lang]?.[item.primary_muscle] ?? item.primary_muscle}
+                {[item.primary_muscle, ...(item.secondary_muscles || [])].filter(Boolean).map((m, i) => {
+                  const isPrimary = i === 0;
+                  const isActive  = activeMuscle === m;
+                  const label     = MUSCLE_LABELS[lang]?.[m] ?? m;
+                  const score     = item.muscle_activations?.[m];
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      onPress={() => setActiveMuscle(isActive ? null : m)}
+                      style={[
+                        det.muscleTag,
+                        isPrimary && { backgroundColor: C.teal+'22', borderColor: C.teal },
+                        isActive  && { backgroundColor: color+'33', borderColor: color },
+                      ]}
+                    >
+                      <Text style={[det.muscleTxt, isPrimary && { color: C.teal }, isActive && { color }]}>
+                        {label}{score ? ` · ${score}/5` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Seçili kas aktivasyon barı */}
+              {activeMuscle && item.muscle_activations?.[activeMuscle] != null && (
+                <View style={det.activationBox}>
+                  <Text style={[det.activationTitle, { color }]}>
+                    {MUSCLE_LABELS[lang]?.[activeMuscle] ?? activeMuscle}
+                  </Text>
+                  <EffBar
+                    value={item.muscle_activations[activeMuscle]}
+                    label={lang === 'tr' ? 'Aktivasyon' : 'Activation'}
+                    color={color}
+                  />
+                  <Text style={det.activationNote}>
+                    {lang === 'tr'
+                      ? `Bu egzersizde ${MUSCLE_LABELS.tr[activeMuscle] ?? activeMuscle} ${item.muscle_activations[activeMuscle] >= 4 ? 'primer olarak çalışır' : 'yardımcı olarak katılır'}.`
+                      : `${MUSCLE_LABELS.en[activeMuscle] ?? activeMuscle} acts as ${item.muscle_activations[activeMuscle] >= 4 ? 'primary mover' : 'secondary stabilizer'} in this exercise.`
+                    }
                   </Text>
                 </View>
-                {(item.secondary_muscles || []).map((m, i) => (
-                  <View key={i} style={det.muscleTag}>
-                    <Text style={det.muscleTxt}>{MUSCLE_LABELS[lang]?.[m] ?? m}</Text>
-                  </View>
-                ))}
-              </View>
+              )}
 
               {/* Etki */}
               <Text style={det.sectionTitle}>{t('effectiveness', lang)}</Text>
@@ -274,9 +305,12 @@ const det = StyleSheet.create({
   name:       { color: C.text, fontSize: 20, fontWeight: '900' },
   sectionTitle:{ color: C.text, fontSize: 13, fontWeight: '800', marginTop: 16, marginBottom: 8 },
   instrTxt:   { color: C.muted, fontSize: 13, lineHeight: 20 },
-  muscleTag:  { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: C.border, backgroundColor: C.s2 },
-  muscleTxt:  { color: C.muted, fontSize: 12, fontWeight: '600' },
-  closeBtn:   { borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  muscleTag:     { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: C.border, backgroundColor: C.s2 },
+  muscleTxt:     { color: C.muted, fontSize: 12, fontWeight: '600' },
+  activationBox: { backgroundColor: C.s2, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, marginTop: 8, marginBottom: 4 },
+  activationTitle:{ fontSize: 13, fontWeight: '800', marginBottom: 8 },
+  activationNote: { color: C.muted, fontSize: 11, marginTop: 4, lineHeight: 16 },
+  closeBtn:      { borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
 });
 
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
