@@ -20,7 +20,7 @@
     "expo-device": "~7.0.3",
     "expo-font": "~13.0.4",
     "expo-image": "~2.0.7",
-    "expo-image-picker": "^56.0.14",
+    "expo-image-picker": "~16.0.0",
     "expo-linear-gradient": "^56.0.4",
     "expo-secure-store": "^56.0.4",
     "expo-splash-screen": "~0.29.22",
