@@ -150,7 +150,8 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
     try {
       const { data: ud } = await supabase.auth.getUser();
       if (!ud?.user) return;
-      await supabase.from('exercise_ratings').upsert({ exercise_id: item.id, user_id: ud.user.id, rating });
+      await supabase.from('exercise_ratings')
+        .upsert({ exercise_id: item.id, user_id: ud.user.id, rating }, { onConflict: 'exercise_id,user_id' });
       // XP sadece ilk oyda verilir
       if (wasFirstTime) {
         await supabase.rpc('increment_xp', { uid: ud.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
@@ -324,6 +325,7 @@ export default function ExercisesScreen() {
   const [hasMore,   setHasMore]   = useState(true);
   const [search,    setSearch]    = useState('');
   const [cat,       setCat]       = useState('');   // '' = Tümü
+  const [diff,      setDiff]      = useState(0);    // 0 = Tümü, 1-5
   const [selected,  setSelected]  = useState(null);
   const offsetRef   = useRef(0);
   const searchTimer = useRef(null);
@@ -335,6 +337,7 @@ export default function ExercisesScreen() {
     let q = supabase.from('exercises').select('*')
       .range(offset, offset + PAGE - 1).order('name');
     if (cat)           q = q.eq('category', cat);
+    if (diff > 0)      q = q.eq('difficulty', diff);
     if (search.trim()) q = q.ilike('name', `%${search.trim()}%`);
 
     const { data, error } = await q;
@@ -365,7 +368,7 @@ export default function ExercisesScreen() {
     }
     setHasMore(unique.length === PAGE);
     setLoading(false); setLoadMore(false);
-  }, [cat, search]);
+  }, [cat, diff, search]);
 
   useEffect(() => {
     setLoading(true); offsetRef.current = 0;
@@ -417,6 +420,27 @@ export default function ExercisesScreen() {
         style={s.catList} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
       />
 
+      {/* Zorluk filtresi */}
+      <View style={s.diffRow}>
+        {[0,1,2,3,4,5].map(d => {
+          const DIFF_LABELS = ['Tümü','Kolay','Orta-Kolay','Orta','Zor','Çok Zor'];
+          const DIFF_LABELS_EN = ['All','Easy','Easy-Med','Medium','Hard','Very Hard'];
+          const label = lang === 'tr' ? DIFF_LABELS[d] : DIFF_LABELS_EN[d];
+          const DIFF_COLORS = [C.muted, C.green, C.teal, C.lime, C.orange, C.red];
+          const active = diff === d;
+          const col = DIFF_COLORS[d];
+          return (
+            <TouchableOpacity
+              key={d}
+              style={[s.diffBtn, active && { backgroundColor: col + '22', borderColor: col }]}
+              onPress={() => setDiff(d)}
+            >
+              <Text style={[s.diffTxt, active && { color: col, fontWeight: '700' }]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {/* Sayaç */}
       <Text style={s.countTxt}>{loading ? '...' : `${exercises.length}+ ${t('exercises', lang)}`}</Text>
 
@@ -458,9 +482,12 @@ const s = StyleSheet.create({
   fill:       { flex: 1, backgroundColor: C.bg },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.s1, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, height: 46, margin: 16, marginBottom: 10 },
   searchInput:{ flex: 1, color: C.text, fontSize: 14 },
-  catList:    { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
+  catList:    { flexGrow: 0, flexShrink: 0, marginBottom: 6 },
   catBtn:     { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
   catTxt:     { color: C.muted, fontSize: 12, fontWeight: '600' },
+  diffRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
+  diffBtn:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
+  diffTxt:    { color: C.muted, fontSize: 11, fontWeight: '600' },
   countTxt:   { color: C.dim, fontSize: 11, fontWeight: '600', paddingHorizontal: 16, marginBottom: 6 },
   list:       { paddingHorizontal: 16, paddingBottom: 32 },
   exRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.s1, borderRadius: 14, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: C.border },
