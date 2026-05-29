@@ -105,7 +105,7 @@ const ExerciseRow = memo(({ item, onPress, lang }) => {
 });
 
 // ─── Detay bottom sheet ───────────────────────────────────────────────────────
-function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
+function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lang }) {
   const [userRating, setUserRating] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted,  setSubmitted]  = useState(false);
@@ -114,11 +114,27 @@ function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
   const color = CAT_COLOR[item?.category] ?? C.lime;
   const DIFF  = [t('diff1',lang), t('diff2',lang), t('diff3',lang), t('diff4',lang), t('diff5',lang)];
 
+  const refreshSummary = async (exerciseId) => {
+    const { data: s } = await supabase
+      .from('exercise_rating_summary')
+      .select('avg_rating, vote_count')
+      .eq('exercise_id', exerciseId)
+      .single();
+    if (s) {
+      const avg   = Number(s.avg_rating) || 0;
+      const votes = s.vote_count || 0;
+      setLiveAvg(avg);
+      setLiveVotes(votes);
+      // Parent'taki selected'ı da güncelle — modal kapanınca eski değer dönmesin
+      onUpdateSelected?.(avg, votes);
+    }
+  };
+
   useEffect(() => {
     if (!visible || !item) return;
     setUserRating(0); setSubmitted(false);
-    setLiveAvg(item?.avg_rating ?? 0);
-    setLiveVotes(item?.vote_count ?? 0);
+    // Her açılışta DB'den güncel summary çek
+    refreshSummary(item.id);
     supabase.auth.getUser().then(({ data }) => {
       if (!data?.user) return;
       supabase.from('exercise_ratings').select('rating')
@@ -139,16 +155,7 @@ function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
       if (wasFirstTime) {
         await supabase.rpc('increment_xp', { uid: ud.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
       }
-      // Güncel topluluk ortalamasını çek
-      const { data: summary } = await supabase
-        .from('exercise_rating_summary')
-        .select('avg_rating, vote_count')
-        .eq('exercise_id', item.id)
-        .single();
-      if (summary) {
-        setLiveAvg(Number(summary.avg_rating) || 0);
-        setLiveVotes(summary.vote_count || 0);
-      }
+      await refreshSummary(item.id);
       setSubmitted(true); onRated?.();
     } catch {}
     setSubmitting(false);
@@ -404,6 +411,9 @@ export default function ExercisesScreen() {
         item={selected} visible={!!selected}
         onClose={() => setSelected(null)}
         onRated={() => fetchExercises(true)}
+        onUpdateSelected={(avg, votes) => setSelected(prev =>
+          prev ? { ...prev, avg_rating: avg, vote_count: votes } : prev
+        )}
         lang={lang}
       />
     </View>
