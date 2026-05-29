@@ -109,12 +109,16 @@ function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
   const [userRating, setUserRating] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted,  setSubmitted]  = useState(false);
+  const [liveAvg,    setLiveAvg]    = useState(0);
+  const [liveVotes,  setLiveVotes]  = useState(0);
   const color = CAT_COLOR[item?.category] ?? C.lime;
   const DIFF  = [t('diff1',lang), t('diff2',lang), t('diff3',lang), t('diff4',lang), t('diff5',lang)];
 
   useEffect(() => {
     if (!visible || !item) return;
     setUserRating(0); setSubmitted(false);
+    setLiveAvg(item?.avg_rating ?? 0);
+    setLiveVotes(item?.vote_count ?? 0);
     supabase.auth.getUser().then(({ data }) => {
       if (!data?.user) return;
       supabase.from('exercise_ratings').select('rating')
@@ -134,6 +138,16 @@ function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
       // XP sadece ilk oyda verilir
       if (wasFirstTime) {
         await supabase.rpc('increment_xp', { uid: ud.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
+      }
+      // Güncel topluluk ortalamasını çek
+      const { data: summary } = await supabase
+        .from('exercise_rating_summary')
+        .select('avg_rating, vote_count')
+        .eq('exercise_id', item.id)
+        .single();
+      if (summary) {
+        setLiveAvg(Number(summary.avg_rating) || 0);
+        setLiveVotes(summary.vote_count || 0);
       }
       setSubmitted(true); onRated?.();
     } catch {}
@@ -208,10 +222,10 @@ function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
               {/* Topluluk puanı */}
               <Text style={det.sectionTitle}>{t('communityRating', lang)}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <Stars value={item.avg_rating ?? 0} size={20} />
-                {(item.vote_count ?? 0) > 0 && (
+                <Stars value={liveAvg} size={20} />
+                {liveVotes > 0 && (
                   <Text style={{ color: C.dim, fontSize: 12 }}>
-                    {t('avg', lang)} {Number(item.avg_rating).toFixed(1)} · {item.vote_count} {t('votes', lang)}
+                    {t('avg', lang)} {Number(liveAvg).toFixed(1)} · {liveVotes} {t('votes', lang)}
                   </Text>
                 )}
               </View>
