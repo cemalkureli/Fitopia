@@ -124,12 +124,17 @@ function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
   }, [visible, item?.id]);
 
   const handleRate = async (rating) => {
+    if (rating === userRating) return; // aynı yıldıza tekrar basınca bir şey yapma
+    const wasFirstTime = !submitted;
     setUserRating(rating); setSubmitting(true);
     try {
       const { data: ud } = await supabase.auth.getUser();
       if (!ud?.user) return;
       await supabase.from('exercise_ratings').upsert({ exercise_id: item.id, user_id: ud.user.id, rating });
-      await supabase.rpc('increment_xp', { uid: ud.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
+      // XP sadece ilk oyda verilir
+      if (wasFirstTime) {
+        await supabase.rpc('increment_xp', { uid: ud.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
+      }
       setSubmitted(true); onRated?.();
     } catch {}
     setSubmitting(false);
@@ -212,13 +217,20 @@ function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
               </View>
 
               {/* Kullanıcı oyu */}
-              <Text style={det.sectionTitle}>{submitted ? t('yourRatingDone', lang) : t('yourRating', lang)}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={det.sectionTitle}>{t('yourRating', lang)}</Text>
+                {submitted && <Text style={{ color: C.teal, fontSize: 11 }}>{t('xpEarned', lang)}</Text>}
+              </View>
               {submitting ? (
-                <ActivityIndicator color={C.lime} />
+                <ActivityIndicator color={C.lime} style={{ alignSelf: 'flex-start' }} />
               ) : (
-                <Stars value={userRating} size={28} onPress={submitted ? undefined : handleRate} />
+                <Stars value={userRating} size={30} onPress={handleRate} />
               )}
-              {submitted && <Text style={{ color: C.teal, fontSize: 12, marginTop: 6 }}>{t('xpEarned', lang)}</Text>}
+              {submitted && (
+                <Text style={{ color: C.dim, fontSize: 11, marginTop: 4 }}>
+                  {lang === 'tr' ? 'Oyunu değiştirebilirsin' : 'You can change your rating'}
+                </Text>
+              )}
 
               {/* Kapat */}
               <TouchableOpacity onPress={onClose} style={[det.closeBtn, { borderColor: color + '50', marginTop: 20 }]}>
