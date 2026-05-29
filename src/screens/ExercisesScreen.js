@@ -290,9 +290,10 @@ export default function ExercisesScreen() {
     const offset = reset ? 0 : offsetRef.current;
     if (!reset) setLoadMore(true);
 
+    // Egzersiz sorgusu (join olmadan — duplicate row riski yok)
     let q = supabase
       .from('exercises')
-      .select(`*, exercise_rating_summary(avg_rating, vote_count)`)
+      .select('*')
       .range(offset, offset + PAGE - 1)
       .order('name');
 
@@ -302,21 +303,42 @@ export default function ExercisesScreen() {
     const { data, error } = await q;
     if (error) { setLoading(false); setLoadMore(false); return; }
 
-    // Flatten rating summary
-    const rows = (data || []).map(ex => ({
-      ...ex,
-      avg_rating: ex.exercise_rating_summary?.[0]?.avg_rating ?? 0,
-      vote_count: ex.exercise_rating_summary?.[0]?.vote_count ?? 0,
-    }));
+    // Slug'a göre dedup (güvenlik önlemi)
+    const seen = new Set();
+    const unique = (data || []).filter(ex => {
+      if (seen.has(ex.slug)) return false;
+      seen.add(ex.slug);
+      return true;
+    });
+
+    // Puanları ayrı çek
+    if (unique.length > 0) {
+      const ids = unique.map(e => e.id);
+      const { data: ratings } = await supabase
+        .from('exercise_rating_summary')
+        .select('*')
+        .in('exercise_id', ids);
+
+      const ratingMap = {};
+      (ratings || []).forEach(r => { ratingMap[r.exercise_id] = r; });
+      unique.forEach(ex => {
+        ex.avg_rating = ratingMap[ex.id]?.avg_rating ?? 0;
+        ex.vote_count = ratingMap[ex.id]?.vote_count ?? 0;
+      });
+    }
 
     if (reset) {
-      setExercises(rows);
-      offsetRef.current = rows.length;
+      setExercises(unique);
+      offsetRef.current = unique.length;
     } else {
-      setExercises(prev => [...prev, ...rows]);
-      offsetRef.current += rows.length;
+      setExercises(prev => {
+        // Merge — prev'deki slug'larla çakışma olmasın
+        const existingSlugs = new Set(prev.map(e => e.slug));
+        return [...prev, ...unique.filter(e => !existingSlugs.has(e.slug))];
+      });
+      offsetRef.current += unique.length;
     }
-    setHasMore(rows.length === PAGE);
+    setHasMore(unique.length === PAGE);
     setLoading(false);
     setLoadMore(false);
   }, [cat, search]);
@@ -389,7 +411,7 @@ export default function ExercisesScreen() {
       ) : (
         <FlatList
           data={exercises}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.slug ?? item.id}
           renderItem={renderItem}
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
