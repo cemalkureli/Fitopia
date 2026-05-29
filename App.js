@@ -11,6 +11,9 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { C } from './src/utils/theme';
 import { supabase } from './src/lib/supabase';
+import { LanguageProvider, useLang } from './src/context/LanguageContext';
+import LangToggle from './src/components/LangToggle';
+import { t } from './src/utils/i18n';
 
 import LoginScreen    from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
@@ -47,31 +50,36 @@ const TAB_ICONS = {
 // ─── Üst başlık ───────────────────────────────────────────────────────────────
 function Header() {
   const [now, setNow] = useState(new Date());
+  const { lang } = useLang();
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
-  const days   = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
-  const months = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const days_tr   = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+  const days_en   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months_tr = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const months_en = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const h   = String(now.getHours()).padStart(2,'0');
   const m   = String(now.getMinutes()).padStart(2,'0');
   const sec = String(now.getSeconds()).padStart(2,'0');
+  const dayStr = lang === 'tr'
+    ? `${days_tr[now.getDay()]}, ${now.getDate()} ${months_tr[now.getMonth()]}`
+    : `${days_en[now.getDay()]}, ${months_en[now.getMonth()]} ${now.getDate()}`;
   return (
     <View style={{
       flexDirection:'row', alignItems:'center', justifyContent:'space-between',
-      paddingHorizontal:18, paddingVertical:12,
+      paddingHorizontal:16, paddingVertical:10,
       backgroundColor:C.bg, borderBottomWidth:1, borderBottomColor:C.border,
     }}>
       <Text style={{ color:C.lime, fontSize:20, fontWeight:'900', letterSpacing:1 }}>
         FITO<Text style={{ color:C.muted }}>/PIA</Text>
       </Text>
+      <LangToggle />
       <View style={{ alignItems:'flex-end' }}>
-        <Text style={{ color:C.text, fontSize:18, fontWeight:'800' }}>
-          {h}:{m}<Text style={{ color:C.muted, fontSize:12 }}>:{sec}</Text>
+        <Text style={{ color:C.text, fontSize:16, fontWeight:'800' }}>
+          {h}:{m}<Text style={{ color:C.muted, fontSize:11 }}>:{sec}</Text>
         </Text>
-        <Text style={{ color:C.muted, fontSize:10 }}>
-          {days[now.getDay()]}, {now.getDate()} {months[now.getMonth()]}
-        </Text>
+        <Text style={{ color:C.muted, fontSize:10 }}>{dayStr}</Text>
       </View>
     </View>
   );
@@ -130,18 +138,19 @@ function CustomTabBar({ state, descriptors, navigation }) {
 
 // ─── Ana Sekmeler ──────────────────────────────────────────────────────────────
 function MainTabs({ onSignOut }) {
+  const { lang } = useLang();
   return (
     <SafeAreaView style={{ flex:1, backgroundColor:C.bg }} edges={['top']}>
       <Header />
       <Tab.Navigator
-        tabBar={props => <CustomTabBar {...props} />}
+        tabBar={props => <CustomTabBar {...props} lang={lang} />}
         screenOptions={{ headerShown:false }}
       >
-        <Tab.Screen name="Ana"         component={HomeScreen} options={{ tabBarLabel:'ANA' }} />
-        <Tab.Screen name="Program"     component={ProgramScreen} />
-        <Tab.Screen name="Egzersizler" component={ExercisesScreen} />
-        <Tab.Screen name="İlerleme"    component={ProgressScreen} />
-        <Tab.Screen name="Profil">
+        <Tab.Screen name="Ana"         component={HomeScreen}     options={{ tabBarLabel: t('tabHome', lang) }} />
+        <Tab.Screen name="Program"     component={ProgramScreen}  options={{ tabBarLabel: t('tabProgram', lang) }} />
+        <Tab.Screen name="Egzersizler" component={ExercisesScreen}options={{ tabBarLabel: t('tabExercises', lang) }} />
+        <Tab.Screen name="İlerleme"    component={ProgressScreen} options={{ tabBarLabel: t('tabProgress', lang) }} />
+        <Tab.Screen name="Profil"      options={{ tabBarLabel: t('tabProfile', lang) }}>
           {() => <ProfileScreen onSignOut={onSignOut} />}
         </Tab.Screen>
       </Tab.Navigator>
@@ -181,46 +190,37 @@ export default function App() {
     setAuthMode('login');
   };
 
-  if (session === undefined) {
-    // Yükleniyor
-    return (
-      <View style={{ flex:1, backgroundColor:C.bg, justifyContent:'center', alignItems:'center' }}>
-        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
-        <Text style={{ color:C.lime, fontSize:28, fontWeight:'900', letterSpacing:2 }}>
-          FITO<Text style={{ color:C.muted }}>/PIA</Text>
-        </Text>
-      </View>
-    );
-  }
-
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+    <LanguageProvider>
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
 
-      {session ? (
-        // Giriş yapılmış → Ana uygulama
-        <NavigationContainer theme={navTheme}>
-          <MainTabs onSignOut={handleSignOut} />
-        </NavigationContainer>
-      ) : (
-        // Giriş yapılmamış → Auth ekranları
-        <SafeAreaView style={{ flex:1, backgroundColor:C.bg }} edges={['top','bottom']}>
-          {authMode === 'login'
-            ? (
+        {session === undefined ? (
+          <View style={{ flex:1, backgroundColor:C.bg, justifyContent:'center', alignItems:'center' }}>
+            <Text style={{ color:C.lime, fontSize:28, fontWeight:'900', letterSpacing:2 }}>
+              FITO<Text style={{ color:C.muted }}>/PIA</Text>
+            </Text>
+          </View>
+        ) : session ? (
+          <NavigationContainer theme={navTheme}>
+            <MainTabs onSignOut={handleSignOut} />
+          </NavigationContainer>
+        ) : (
+          <SafeAreaView style={{ flex:1, backgroundColor:C.bg }} edges={['top','bottom']}>
+            {authMode === 'login' ? (
               <LoginScreen
                 onSuccess={() => {}}
                 onGoRegister={() => setAuthMode('register')}
               />
-            )
-            : (
+            ) : (
               <RegisterScreen
                 onSuccess={() => setAuthMode('login')}
                 onGoLogin={() => setAuthMode('login')}
               />
-            )
-          }
-        </SafeAreaView>
-      )}
-    </SafeAreaProvider>
+            )}
+          </SafeAreaView>
+        )}
+      </SafeAreaProvider>
+    </LanguageProvider>
   );
 }

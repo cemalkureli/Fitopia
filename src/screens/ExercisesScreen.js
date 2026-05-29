@@ -2,44 +2,36 @@ import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, Modal, Dimensions, Image, ActivityIndicator,
-  Platform,
+  ScrollView, Platform,
 } from 'react-native';
-import Animated, { FadeInDown, FadeIn, SlideInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '../utils/theme';
 import { supabase } from '../lib/supabase';
 import ExerciseMedia from '../components/ExerciseMedia';
+import { useLang } from '../context/LanguageContext';
+import { t, CATEGORY_LABELS, MUSCLE_LABELS } from '../utils/i18n';
 
 const { width, height } = Dimensions.get('window');
 
-const CATS = ['Tümü','Göğüs','Sırt','Omuz','Kol','Bacak','Core','Kardio','Compound'];
+// Kategori filtre listesi (DB değerleri)
+const CAT_KEYS = ['Göğüs','Sırt','Omuz','Kol','Bacak','Core','Kardio','Compound'];
 
 const CAT_COLOR = {
-  'Göğüs':   C.orange,
-  'Sırt':    C.blue,
-  'Omuz':    C.purple,
-  'Kol':     C.teal,
-  'Bacak':   C.green,
-  'Core':    C.lime,
-  'Kardio':  C.red,
-  'Compound':C.muted,
+  'Göğüs':   C.orange, 'Sırt':   C.blue,  'Omuz':    C.purple,
+  'Kol':     C.teal,   'Bacak':  C.green,  'Core':    C.lime,
+  'Kardio':  C.red,    'Compound':C.muted,
 };
 
-const DIFF_LABEL = ['','Kolay','Orta-Kolay','Orta','Zor','Çok Zor'];
-const STAR_COLORS = ['#f87171','#fb923c','#e8f44a','#34d399','#14b8a6'];
-
-// ─── Yıldız bileşeni ──────────────────────────────────────────────────────────
+// ─── Yıldız ──────────────────────────────────────────────────────────────────
 function Stars({ value, max = 5, size = 14, onPress }) {
+  const STAR_COLORS = ['#f87171','#fb923c','#e8f44a','#34d399','#14b8a6'];
   return (
-    <View style={{ flexDirection: 'row', gap: 2 }}>
+    <View style={{ flexDirection: 'row', gap: 3 }}>
       {Array.from({ length: max }, (_, i) => (
-        <TouchableOpacity
-          key={i}
-          onPress={onPress ? () => onPress(i + 1) : undefined}
-          disabled={!onPress}
-          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-        >
+        <TouchableOpacity key={i} onPress={onPress ? () => onPress(i + 1) : undefined}
+          disabled={!onPress} hitSlop={{ top:8, bottom:8, left:4, right:4 }}>
           <Ionicons
             name={i < Math.round(value) ? 'star' : 'star-outline'}
             size={size}
@@ -52,7 +44,7 @@ function Stars({ value, max = 5, size = 14, onPress }) {
 }
 
 // ─── Etki çubuğu ─────────────────────────────────────────────────────────────
-function EffectivenessBar({ value, label, color }) {
+function EffBar({ value, label, color }) {
   return (
     <View style={eb.row}>
       <Text style={eb.label}>{label}</Text>
@@ -64,34 +56,21 @@ function EffectivenessBar({ value, label, color }) {
   );
 }
 const eb = StyleSheet.create({
-  row:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  label: { color: C.muted, fontSize: 11, width: 80 },
-  track: { flex: 1, height: 6, backgroundColor: C.s3, borderRadius: 3, overflow: 'hidden' },
-  fill:  { height: '100%', borderRadius: 3 },
-  val:   { fontSize: 11, fontWeight: '700', width: 30, textAlign: 'right' },
-});
-
-// ─── Kas etiketi ─────────────────────────────────────────────────────────────
-function MuscleTag({ name, primary }) {
-  return (
-    <View style={[mt.tag, primary && { backgroundColor: C.teal + '20', borderColor: C.teal }]}>
-      <Text style={[mt.text, primary && { color: C.teal }]}>{name}</Text>
-    </View>
-  );
-}
-const mt = StyleSheet.create({
-  tag:  { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: C.border, backgroundColor: C.s2, marginRight: 4, marginBottom: 4 },
-  text: { color: C.muted, fontSize: 11, fontWeight: '600' },
+  row:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  label:{ color: C.muted, fontSize: 11, width: 90 },
+  track:{ flex: 1, height: 6, backgroundColor: C.s3, borderRadius: 3, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 3 },
+  val:  { fontSize: 11, fontWeight: '700', width: 30, textAlign: 'right' },
 });
 
 // ─── Egzersiz satırı ─────────────────────────────────────────────────────────
-const ExerciseRow = memo(({ item, onPress }) => {
-  const color = CAT_COLOR[item.category] ?? C.lime;
-  const avgRating = item.avg_rating ?? 0;
+const ExerciseRow = memo(({ item, onPress, lang }) => {
+  const color    = CAT_COLOR[item.category] ?? C.lime;
+  const catLabel = CATEGORY_LABELS[lang]?.[item.category] ?? item.category;
+  const muscle   = MUSCLE_LABELS[lang]?.[item.primary_muscle] ?? item.primary_muscle;
 
   return (
     <TouchableOpacity style={s.exRow} onPress={() => onPress(item)} activeOpacity={0.8}>
-      {/* Thumbnail */}
       {item.thumb_url ? (
         <Image source={{ uri: item.thumb_url }} style={s.thumb} resizeMode="cover" />
       ) : (
@@ -99,232 +78,212 @@ const ExerciseRow = memo(({ item, onPress }) => {
           <Text style={[s.thumbLetter, { color }]}>{(item.name ?? '?')[0]}</Text>
         </LinearGradient>
       )}
-
-      {/* Bilgi */}
       <View style={{ flex: 1 }}>
         <Text style={s.exName} numberOfLines={1}>{item.name}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-          <View style={[s.catBadge, { backgroundColor: color + '15' }]}>
-            <Text style={[s.catBadgeText, { color }]}>{item.category}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+          <View style={[s.badge, { backgroundColor: color + '18' }]}>
+            <Text style={[s.badgeTxt, { color }]}>{catLabel}</Text>
           </View>
-          <Text style={s.muscleMini}>{item.primary_muscle}</Text>
+          <Text style={s.muscleTxt}>{muscle}</Text>
         </View>
-        {avgRating > 0 && (
+        {(item.avg_rating ?? 0) > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
-            <Stars value={avgRating} size={11} />
-            <Text style={{ color: C.dim, fontSize: 10 }}>({item.vote_count ?? 0})</Text>
+            <Stars value={item.avg_rating} size={11} />
+            <Text style={{ color: C.dim, fontSize: 10 }}>({item.vote_count})</Text>
           </View>
         )}
       </View>
-
-      {/* Etki değeri */}
+      {/* Etki nokta göstergesi */}
       <View style={s.effWrap}>
         {Array.from({ length: 5 }, (_, i) => (
-          <View
-            key={i}
-            style={[s.effDot, { backgroundColor: i < (item.effectiveness ?? 0) ? color : C.s3 }]}
-          />
+          <View key={i} style={[s.effDot, { backgroundColor: i < (item.effectiveness ?? 0) ? color : C.s3 }]} />
         ))}
       </View>
-
       <Ionicons name="chevron-forward" size={14} color={C.dim} />
     </TouchableOpacity>
   );
 });
 
-// ─── Detay modal ─────────────────────────────────────────────────────────────
-function ExerciseDetail({ item, visible, onClose, onRated }) {
+// ─── Detay bottom sheet ───────────────────────────────────────────────────────
+function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
   const [userRating, setUserRating] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted,  setSubmitted]  = useState(false);
   const color = CAT_COLOR[item?.category] ?? C.lime;
+  const DIFF  = [t('diff1',lang), t('diff2',lang), t('diff3',lang), t('diff4',lang), t('diff5',lang)];
 
   useEffect(() => {
     if (!visible || !item) return;
-    setUserRating(0);
-    setSubmitted(false);
-    // Kullanıcının önceki oyunu çek
+    setUserRating(0); setSubmitted(false);
     supabase.auth.getUser().then(({ data }) => {
       if (!data?.user) return;
-      supabase.from('exercise_ratings')
-        .select('rating')
-        .eq('exercise_id', item.id)
-        .eq('user_id', data.user.id)
-        .single()
-        .then(({ data: r }) => {
-          if (r) { setUserRating(r.rating); setSubmitted(true); }
-        });
+      supabase.from('exercise_ratings').select('rating')
+        .eq('exercise_id', item.id).eq('user_id', data.user.id).single()
+        .then(({ data: r }) => { if (r) { setUserRating(r.rating); setSubmitted(true); } });
     });
   }, [visible, item?.id]);
 
   const handleRate = async (rating) => {
-    setUserRating(rating);
-    setSubmitting(true);
+    setUserRating(rating); setSubmitting(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData?.user) { setSubmitting(false); return; }
-
-      await supabase.from('exercise_ratings').upsert({
-        exercise_id: item.id,
-        user_id:     userData.user.id,
-        rating,
-      });
-
-      // XP güncelle
-      await supabase.from('user_xp').upsert({
-        user_id:       userData.user.id,
-        xp:            5,
-        total_ratings: 1,
-      }, { onConflict: 'user_id', ignoreDuplicates: false });
-
-      await supabase.rpc('increment_xp', { uid: userData.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
-
-      setSubmitted(true);
-      onRated?.();
+      const { data: ud } = await supabase.auth.getUser();
+      if (!ud?.user) return;
+      await supabase.from('exercise_ratings').upsert({ exercise_id: item.id, user_id: ud.user.id, rating });
+      await supabase.rpc('increment_xp', { uid: ud.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
+      setSubmitted(true); onRated?.();
     } catch {}
     setSubmitting(false);
   };
 
   if (!item) return null;
+  const catLabel = CATEGORY_LABELS[lang]?.[item.category] ?? item.category;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.detailOverlay} activeOpacity={1} onPress={onClose} />
-      <Animated.View entering={SlideInUp.springify().damping(18)} style={s.detailSheet}>
-        {/* Kapat çubuğu */}
-        <View style={s.dragBar} />
+      <View style={det.container}>
+        {/* Overlay */}
+        <TouchableOpacity style={det.overlay} activeOpacity={1} onPress={onClose} />
 
-        {/* Video */}
-        <View style={[s.videoWrap, { borderColor: color + '40' }]}>
-          {item.webm_url
-            ? <ExerciseMedia source={item.webm_url} style={{ flex: 1 }} />
-            : (
-              <LinearGradient colors={[color + '22', color + '08']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="barbell-outline" size={48} color={color} />
-              </LinearGradient>
-            )
-          }
-        </View>
+        {/* Sheet */}
+        <View style={det.sheet}>
+          <View style={det.dragBar} />
 
-        {/* Başlık + kategori */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 20, marginTop: 14 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.detailName}>{item.name}</Text>
-            <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-              <View style={[s.catBadge, { backgroundColor: color + '15' }]}>
-                <Text style={[s.catBadgeText, { color }]}>{item.category}</Text>
-              </View>
-              <View style={[s.catBadge, { backgroundColor: C.s2 }]}>
-                <Text style={[s.catBadgeText, { color: C.muted }]}>{DIFF_LABEL[item.difficulty] || 'Orta'}</Text>
-              </View>
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            {/* Video */}
+            <View style={[det.videoWrap, { borderColor: color + '44' }]}>
+              {item.webm_url ? (
+                <ExerciseMedia source={item.webm_url} style={{ flex: 1 }} />
+              ) : (
+                <LinearGradient colors={[color+'22', color+'08']} style={{ flex:1, alignItems:'center', justifyContent:'center' }}>
+                  <Ionicons name="barbell-outline" size={56} color={color} />
+                </LinearGradient>
+              )}
             </View>
-          </View>
-        </View>
 
-        {/* Açıklama */}
-        {item.instructions ? (
-          <Text style={s.instrText}>{item.instructions}</Text>
-        ) : null}
+            <View style={{ padding: 20 }}>
+              {/* Başlık */}
+              <Text style={det.name}>{item.name}</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                <View style={[s.badge, { backgroundColor: color + '18' }]}>
+                  <Text style={[s.badgeTxt, { color }]}>{catLabel}</Text>
+                </View>
+                <View style={[s.badge, { backgroundColor: C.s2 }]}>
+                  <Text style={[s.badgeTxt, { color: C.muted }]}>{DIFF[(item.difficulty ?? 3) - 1]}</Text>
+                </View>
+              </View>
 
-        {/* Kas grupları */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Çalışan Kaslar</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <MuscleTag name={item.primary_muscle} primary />
-            {(item.secondary_muscles || []).map((m, i) => (
-              <MuscleTag key={i} name={m} />
-            ))}
-          </View>
-        </View>
+              {/* Nasıl yapılır */}
+              {item.instructions ? (
+                <>
+                  <Text style={det.sectionTitle}>{t('instructions', lang)}</Text>
+                  <Text style={det.instrTxt}>{item.instructions}</Text>
+                </>
+              ) : null}
 
-        {/* Etki değerleri */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Etki Değerleri</Text>
-          <EffectivenessBar value={item.effectiveness ?? 3} label="Genel Etki" color={color} />
-          <EffectivenessBar value={item.difficulty ?? 3}    label="Zorluk"     color={C.orange} />
-        </View>
+              {/* Kaslar */}
+              <Text style={det.sectionTitle}>{t('muscleGroups', lang)}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                <View style={[det.muscleTag, { backgroundColor: C.teal+'22', borderColor: C.teal }]}>
+                  <Text style={[det.muscleTxt, { color: C.teal }]}>
+                    {MUSCLE_LABELS[lang]?.[item.primary_muscle] ?? item.primary_muscle}
+                  </Text>
+                </View>
+                {(item.secondary_muscles || []).map((m, i) => (
+                  <View key={i} style={det.muscleTag}>
+                    <Text style={det.muscleTxt}>{MUSCLE_LABELS[lang]?.[m] ?? m}</Text>
+                  </View>
+                ))}
+              </View>
 
-        {/* Topluluk puanı */}
-        <View style={s.section}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={s.sectionTitle}>Topluluk Puanı</Text>
-            {item.vote_count > 0 && (
-              <Text style={s.voteCount}>{item.vote_count} oy · Ort. {Number(item.avg_rating).toFixed(1)}</Text>
-            )}
-          </View>
-          <Stars value={item.avg_rating ?? 0} size={22} />
-        </View>
+              {/* Etki */}
+              <Text style={det.sectionTitle}>{t('effectiveness', lang)}</Text>
+              <EffBar value={item.effectiveness ?? 3} label={t('generalEffect', lang)} color={color} />
+              <EffBar value={item.difficulty ?? 3}    label={t('difficulty', lang)}    color={C.orange} />
 
-        {/* Kullanıcı oyu */}
-        <View style={[s.section, { marginBottom: 8 }]}>
-          <Text style={s.sectionTitle}>
-            {submitted ? 'Oyun' : 'Oy Ver'}
-          </Text>
-          {submitting ? (
-            <ActivityIndicator color={C.lime} />
-          ) : (
-            <Stars value={userRating} size={28} onPress={submitted ? undefined : handleRate} />
-          )}
-          {submitted && <Text style={{ color: C.teal, fontSize: 12, marginTop: 6 }}>+5 XP kazandın!</Text>}
+              {/* Topluluk puanı */}
+              <Text style={det.sectionTitle}>{t('communityRating', lang)}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <Stars value={item.avg_rating ?? 0} size={20} />
+                {(item.vote_count ?? 0) > 0 && (
+                  <Text style={{ color: C.dim, fontSize: 12 }}>
+                    {t('avg', lang)} {Number(item.avg_rating).toFixed(1)} · {item.vote_count} {t('votes', lang)}
+                  </Text>
+                )}
+              </View>
+
+              {/* Kullanıcı oyu */}
+              <Text style={det.sectionTitle}>{submitted ? t('yourRatingDone', lang) : t('yourRating', lang)}</Text>
+              {submitting ? (
+                <ActivityIndicator color={C.lime} />
+              ) : (
+                <Stars value={userRating} size={28} onPress={submitted ? undefined : handleRate} />
+              )}
+              {submitted && <Text style={{ color: C.teal, fontSize: 12, marginTop: 6 }}>{t('xpEarned', lang)}</Text>}
+
+              {/* Kapat */}
+              <TouchableOpacity onPress={onClose} style={[det.closeBtn, { borderColor: color + '50', marginTop: 20 }]}>
+                <Text style={{ color, fontWeight: '700', fontSize: 14 }}>{t('close', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
-      </Animated.View>
+      </View>
     </Modal>
   );
 }
+
+const det = StyleSheet.create({
+  container:  { flex: 1, justifyContent: 'flex-end' },
+  overlay:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)' },
+  sheet:      { backgroundColor: C.s1, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: height * 0.92, borderWidth: 1, borderColor: C.border },
+  dragBar:    { width: 36, height: 4, backgroundColor: C.s3, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 2 },
+  videoWrap:  { height: 220, borderWidth: 1, overflow: 'hidden', backgroundColor: C.s2 },
+  name:       { color: C.text, fontSize: 20, fontWeight: '900' },
+  sectionTitle:{ color: C.text, fontSize: 13, fontWeight: '800', marginTop: 16, marginBottom: 8 },
+  instrTxt:   { color: C.muted, fontSize: 13, lineHeight: 20 },
+  muscleTag:  { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: C.border, backgroundColor: C.s2 },
+  muscleTxt:  { color: C.muted, fontSize: 12, fontWeight: '600' },
+  closeBtn:   { borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+});
 
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
 const PAGE = 20;
 
 export default function ExercisesScreen() {
+  const { lang } = useLang();
   const [exercises, setExercises] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [loadMore,  setLoadMore]  = useState(false);
   const [hasMore,   setHasMore]   = useState(true);
   const [search,    setSearch]    = useState('');
-  const [cat,       setCat]       = useState('Tümü');
+  const [cat,       setCat]       = useState('');   // '' = Tümü
   const [selected,  setSelected]  = useState(null);
-  const offsetRef = useRef(0);
+  const offsetRef   = useRef(0);
   const searchTimer = useRef(null);
 
   const fetchExercises = useCallback(async (reset = false) => {
     const offset = reset ? 0 : offsetRef.current;
     if (!reset) setLoadMore(true);
 
-    // Egzersiz sorgusu (join olmadan — duplicate row riski yok)
-    let q = supabase
-      .from('exercises')
-      .select('*')
-      .range(offset, offset + PAGE - 1)
-      .order('name');
-
-    if (cat !== 'Tümü') q = q.eq('category', cat);
-    if (search.trim())  q = q.ilike('name', `%${search.trim()}%`);
+    let q = supabase.from('exercises').select('*')
+      .range(offset, offset + PAGE - 1).order('name');
+    if (cat)           q = q.eq('category', cat);
+    if (search.trim()) q = q.ilike('name', `%${search.trim()}%`);
 
     const { data, error } = await q;
     if (error) { setLoading(false); setLoadMore(false); return; }
 
-    // Slug'a göre dedup (güvenlik önlemi)
+    // Dedup by slug
     const seen = new Set();
-    const unique = (data || []).filter(ex => {
-      if (seen.has(ex.slug)) return false;
-      seen.add(ex.slug);
-      return true;
-    });
+    const unique = (data || []).filter(ex => { if (seen.has(ex.slug)) return false; seen.add(ex.slug); return true; });
 
-    // Puanları ayrı çek
+    // Ratings ayrı sorgu
     if (unique.length > 0) {
       const ids = unique.map(e => e.id);
-      const { data: ratings } = await supabase
-        .from('exercise_rating_summary')
-        .select('*')
-        .in('exercise_id', ids);
-
-      const ratingMap = {};
-      (ratings || []).forEach(r => { ratingMap[r.exercise_id] = r; });
-      unique.forEach(ex => {
-        ex.avg_rating = ratingMap[ex.id]?.avg_rating ?? 0;
-        ex.vote_count = ratingMap[ex.id]?.vote_count ?? 0;
-      });
+      const { data: ratings } = await supabase.from('exercise_rating_summary').select('*').in('exercise_id', ids);
+      const rm = {};
+      (ratings || []).forEach(r => { rm[r.exercise_id] = r; });
+      unique.forEach(ex => { ex.avg_rating = rm[ex.id]?.avg_rating ?? 0; ex.vote_count = rm[ex.id]?.vote_count ?? 0; });
     }
 
     if (reset) {
@@ -332,42 +291,38 @@ export default function ExercisesScreen() {
       offsetRef.current = unique.length;
     } else {
       setExercises(prev => {
-        // Merge — prev'deki slug'larla çakışma olmasın
-        const existingSlugs = new Set(prev.map(e => e.slug));
-        return [...prev, ...unique.filter(e => !existingSlugs.has(e.slug))];
+        const existing = new Set(prev.map(e => e.slug));
+        return [...prev, ...unique.filter(e => !existing.has(e.slug))];
       });
       offsetRef.current += unique.length;
     }
     setHasMore(unique.length === PAGE);
-    setLoading(false);
-    setLoadMore(false);
+    setLoading(false); setLoadMore(false);
   }, [cat, search]);
 
   useEffect(() => {
-    setLoading(true);
-    offsetRef.current = 0;
+    setLoading(true); offsetRef.current = 0;
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => fetchExercises(true), search ? 400 : 0);
     return () => clearTimeout(searchTimer.current);
   }, [cat, search]);
 
-  const handleEndReached = useCallback(() => {
-    if (!loadMore && hasMore) fetchExercises(false);
-  }, [loadMore, hasMore, fetchExercises]);
+  const renderItem   = useCallback(({ item }) => <ExerciseRow item={item} onPress={setSelected} lang={lang} />, [lang]);
+  const renderCat    = useCallback(({ item: c }) => {
+    const label = c === '' ? (lang === 'tr' ? 'Tümü' : 'All') : (CATEGORY_LABELS[lang]?.[c] ?? c);
+    const color = CAT_COLOR[c] ?? C.lime;
+    return (
+      <TouchableOpacity
+        style={[s.catBtn, cat === c && { backgroundColor: color + '20', borderColor: color }]}
+        onPress={() => setCat(c)}
+      >
+        <Text style={[s.catTxt, cat === c && { color, fontWeight: '700' }]}>{label}</Text>
+      </TouchableOpacity>
+    );
+  }, [cat, lang]);
+  const renderFooter = useCallback(() => loadMore ? <ActivityIndicator color={C.teal} style={{ margin: 16 }} /> : null, [loadMore]);
 
-  const renderItem    = useCallback(({ item }) => <ExerciseRow item={item} onPress={setSelected} />, []);
-  const renderCat     = useCallback(({ item: c }) => (
-    <TouchableOpacity
-      style={[s.catBtn, cat === c && { backgroundColor: (CAT_COLOR[c] ?? C.lime) + '20', borderColor: CAT_COLOR[c] ?? C.lime }]}
-      onPress={() => setCat(c)}
-    >
-      <Text style={[s.catText, cat === c && { color: CAT_COLOR[c] ?? C.lime, fontWeight: '700' }]}>{c}</Text>
-    </TouchableOpacity>
-  ), [cat]);
-
-  const renderFooter = useCallback(() =>
-    loadMore ? <ActivityIndicator color={C.teal} style={{ margin: 16 }} /> : null
-  , [loadMore]);
+  const CATS = ['', ...CAT_KEYS];
 
   return (
     <View style={s.fill}>
@@ -376,10 +331,9 @@ export default function ExercisesScreen() {
         <Ionicons name="search-outline" size={18} color={C.dim} />
         <TextInput
           style={s.searchInput}
-          placeholder="Egzersiz ara..."
+          placeholder={t('searchPlaceholder', lang)}
           placeholderTextColor={C.dim}
-          value={search}
-          onChangeText={setSearch}
+          value={search} onChangeText={setSearch}
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => setSearch('')}>
@@ -388,25 +342,21 @@ export default function ExercisesScreen() {
         )}
       </View>
 
-      {/* Kategori */}
+      {/* Kategori filtreleri */}
       <FlatList
-        data={CATS}
-        keyExtractor={c => c}
+        data={CATS} keyExtractor={c => c || '__all__'}
         renderItem={renderCat}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={s.catList}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        horizontal showsHorizontalScrollIndicator={false}
+        style={s.catList} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
       />
 
       {/* Sayaç */}
-      <Text style={s.countText}>{loading ? '...' : `${exercises.length}+ egzersiz`}</Text>
+      <Text style={s.countTxt}>{loading ? '...' : `${exercises.length}+ ${t('exercises', lang)}`}</Text>
 
-      {/* Liste */}
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={C.lime} size="large" />
-          <Text style={{ color: C.muted, marginTop: 12, fontSize: 13 }}>Yükleniyor...</Text>
+          <Text style={{ color: C.muted, marginTop: 12, fontSize: 13 }}>{t('loading', lang)}</Text>
         </View>
       ) : (
         <FlatList
@@ -416,22 +366,19 @@ export default function ExercisesScreen() {
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
           style={{ flex: 1 }}
-          onEndReached={handleEndReached}
+          onEndReached={() => { if (!loadMore && hasMore) fetchExercises(false); }}
           onEndReachedThreshold={0.3}
           ListFooterComponent={renderFooter}
-          initialNumToRender={12}
-          maxToRenderPerBatch={10}
-          windowSize={5}
+          initialNumToRender={12} maxToRenderPerBatch={10} windowSize={5}
           removeClippedSubviews={Platform.OS === 'android'}
         />
       )}
 
-      {/* Detay modalı */}
       <ExerciseDetail
-        item={selected}
-        visible={!!selected}
+        item={selected} visible={!!selected}
         onClose={() => setSelected(null)}
         onRated={() => fetchExercises(true)}
+        lang={lang}
       />
     </View>
   );
@@ -443,28 +390,16 @@ const s = StyleSheet.create({
   searchInput:{ flex: 1, color: C.text, fontSize: 14 },
   catList:    { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
   catBtn:     { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
-  catText:    { color: C.muted, fontSize: 12, fontWeight: '600' },
-  countText:  { color: C.dim, fontSize: 11, fontWeight: '600', paddingHorizontal: 16, marginBottom: 6 },
+  catTxt:     { color: C.muted, fontSize: 12, fontWeight: '600' },
+  countTxt:   { color: C.dim, fontSize: 11, fontWeight: '600', paddingHorizontal: 16, marginBottom: 6 },
   list:       { paddingHorizontal: 16, paddingBottom: 32 },
-
-  exRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.s1, borderRadius: 14, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: C.border },
-  thumb:       { width: 60, height: 60, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: C.s2 },
-  thumbLetter: { fontSize: 24, fontWeight: '900' },
-  exName:      { color: C.text, fontSize: 13, fontWeight: '700' },
-  catBadge:    { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  catBadgeText:{ fontSize: 10, fontWeight: '700' },
-  muscleMini:  { color: C.dim, fontSize: 11 },
-  effWrap:     { flexDirection: 'column', gap: 2, marginRight: 4 },
-  effDot:      { width: 5, height: 5, borderRadius: 2.5 },
-
-  // Detail sheet
-  detailOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)' },
-  detailSheet:   { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.s1, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: height * 0.92, borderWidth: 1, borderColor: C.border },
-  dragBar:       { width: 36, height: 4, backgroundColor: C.s3, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
-  videoWrap:     { width: '100%', height: 220, borderWidth: 1, overflow: 'hidden', backgroundColor: C.s2 },
-  detailName:    { color: C.text, fontSize: 18, fontWeight: '900' },
-  instrText:     { color: C.muted, fontSize: 13, lineHeight: 20, paddingHorizontal: 20, marginTop: 10 },
-  section:       { paddingHorizontal: 20, paddingTop: 14 },
-  sectionTitle:  { color: C.text, fontSize: 13, fontWeight: '800', marginBottom: 8 },
-  voteCount:     { color: C.dim, fontSize: 11 },
+  exRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.s1, borderRadius: 14, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: C.border },
+  thumb:      { width: 60, height: 60, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: C.s2 },
+  thumbLetter:{ fontSize: 24, fontWeight: '900' },
+  exName:     { color: C.text, fontSize: 13, fontWeight: '700' },
+  badge:      { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeTxt:   { fontSize: 10, fontWeight: '700' },
+  muscleTxt:  { color: C.dim, fontSize: 11 },
+  effWrap:    { flexDirection: 'column', gap: 2, marginRight: 4 },
+  effDot:     { width: 5, height: 5, borderRadius: 2.5 },
 });
