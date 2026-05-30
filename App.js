@@ -146,7 +146,7 @@ function MainTabs({ onSignOut }) {
         screenOptions={{ headerShown:false }}
       >
         <Tab.Screen name="Ana"         component={HomeScreen}     options={{ tabBarLabel: t('tabHome', lang) }} />
-        <Tab.Screen name="Program"     component={ProgramScreen}  options={{ tabBarLabel: t('tabProgram', lang) }} />
+        <Tab.Screen name="Program"     component={ProgramScreen}  options={{ tabBarLabel: lang === 'tr' ? 'WORKOUTS' : 'WORKOUTS' }} />
         <Tab.Screen name="Egzersizler" component={ExercisesScreen}options={{ tabBarLabel: t('tabExercises', lang) }} />
         <Tab.Screen name="İlerleme"    component={ProgressScreen} options={{ tabBarLabel: t('tabProgress', lang) }} />
         <Tab.Screen name="Profil"      options={{ tabBarLabel: t('tabProfile', lang) }}>

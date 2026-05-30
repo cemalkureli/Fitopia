@@ -14,7 +14,8 @@ import { useLang } from '../context/LanguageContext';
 import { t, CATEGORY_LABELS, MUSCLE_LABELS } from '../utils/i18n';
 import { getFavorites, toggleFavorite } from '../utils/storage';
 import { TRAINING_PLANS, PLAN_FILTERS } from '../data/trainingPlans';
-import { setActiveProgram, getMyPlans, saveMyPlan, deleteMyPlan } from '../utils/storage';
+import { setActiveProgram, getMyPlans, saveMyPlan, deleteMyPlan, getActiveProgram, clearActiveProgram } from '../utils/storage';
+import { useToast, ConfirmModal } from '../components/Toast';
 
 // Workout terminology definitions (shared with ProgramScreen)
 const TERIMLER = {
@@ -386,6 +387,7 @@ function SubHdr({ title, onBack, right }) {
 
 // ─── Workouts Tab ─────────────────────────────────────────────────────────────
 function WorkoutsTab({ lang }) {
+  const { show: showToast, ToastNode } = useToast();
   const [workouts,    setWorkouts]    = useState([]);
   const [userId,      setUserId]      = useState(null);
   const [view,        setView]        = useState('main'); // 'main'|'detail'|'picker'
@@ -881,8 +883,7 @@ function WorkoutsTab({ lang }) {
                   await saveMyPlan(plan);
                   setCreatingTemplate(false);
                   setTmplForm({ title: '', description: '', level: 'intermediate', goals: [], days: 3 });
-                  Alert.alert(lang === 'tr' ? '✓ Kaydedildi' : '✓ Saved',
-                    lang === 'tr' ? 'Plan "Planlarım" sekmesine eklendi.' : 'Plan added to "My Plans" tab.');
+                  showToast(lang === 'tr' ? '✓ Template başarıyla eklendi!' : '✓ Template saved successfully!', 'success');
                 }}
                 disabled={!tmplForm.title.trim()}
               >
@@ -900,7 +901,8 @@ function WorkoutsTab({ lang }) {
 
   // ── Main workouts list ──────────────────────────────────────────────────────
   return (
-    <View style={wt.fill}>
+    <View style={[wt.fill, { position: 'relative' }]}>
+      {ToastNode}
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         {/* All Workouts accordion */}
         <TouchableOpacity style={wt.accordion} onPress={() => setAllOpen(v => !v)}>
@@ -1077,7 +1079,10 @@ function TemplatesTab({ lang }) {
   const [plansOpen,  setPlansOpen]  = useState(true);
   const [myPlansOpen,setMyPlansOpen]= useState(true);
   const [myPlans,    setMyPlans]    = useState([]);
-  const [activeTab,  setActiveTab]  = useState('all'); // 'all' | 'mine'
+  const [activeTab,  setActiveTab]  = useState('all');
+  const [confirmDel, setConfirmDel] = useState(null); // plan to delete
+  const [confirmAct, setConfirmAct] = useState(null); // {plan, workout} to set active
+  const { show: showToast, ToastNode } = useToast();
 
   useEffect(() => {
     getMyPlans().then(setMyPlans);
@@ -1213,20 +1218,7 @@ function TemplatesTab({ lang }) {
                 <Text style={ft.workoutItemTitle}>{w.name}</Text>
                 <TouchableOpacity
                   style={ft.setActiveBtn}
-                  onPress={async () => {
-                    await setActiveProgram({
-                      id:          `${selected.id}-${i}`,
-                      title:       `${selected.title} — ${w.name}`,
-                      description: selected.description,
-                      exercises:   w.exercises.map(ex => ({ name: ex })),
-                    });
-                    Alert.alert(
-                      lang === 'tr' ? '✓ Program Ayarlandı' : '✓ Program Set',
-                      lang === 'tr'
-                        ? `"${w.name}" artık aktif programın.`
-                        : `"${w.name}" is now your active program.`
-                    );
-                  }}
+                  onPress={() => setConfirmAct({ plan: selected, workout: w, idx: i })}
                 >
                   <Ionicons name="calendar-outline" size={12} color={C.lime} />
                   <Text style={ft.setActiveTxt}>{lang === 'tr' ? 'Aktif Yap' : 'Set Active'}</Text>
@@ -1244,7 +1236,53 @@ function TemplatesTab({ lang }) {
 
   // ── Templates list ──────────────────────────────────────────────────────────
   return (
-    <View style={wt.fill}>
+    <View style={[wt.fill, { position: 'relative' }]}>
+      {/* Confirm: Delete plan */}
+      <ConfirmModal
+        visible={!!confirmDel}
+        title={lang === 'tr' ? 'Planı Sil' : 'Delete Plan'}
+        message={confirmDel ? (lang === 'tr' ? `"${confirmDel.title}" silinecek. Aktif programdaysa kaldırılır.` : `"${confirmDel.title}" will be deleted. Removed from active program if set.`) : ''}
+        confirmLabel={lang === 'tr' ? 'Sil' : 'Delete'}
+        confirmColor="#dc2626"
+        lang={lang}
+        onCancel={() => setConfirmDel(null)}
+        onConfirm={async () => {
+          const ap = await getActiveProgram();
+          if (ap && (ap.id === confirmDel.id || ap.id?.startsWith(confirmDel.id))) {
+            await clearActiveProgram();
+          }
+          await deleteMyPlan(confirmDel.id);
+          getMyPlans().then(setMyPlans);
+          setConfirmDel(null);
+          showToast(lang === 'tr' ? 'Plan silindi.' : 'Plan deleted.', 'error');
+        }}
+      />
+
+      {/* Confirm: Set active program */}
+      <ConfirmModal
+        visible={!!confirmAct}
+        title={lang === 'tr' ? 'Aktif Program Yap' : 'Set Active Program'}
+        message={confirmAct ? (lang === 'tr' ? `"${confirmAct.workout?.name}" aktif program olarak ayarlanacak.` : `"${confirmAct.workout?.name}" will be set as your active program.`) : ''}
+        confirmLabel={lang === 'tr' ? 'Ayarla' : 'Set'}
+        confirmColor={C.lime}
+        lang={lang}
+        onCancel={() => setConfirmAct(null)}
+        onConfirm={async () => {
+          const { plan, workout, idx } = confirmAct;
+          await setActiveProgram({
+            id:          `${plan.id}-${idx}`,
+            title:       `${plan.title} — ${workout.name}`,
+            description: plan.description,
+            exercises:   workout.exercises.map(ex => (typeof ex === 'string' ? { name: ex } : ex)),
+          });
+          setConfirmAct(null);
+          showToast(lang === 'tr' ? `✓ "${workout.name}" aktif program oldu!` : `✓ "${workout.name}" set as active!`, 'success');
+        }}
+      />
+
+      {/* Toast */}
+      {ToastNode}
+
       {/* All Plans / My Plans tab */}
       <View style={ft.subTabBar}>
         {[
@@ -1282,10 +1320,7 @@ function TemplatesTab({ lang }) {
                     <Ionicons name="person-outline" size={12} color={C.dim} />
                     <Text style={ft.planAthletes}>{lang === 'tr' ? 'Kişisel plan' : 'Personal plan'}</Text>
                     <TouchableOpacity
-                      onPress={() => Alert.alert(lang === 'tr' ? 'Planı Sil' : 'Delete Plan', '', [
-                        { text: t('cancel', lang), style: 'cancel' },
-                        { text: lang === 'tr' ? 'Sil' : 'Delete', style: 'destructive', onPress: async () => { await deleteMyPlan(plan.id); getMyPlans().then(setMyPlans); }},
-                      ])}
+                      onPress={() => setConfirmDel(plan)}
                       style={{ marginLeft: 'auto' }}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >

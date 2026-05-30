@@ -14,6 +14,7 @@ import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
 import FitnessMascot from '../components/FitnessMascot';
 import TurntableMascot from '../components/TurntableMascot';
+import { useToast, ConfirmModal } from '../components/Toast';
 import { t, MONTHS_SHORT, DAYS_SHORT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
 
@@ -84,7 +85,7 @@ const mc = StyleSheet.create({
 });
 
 // ─── Exercise card (Progressive tab) ─────────────────────────────────────────
-function ExerciseCard({ name, sessions, onLog, index, lang, onReload }) {
+function ExerciseCard({ name, sessions, onLog, index, lang, onReload, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const last = sessions[0];
   const best = calcBestSet(sessions);
@@ -113,17 +114,7 @@ function ExerciseCard({ name, sessions, onLog, index, lang, onReload }) {
             </TouchableOpacity>
             {/* Delete entire exercise */}
             <TouchableOpacity
-              onPress={() => Alert.alert(
-                lang === 'tr' ? 'Egzersizi Sil' : 'Delete Exercise',
-                lang === 'tr' ? `"${name}" ve tüm kayıtları silinecek.` : `"${name}" and all its logs will be deleted.`,
-                [
-                  { text: t('cancel', lang), style: 'cancel' },
-                  { text: lang === 'tr' ? 'Sil' : 'Delete', style: 'destructive', onPress: async () => {
-                    await deleteAllExerciseSessions(name);
-                    onReload?.();
-                  }},
-                ]
-              )}
+              onPress={() => onDelete?.(name)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Ionicons name="trash-outline" size={16} color={C.red} />
@@ -629,8 +620,10 @@ export default function ProgressScreen() {
   const [favorites,   setFavorites]    = useState([]);
   const [logModal,    setLogModal]     = useState(null);
   const [logSets,     setLogSets]      = useState([{ reps: '', kg: '' }, { reps: '', kg: '' }, { reps: '', kg: '' }]);
-  const [filterProg,  setFilterProg]   = useState('all'); // 'all' = favorites, 'logged'
-  const [activeTab,   setActiveTab]    = useState(0);     // 0=General, 1=Progressive, 2=Measurement
+  const [filterProg,  setFilterProg]   = useState('all');
+  const [activeTab,   setActiveTab]    = useState(0);
+  const [confirmDel,  setConfirmDel]   = useState(null); // exercise name to delete
+  const { show: showToast, ToastNode } = useToast();
 
   useFocusEffect(useCallback(() => {
     getAllWorkoutLogs().then(setWorkoutLogs);
@@ -668,7 +661,24 @@ export default function ProgressScreen() {
   ];
 
   return (
-    <View style={s.fill}>
+    <View style={[s.fill, { position: 'relative' }]}>
+      {/* Confirm delete exercise */}
+      <ConfirmModal
+        visible={!!confirmDel}
+        title={lang === 'tr' ? 'Egzersizi Sil' : 'Delete Exercise'}
+        message={confirmDel ? (lang === 'tr' ? `"${confirmDel}" ve tüm geçmiş kayıtları silinecek.` : `"${confirmDel}" and all its records will be deleted.`) : ''}
+        confirmLabel={lang === 'tr' ? 'Sil' : 'Delete'}
+        confirmColor="#dc2626"
+        lang={lang}
+        onCancel={() => setConfirmDel(null)}
+        onConfirm={async () => {
+          await deleteAllExerciseSessions(confirmDel);
+          setWorkoutLogs(await getAllWorkoutLogs());
+          setConfirmDel(null);
+          showToast(lang === 'tr' ? 'Egzersiz silindi.' : 'Exercise deleted.', 'error');
+        }}
+      />
+      {ToastNode}
       {/* Tab bar */}
       <View style={s.tabBar}>
         {TABS.map((tab, i) => (
@@ -717,7 +727,8 @@ export default function ProgressScreen() {
             ) : (
               filteredProg.map((ex, i) => (
                 <ExerciseCard key={ex} name={ex} sessions={workoutLogs[ex] || []} onLog={openLog} index={i} lang={lang}
-                  onReload={() => getAllWorkoutLogs().then(setWorkoutLogs)} />
+                  onReload={() => getAllWorkoutLogs().then(setWorkoutLogs)}
+                  onDelete={(n) => setConfirmDel(n)} />
               ))
             )}
           </ScrollView>
