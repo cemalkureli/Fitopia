@@ -492,9 +492,15 @@ function WorkoutsTab({ lang }) {
 
   const openEdit = (ex) => {
     setEditEx(ex);
-    const sd = ex.sets_data?.length ? ex.sets_data : Array.from({ length: ex.sets || 3 }, () => ({ weight: String(ex.weight || ''), reps: String(ex.reps || 10) }));
-    setSetsData(sd.map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
-    // Restore saved mode: check intensity first, then rir
+    const sd = ex.sets_data?.length
+      ? ex.sets_data
+      : Array.from({ length: ex.sets || 3 }, () => ({ weight: String(ex.weight || ''), reps: String(ex.reps || 10) }));
+    // Add stable _key to each set to avoid animation key conflicts
+    setSetsData(sd.map((s, idx) => ({
+      weight: String(s.weight ?? ''),
+      reps:   String(s.reps ?? ''),
+      _key:   `${ex.id}-${idx}-${Date.now()}`,
+    })));
     const savedMode = ex.intensity
       ? ex.intensity
       : (ex.rir != null && ex.rir !== '' ? `rir${ex.rir}` : null);
@@ -502,27 +508,46 @@ function WorkoutsTab({ lang }) {
     setView('exerciseDetail');
   };
 
-  const updateSetField = (i, field, val) => setSetsData(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
-  const addSet    = () => setSetsData(prev => [...prev, { weight: prev[prev.length-1]?.weight ?? '', reps: prev[prev.length-1]?.reps ?? '' }]);
+  const updateSetField = (i, field, val) =>
+    setSetsData(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
+
+  const addSet = () =>
+    setSetsData(prev => [...prev, {
+      weight: prev[prev.length - 1]?.weight ?? '',
+      reps:   prev[prev.length - 1]?.reps ?? '',
+      _key:   `new-${Date.now()}-${Math.random()}`,
+    }]);
+
   const removeSet = (i) => setSetsData(prev => prev.filter((_, idx) => idx !== i));
 
   const saveEdit = async () => {
-    if (!editEx) return;
+    if (!editEx || !active) return;
     setEditSaving(true);
     try {
-      const cleanSets = setsData.map(s => ({ weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps) || 0 }));
-      const isRir = editMode?.startsWith('rir');
-      const rirVal = isRir ? parseInt(editMode.replace('rir','')) : null;
-      await supabase.from('workout_exercises').update({
-        sets:      cleanSets.length,
-        reps:      cleanSets[0]?.reps || 10,
-        weight:    cleanSets[0]?.weight || 0,
-        rir:       rirVal,
-        sets_data: cleanSets,
-        intensity: isRir ? null : (editMode ?? null),
-      }).eq('id', editEx.id);
+      const cleanSets = setsData.map(s => ({
+        weight: parseFloat(s.weight) || 0,
+        reps:   parseInt(s.reps)    || 0,
+      }));
+      const isRir  = editMode?.startsWith('rir');
+      const rirVal = isRir ? parseInt(editMode.replace('rir', '')) : null;
+
+      const { error } = await supabase
+        .from('workout_exercises')
+        .update({
+          sets:      cleanSets.length,
+          reps:      cleanSets[0]?.reps || 10,
+          weight:    cleanSets[0]?.weight || 0,
+          rir:       rirVal,
+          sets_data: cleanSets,
+          intensity: isRir ? null : (editMode ?? null),
+        })
+        .eq('id', editEx.id);
+
+      if (error) { Alert.alert('Error', error.message); return; }
+
       await loadWorkoutExercises(active.id);
       setEditEx(null);
+      setView('detail'); // explicitly navigate back
     } finally {
       setEditSaving(false);
     }
@@ -639,7 +664,7 @@ function WorkoutsTab({ lang }) {
               </View>
               <View style={ed.summaryDiv} />
               <View style={ed.summaryItem}>
-                <Text style={ed.summaryVal} numberOfLines={1} style={[ed.summaryVal, { fontSize: editMode ? 13 : 22 }]}>
+                <Text numberOfLines={1} style={[ed.summaryVal, { fontSize: editMode ? 13 : 22 }]}>
                   {editMode
                     ? editMode.startsWith('rir') ? `RIR ${editMode.replace('rir','')}` : editMode
                     : '—'
@@ -675,9 +700,9 @@ function WorkoutsTab({ lang }) {
               <View style={{ width: 32 }} />
             </View>
 
-            {/* Set rows */}
+            {/* Set rows — stable keys to prevent animation glitches */}
             {setsData.map((s, i) => (
-              <Animated.View key={i} entering={FadeInLeft.delay(i * 40).duration(240)} style={ed.setRow}>
+              <View key={s._key || i} style={ed.setRow}>
                 <View style={ed.setNum}><Text style={ed.setNumTxt}>{i + 1}</Text></View>
                 <TextInput
                   style={ed.setInput}
@@ -700,7 +725,7 @@ function WorkoutsTab({ lang }) {
                 <TouchableOpacity onPress={() => removeSet(i)} style={{ width: 32, alignItems: 'center' }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="remove-circle-outline" size={20} color={C.dim} />
                 </TouchableOpacity>
-              </Animated.View>
+              </View>
             ))}
 
             {/* Add set */}
