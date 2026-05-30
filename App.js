@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { C } from './src/utils/theme';
 import { supabase } from './src/lib/supabase';
 import { LanguageProvider, useLang } from './src/context/LanguageContext';
+import { UnitsProvider } from './src/context/UnitsContext';
 import LangToggle from './src/components/LangToggle';
 import { t } from './src/utils/i18n';
 
@@ -192,7 +193,8 @@ export default function App() {
 
   return (
     <LanguageProvider>
-      <SafeAreaProvider>
+      <UnitsProvider>
+        <SafeAreaProvider>
         <StatusBar barStyle="light-content" backgroundColor={C.bg} />
 
         {session === undefined ? (
@@ -220,7 +222,8 @@ export default function App() {
             )}
           </SafeAreaView>
         )}
-      </SafeAreaProvider>
+        </SafeAreaProvider>
+      </UnitsProvider>
     </LanguageProvider>
   );
 }
