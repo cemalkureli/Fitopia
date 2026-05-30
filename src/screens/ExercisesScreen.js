@@ -1127,8 +1127,9 @@ function TemplatesTab({ lang }) {
   const [myPlansOpen,setMyPlansOpen]= useState(true);
   const [myPlans,    setMyPlans]    = useState([]);
   const [activeTab,  setActiveTab]  = useState('all');
-  const [confirmDel, setConfirmDel] = useState(null); // plan to delete
-  const [confirmAct, setConfirmAct] = useState(null); // {plan, workout} to set active
+  const [confirmDel,     setConfirmDel]     = useState(null);
+  const [confirmAct,     setConfirmAct]     = useState(null);
+  const [confirmReplace, setConfirmReplace] = useState(null); // {plan, existing} — replace warning
   const { show: showToast, ToastNode } = useToast();
 
   useEffect(() => {
@@ -1271,7 +1272,14 @@ function TemplatesTab({ lang }) {
           {/* Single Set Active button for entire template */}
           <TouchableOpacity
             style={ft.setActivePlanBtn}
-            onPress={() => setConfirmAct({ plan: selected, workout: null, isFullPlan: true })}
+            onPress={async () => {
+              const existing = await getActiveProgram();
+              if (existing) {
+                setConfirmReplace({ plan: selected, existing });
+              } else {
+                setConfirmAct({ plan: selected, isFullPlan: true });
+              }
+            }}
           >
             <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ft.setActivePlanGrad}>
               <Ionicons name="calendar-outline" size={18} color="#fff" />
@@ -1288,6 +1296,26 @@ function TemplatesTab({ lang }) {
   // ── Templates list ──────────────────────────────────────────────────────────
   return (
     <View style={[wt.fill, { position: 'relative' }]}>
+      {/* Confirm: Replace existing active program */}
+      <ConfirmModal
+        visible={!!confirmReplace}
+        title={lang === 'tr' ? 'Aktif Program Mevcut' : 'Active Program Exists'}
+        message={confirmReplace
+          ? (lang === 'tr'
+              ? `"${confirmReplace.existing.title}" zaten aktif program olarak ayarlı.\n\nYeni programla değiştirmek istiyor musunuz?`
+              : `"${confirmReplace.existing.title}" is already your active program.\n\nDo you want to replace it?`)
+          : ''}
+        confirmLabel={lang === 'tr' ? 'Değiştir' : 'Replace'}
+        confirmColor={C.orange}
+        lang={lang}
+        onCancel={() => setConfirmReplace(null)}
+        onConfirm={() => {
+          const { plan } = confirmReplace;
+          setConfirmReplace(null);
+          setConfirmAct({ plan, isFullPlan: true });
+        }}
+      />
+
       {/* Confirm: Delete plan */}
       <ConfirmModal
         visible={!!confirmDel}
