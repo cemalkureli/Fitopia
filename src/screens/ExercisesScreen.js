@@ -454,23 +454,35 @@ function WorkoutsTab({ lang }) {
     await loadWorkoutExercises(active.id);
   };
 
-  const [editEx,   setEditEx]   = useState(null);
-  const [editForm, setEditForm] = useState({ sets: 3, reps: 10, rir: 1.0 });
-  const [editSaving, setEditSaving] = useState(false);
+  // ── Exercise detail sub-view ───────────────────────────────────────────────
+  const [editEx,    setEditEx]    = useState(null);
+  const [setsData,  setSetsData]  = useState([]); // [{weight:'',reps:''}]
+  const [editRir,   setEditRir]   = useState('1');
+  const [editSaving,setEditSaving]= useState(false);
 
   const openEdit = (ex) => {
     setEditEx(ex);
-    setEditForm({ sets: String(ex.sets), reps: String(ex.reps), rir: String(ex.rir) });
+    const sd = ex.sets_data?.length ? ex.sets_data : Array.from({ length: ex.sets || 3 }, () => ({ weight: String(ex.weight || ''), reps: String(ex.reps || 10) }));
+    setSetsData(sd.map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
+    setEditRir(String(ex.rir ?? 1));
+    setView('exerciseDetail');
   };
+
+  const updateSetField = (i, field, val) => setSetsData(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
+  const addSet    = () => setSetsData(prev => [...prev, { weight: prev[prev.length-1]?.weight ?? '', reps: prev[prev.length-1]?.reps ?? '' }]);
+  const removeSet = (i) => setSetsData(prev => prev.filter((_, idx) => idx !== i));
 
   const saveEdit = async () => {
     if (!editEx) return;
     setEditSaving(true);
     try {
+      const cleanSets = setsData.map(s => ({ weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps) || 0 }));
       await supabase.from('workout_exercises').update({
-        sets: parseInt(editForm.sets) || 3,
-        reps: parseInt(editForm.reps) || 10,
-        rir:  parseFloat(editForm.rir) ?? 1.0,
+        sets:      cleanSets.length,
+        reps:      cleanSets[0]?.reps || 10,
+        weight:    cleanSets[0]?.weight || 0,
+        rir:       parseFloat(editRir) || 1,
+        sets_data: cleanSets,
       }).eq('id', editEx.id);
       await loadWorkoutExercises(active.id);
       setEditEx(null);
@@ -500,9 +512,9 @@ function WorkoutsTab({ lang }) {
           onBack={() => { setView('detail'); setPickerSel(new Set()); }}
         />
         {/* Search */}
-        <View style={wt.pickerSearch}>
+        <View style={ed.pickerSearch}>
           <Ionicons name="search-outline" size={18} color={C.dim} />
-          <TextInput style={wt.pickerInput} value={pickerSearch} onChangeText={setPickerSearch} placeholder={t('searchPlaceholder', lang)} placeholderTextColor={C.dim} />
+          <TextInput style={ed.pickerInput} value={pickerSearch} onChangeText={setPickerSearch} placeholder={t('searchPlaceholder', lang)} placeholderTextColor={C.dim} />
         </View>
 
         {loadingPicker
@@ -511,18 +523,18 @@ function WorkoutsTab({ lang }) {
             <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
               {Object.keys(groups).sort().map(letter => (
                 <View key={letter}>
-                  <View style={wt.pickerLetterRow}>
-                    <Text style={wt.pickerLetter}>{letter}</Text>
-                    <View style={wt.pickerLetterLine} />
+                  <View style={ed.pickerLetterRow}>
+                    <Text style={ed.pickerLetter}>{letter}</Text>
+                    <View style={ed.pickerLetterLine} />
                   </View>
                   {groups[letter].map(ex => {
                     const sel = pickerSel.has(ex.name);
                     return (
-                      <TouchableOpacity key={ex.id} style={wt.pickerRow} onPress={() => {
+                      <TouchableOpacity key={ex.id} style={ed.pickerRow} onPress={() => {
                         setPickerSel(prev => { const n = new Set(prev); sel ? n.delete(ex.name) : n.add(ex.name); return n; });
                       }}>
-                        <Text style={wt.pickerExName}>{ex.name}</Text>
-                        <View style={[wt.checkbox, sel && wt.checkboxActive]}>
+                        <Text style={ed.pickerExName}>{ex.name}</Text>
+                        <View style={[ed.checkbox, sel && ed.checkboxActive]}>
                           {sel && <Ionicons name="checkmark" size={14} color="#fff" />}
                         </View>
                       </TouchableOpacity>
@@ -535,10 +547,10 @@ function WorkoutsTab({ lang }) {
         }
 
         {/* Bottom CTA */}
-        <View style={wt.pickerBottom}>
-          <TouchableOpacity style={[wt.pickerAddBtn, pickerSel.size === 0 && { opacity: 0.5 }]} onPress={addPickerExercises} disabled={pickerSel.size === 0}>
-            <LinearGradient colors={['#dc2626', '#7f1d1d']} style={wt.pickerAddGrad}>
-              <Text style={wt.pickerAddTxt}>
+        <View style={ed.pickerBottom}>
+          <TouchableOpacity style={[ed.pickerAddBtn, pickerSel.size === 0 && { opacity: 0.5 }]} onPress={addPickerExercises} disabled={pickerSel.size === 0}>
+            <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ed.pickerAddGrad}>
+              <Text style={ed.pickerAddTxt}>
                 {pickerSel.size > 0
                   ? `${lang === 'tr' ? 'Egzersiz Ekle' : 'Add Exercises'} (${pickerSel.size})`
                   : (lang === 'tr' ? 'Egzersiz Seç' : 'Select Exercises')
@@ -547,6 +559,128 @@ function WorkoutsTab({ lang }) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+      </View>
+    );
+  }
+
+  // ── Exercise detail (set-by-set logging) ──────────────────────────────────
+  if (view === 'exerciseDetail' && editEx) {
+    // Mini volume chart
+    const maxW = Math.max(...setsData.map(s => parseFloat(s.weight) || 0), 1);
+    const totalVol = setsData.reduce((a, s) => a + (parseFloat(s.weight)||0)*(parseInt(s.reps)||0), 0);
+
+    return (
+      <View style={[wt.fill, { backgroundColor: C.bg }]}>
+        <SubHdr
+          title={editEx.exercise_name}
+          onBack={() => { setEditEx(null); setView('detail'); }}
+          right={[
+            <TouchableOpacity key="save" onPress={saveEdit} disabled={editSaving} style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#dc2626', borderRadius: 10 }}>
+              {editSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{lang === 'tr' ? 'Kaydet' : 'Save'}</Text>}
+            </TouchableOpacity>,
+          ]}
+        />
+
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+
+            {/* Volume summary */}
+            <View style={ed.summaryRow}>
+              <View style={ed.summaryItem}>
+                <Text style={ed.summaryVal}>{setsData.length}</Text>
+                <Text style={ed.summaryLbl}>{lang === 'tr' ? 'Set' : 'Sets'}</Text>
+              </View>
+              <View style={ed.summaryDiv} />
+              <View style={ed.summaryItem}>
+                <Text style={ed.summaryVal}>{setsData[0]?.weight || '—'}</Text>
+                <Text style={ed.summaryLbl}>kg</Text>
+              </View>
+              <View style={ed.summaryDiv} />
+              <View style={ed.summaryItem}>
+                <Text style={ed.summaryVal}>{totalVol > 0 ? `${totalVol}` : '—'}</Text>
+                <Text style={ed.summaryLbl}>{lang === 'tr' ? 'Hacim' : 'Volume'}</Text>
+              </View>
+              <View style={ed.summaryDiv} />
+              <View style={ed.summaryItem}>
+                <Text style={ed.summaryVal}>{editRir}</Text>
+                <Text style={ed.summaryLbl}>RIR</Text>
+              </View>
+            </View>
+
+            {/* Mini bar chart (weight per set) */}
+            {setsData.length > 0 && setsData.some(s => parseFloat(s.weight) > 0) && (
+              <View style={ed.chartWrap}>
+                <View style={ed.chartBars}>
+                  {setsData.map((s, i) => {
+                    const h = Math.max(4, ((parseFloat(s.weight)||0) / maxW) * 56);
+                    return (
+                      <View key={i} style={ed.chartBarCol}>
+                        <View style={[ed.chartBar, { height: h }]} />
+                        <Text style={ed.chartBarLbl}>{i+1}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+                <Text style={ed.chartTitle}>{lang === 'tr' ? 'Set Başına Ağırlık (kg)' : 'Weight per Set (kg)'}</Text>
+              </View>
+            )}
+
+            {/* Column headers */}
+            <View style={ed.tableHeader}>
+              <Text style={[ed.thTxt, { width: 36 }]}>{lang === 'tr' ? 'Set' : 'Set'}</Text>
+              <Text style={[ed.thTxt, { flex: 1 }]}>{lang === 'tr' ? 'Ağırlık (kg)' : 'Weight (kg)'}</Text>
+              <Text style={[ed.thTxt, { flex: 1 }]}>{lang === 'tr' ? 'Tekrar' : 'Reps'}</Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            {/* Set rows */}
+            {setsData.map((s, i) => (
+              <Animated.View key={i} entering={FadeInLeft.delay(i * 40).duration(240)} style={ed.setRow}>
+                <View style={ed.setNum}><Text style={ed.setNumTxt}>{i + 1}</Text></View>
+                <TextInput
+                  style={ed.setInput}
+                  value={s.weight}
+                  onChangeText={v => updateSetField(i, 'weight', v)}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor={C.dim}
+                  textAlign="center"
+                />
+                <TextInput
+                  style={ed.setInput}
+                  value={s.reps}
+                  onChangeText={v => updateSetField(i, 'reps', v)}
+                  keyboardType="numeric"
+                  placeholder="10"
+                  placeholderTextColor={C.dim}
+                  textAlign="center"
+                />
+                <TouchableOpacity onPress={() => removeSet(i)} style={{ width: 32, alignItems: 'center' }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="remove-circle-outline" size={20} color={C.dim} />
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+
+            {/* Add set */}
+            <TouchableOpacity style={ed.addSetRow} onPress={addSet}>
+              <Ionicons name="add-circle" size={20} color="#dc2626" />
+              <Text style={ed.addSetTxt}>{lang === 'tr' ? 'Set Ekle' : 'Add Set'}</Text>
+            </TouchableOpacity>
+
+            {/* RIR */}
+            <View style={ed.rirRow}>
+              <Text style={ed.rirLabel}>RIR</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {['0','1','2','3','4'].map(v => (
+                  <TouchableOpacity key={v} style={[ed.rirBtn, editRir === v && ed.rirBtnActive]} onPress={() => setEditRir(v)}>
+                    <Text style={[ed.rirBtnTxt, editRir === v && { color: '#fff', fontWeight: '800' }]}>{v}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     );
   }
@@ -606,44 +740,6 @@ function WorkoutsTab({ lang }) {
           </TouchableOpacity>
         </ScrollView>
 
-        {/* Exercise edit modal */}
-        <Modal visible={!!editEx} transparent animationType="slide" onRequestClose={() => setEditEx(null)}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-            <TouchableOpacity style={wt.modalOverlay} activeOpacity={1} onPress={() => setEditEx(null)}>
-              <TouchableOpacity activeOpacity={1} style={wt.editModal} onPress={() => {}}>
-                <View style={wt.createHandle} />
-                <Text style={wt.exCardName} numberOfLines={2}>{editEx?.exercise_name}</Text>
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
-                  {[
-                    { label: lang === 'tr' ? 'Set' : 'Sets',         field: 'sets', kb: 'numeric' },
-                    { label: lang === 'tr' ? 'Tekrar' : 'Reps',      field: 'reps', kb: 'numeric' },
-                    { label: 'RIR',                                    field: 'rir',  kb: 'decimal-pad' },
-                  ].map(({ label, field, kb }) => (
-                    <View key={field} style={{ flex: 1, alignItems: 'center' }}>
-                      <Text style={wt.editFieldLabel}>{label}</Text>
-                      <TextInput
-                        style={wt.editFieldInput}
-                        value={editForm[field]}
-                        onChangeText={v => setEditForm(f => ({ ...f, [field]: v }))}
-                        keyboardType={kb}
-                        textAlign="center"
-                        placeholderTextColor={C.dim}
-                      />
-                    </View>
-                  ))}
-                </View>
-                <TouchableOpacity style={[wt.createBtn, { marginTop: 24 }]} onPress={saveEdit} disabled={editSaving}>
-                  <LinearGradient colors={['#dc2626', '#7f1d1d']} style={wt.createBtnGrad}>
-                    {editSaving
-                      ? <ActivityIndicator color="#fff" />
-                      : <Text style={wt.createBtnTxt}>{lang === 'tr' ? 'Kaydet' : 'Save'}</Text>
-                    }
-                  </LinearGradient>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </Modal>
       </View>
     );
   }
@@ -749,7 +845,35 @@ const wt = StyleSheet.create({
   editModal:      { backgroundColor: C.s1, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 36, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)' },
   editFieldLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   editFieldInput: { backgroundColor: C.s2, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(220,38,38,0.3)', width: '100%', height: 52, fontSize: 22, fontWeight: '900', color: C.text },
-  // Picker
+});
+
+// ─── Exercise detail styles ───────────────────────────────────────────────────
+const ed = StyleSheet.create({
+  summaryRow:   { flexDirection: 'row', backgroundColor: C.s1, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border },
+  summaryItem:  { flex: 1, alignItems: 'center' },
+  summaryVal:   { color: C.text, fontSize: 22, fontWeight: '900' },
+  summaryLbl:   { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 2 },
+  summaryDiv:   { width: 1, backgroundColor: C.border },
+  chartWrap:    { backgroundColor: C.s1, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border },
+  chartBars:    { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 72, marginBottom: 8 },
+  chartBarCol:  { flex: 1, alignItems: 'center', gap: 4, justifyContent: 'flex-end' },
+  chartBar:     { width: '100%', backgroundColor: '#dc2626', borderRadius: 4, minHeight: 4 },
+  chartBarLbl:  { color: C.dim, fontSize: 10, fontWeight: '600' },
+  chartTitle:   { color: C.muted, fontSize: 11, textAlign: 'center' },
+  tableHeader:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, marginBottom: 8, gap: 8 },
+  thTxt:        { color: C.muted, fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  setRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  setNum:       { width: 36, height: 42, borderRadius: 12, backgroundColor: C.s2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)' },
+  setNumTxt:    { color: '#dc2626', fontWeight: '900', fontSize: 14 },
+  setInput:     { flex: 1, height: 48, backgroundColor: C.s1, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, color: C.text, fontSize: 16, fontWeight: '700' },
+  addSetRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, justifyContent: 'center', borderTopWidth: 1, borderTopColor: C.border, marginTop: 4 },
+  addSetTxt:    { color: '#dc2626', fontSize: 15, fontWeight: '700' },
+  rirRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, backgroundColor: C.s1, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
+  rirLabel:     { color: C.muted, fontSize: 13, fontWeight: '800', width: 36 },
+  rirBtn:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s2 },
+  rirBtnActive: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
+  rirBtnTxt:    { color: C.muted, fontSize: 14, fontWeight: '600' },
+  // Picker (referenced from WorkoutsTab as ed.pickerSearch etc, or keep in wt)
   pickerSearch:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.s1, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, height: 48, margin: 16, marginBottom: 8 },
   pickerInput:    { flex: 1, color: C.text, fontSize: 14 },
   pickerLetterRow:{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 8 },
