@@ -220,6 +220,26 @@ export async function clearActiveProgram() {
   await AsyncStorage.removeItem(KEY_ACTIVE_PROGRAM);
 }
 
+// ─── My Training Plans ────────────────────────────────────────────────────────
+const KEY_MY_PLANS = 'fitopia_my_plans';
+
+export async function getMyPlans() {
+  const raw = await AsyncStorage.getItem(KEY_MY_PLANS);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function saveMyPlan(plan) {
+  const plans = await getMyPlans();
+  const idx   = plans.findIndex(p => p.id === plan.id);
+  if (idx !== -1) plans[idx] = plan; else plans.unshift(plan);
+  await AsyncStorage.setItem(KEY_MY_PLANS, JSON.stringify(plans));
+}
+
+export async function deleteMyPlan(planId) {
+  const plans = (await getMyPlans()).filter(p => p.id !== planId);
+  await AsyncStorage.setItem(KEY_MY_PLANS, JSON.stringify(plans));
+}
+
 // ─── Favorites ────────────────────────────────────────────────────────────────
 const KEY_FAVORITES = 'fitopia_favorites';
 
