@@ -4,14 +4,15 @@ import {
   Modal, TextInput, KeyboardAvoidingView, Platform,
   ActivityIndicator, Animated,
 } from 'react-native';
-import AnimatedRN, { FadeInDown, FadeIn, ZoomIn } from 'react-native-reanimated';
+import AnimatedRN, { FadeInDown, FadeInLeft, FadeIn, ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../utils/theme';
-import { saveWorkoutSession, getAllWorkoutLogs, getFavorites, MONTHS_SHORT as _MONTHS } from '../utils/storage';
+import { saveWorkoutSession, getAllWorkoutLogs, getFavorites } from '../utils/storage';
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
+import FitnessMascot from '../components/FitnessMascot';
 import { t, MONTHS_SHORT, DAYS_SHORT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
 
@@ -262,63 +263,119 @@ const mr = StyleSheet.create({
 });
 
 // ─── General Status tab ───────────────────────────────────────────────────────
-function GeneralTab({ workoutLogs, lang, weightUnit }) {
+function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
+  const [gender,       setGender]       = useState('male');
+  const [latestMeasure, setLatestMeasure] = useState({});
+
+  useEffect(() => {
+    // Load gender from profile
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data?.user) return;
+      supabase.from('profiles').select('gender').eq('id', data.user.id).single()
+        .then(({ data: p }) => { if (p?.gender) setGender(p.gender); });
+      // Load latest measurements
+      supabase.from('body_measurements').select('type, value, unit')
+        .eq('user_id', data.user.id).order('measured_at', { ascending: false })
+        .then(({ data: ms }) => {
+          const latest = {};
+          (ms || []).forEach(m => { if (!latest[m.type]) latest[m.type] = { value: m.value, unit: m.unit }; });
+          setLatestMeasure(latest);
+        });
+    });
+  }, []);
+
   const totalSessions = Object.values(workoutLogs).reduce((a, b) => a + b.length, 0);
   const totalSets     = Object.values(workoutLogs).reduce((a, b) => a + b.reduce((c, s) => c + (s.sets?.length ?? 0), 0), 0);
   const exCount       = Object.keys(workoutLogs).length;
   const days          = DAYS_SHORT[lang] ?? DAYS_SHORT.tr;
 
-  // Weekly activity (last 7 days)
   const today = new Date();
   const week  = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - 6 + i);
-    return d;
+    const d = new Date(today); d.setDate(today.getDate() - 6 + i); return d;
   });
   const logDates = new Set();
   Object.values(workoutLogs).forEach(sessions =>
     sessions.forEach(s => logDates.add(new Date(s.date).toDateString()))
   );
-
-  // Weekly sessions count
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - 7);
   const weekSessions = Object.values(workoutLogs).reduce((a, sessions) =>
     a + sessions.filter(s => new Date(s.date) >= weekStart).length, 0
   );
 
-  // Best exercises (top 3 by volume)
   const bests = Object.entries(workoutLogs)
     .map(([name, sessions]) => ({ name, best: calcBestSet(sessions) }))
-    .filter(x => x.best)
-    .sort((a, b) => b.best.vol - a.best.vol)
-    .slice(0, 3);
+    .filter(x => x.best).sort((a, b) => b.best.vol - a.best.vol).slice(0, 3);
+
+  // Measurement rows to display (only ones with data)
+  const measureRows = MEASURE_TYPES.filter(mt => latestMeasure[mt.key]);
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-      {/* Stats summary */}
-      <AnimatedRN.View entering={FadeInDown.duration(320)} style={g.summaryCard}>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+
+      {/* ── Stats summary ── */}
+      <AnimatedRN.View entering={FadeInDown.duration(300)} style={g.summaryCard}>
         <LinearGradient colors={['rgba(232,244,74,0.08)', 'transparent']} style={StyleSheet.absoluteFill} />
         <View style={g.statsRow}>
-          <View style={g.stat}>
-            <Text style={g.statVal}>{totalSessions}</Text>
-            <Text style={g.statLbl}>{t('totalSessionsP', lang)}</Text>
-          </View>
-          <View style={g.statDiv} />
-          <View style={g.stat}>
-            <Text style={g.statVal}>{totalSets}</Text>
-            <Text style={g.statLbl}>{t('totalSetsP', lang)}</Text>
-          </View>
-          <View style={g.statDiv} />
-          <View style={g.stat}>
-            <Text style={g.statVal}>{exCount}</Text>
-            <Text style={g.statLbl}>{t('exerciseCount', lang)}</Text>
-          </View>
+          {[
+            { val: totalSessions, lbl: t('totalSessionsP', lang) },
+            { val: totalSets,     lbl: t('totalSetsP', lang) },
+            { val: exCount,       lbl: t('exerciseCount', lang) },
+          ].map((item, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && <View style={g.statDiv} />}
+              <View style={g.stat}>
+                <Text style={g.statVal}>{item.val}</Text>
+                <Text style={g.statLbl}>{item.lbl}</Text>
+              </View>
+            </React.Fragment>
+          ))}
         </View>
       </AnimatedRN.View>
 
-      {/* Weekly activity */}
-      <AnimatedRN.View entering={FadeInDown.delay(80).duration(320)} style={g.card}>
+      {/* ── 3D Mascot + measurements ── */}
+      <AnimatedRN.View entering={FadeInDown.delay(80).duration(350)} style={g.mascotSection}>
+        {/* Dark backdrop with subtle red glow */}
+        <LinearGradient
+          colors={['rgba(220,38,38,0.08)', 'rgba(2,6,23,0)']}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* Mascot figure */}
+        <View style={g.mascotWrap}>
+          <FitnessMascot gender={gender} />
+        </View>
+
+        {/* Measurement values below figure */}
+        {measureRows.length > 0 ? (
+          <View style={g.measureList}>
+            {measureRows.map((mt, i) => {
+              const m = latestMeasure[mt.key];
+              return (
+                <AnimatedRN.View
+                  key={mt.key}
+                  entering={FadeInLeft.delay(i * 50).duration(260)}
+                  style={g.measureRow}
+                >
+                  <Text style={g.measureLabel}>{t(mt.labelKey, lang)}</Text>
+                  <View style={g.measureDivider} />
+                  <Text style={g.measureValue}>{m.value}</Text>
+                  <Text style={g.measureUnit}>{m.unit}</Text>
+                </AnimatedRN.View>
+              );
+            })}
+          </View>
+        ) : (
+          <Text style={g.noMeasure}>
+            {lang === 'tr'
+              ? 'Ölçüm eklemek için → Ölçüm sekmesi'
+              : 'Add measurements → Measure tab'}
+          </Text>
+        )}
+      </AnimatedRN.View>
+
+      {/* ── Weekly activity ── */}
+      <AnimatedRN.View entering={FadeInDown.delay(200).duration(300)} style={g.card}>
         <Text style={g.cardTitle}>{t('weekActivity', lang)}</Text>
         <View style={g.weekRow}>
           {week.map((d, i) => {
@@ -326,11 +383,7 @@ function GeneralTab({ workoutLogs, lang, weightUnit }) {
             const isToday = d.toDateString() === today.toDateString();
             return (
               <View key={i} style={g.dayCol}>
-                <View style={[
-                  g.dayDot,
-                  active  && { backgroundColor: C.lime },
-                  isToday && !active && { borderColor: C.lime, borderWidth: 1.5 },
-                ]} />
+                <View style={[g.dayDot, active && { backgroundColor: C.lime }, isToday && !active && { borderColor: C.lime, borderWidth: 1.5 }]} />
                 <Text style={[g.dayLbl, isToday && { color: C.lime }]}>{days[d.getDay()]}</Text>
               </View>
             );
@@ -339,14 +392,13 @@ function GeneralTab({ workoutLogs, lang, weightUnit }) {
         <Text style={g.weekSub}>
           {weekSessions > 0
             ? `${lang === 'tr' ? 'Bu hafta' : 'This week'}: ${weekSessions} ${t('sessions', lang).toLowerCase()}`
-            : t('noLogsYet', lang)
-          }
+            : t('noLogsYet', lang)}
         </Text>
       </AnimatedRN.View>
 
-      {/* Best performances */}
+      {/* ── Best sets ── */}
       {bests.length > 0 && (
-        <AnimatedRN.View entering={FadeInDown.delay(160).duration(320)} style={g.card}>
+        <AnimatedRN.View entering={FadeInDown.delay(260).duration(300)} style={g.card}>
           <Text style={g.cardTitle}>{t('bestSet', lang)}</Text>
           {bests.map(({ name, best }, i) => (
             <View key={i} style={[g.bestRow, i === bests.length - 1 && { borderBottomWidth: 0 }]}>
@@ -357,38 +409,40 @@ function GeneralTab({ workoutLogs, lang, weightUnit }) {
           ))}
         </AnimatedRN.View>
       )}
-
-      {/* Progressive overload info card */}
-      <AnimatedRN.View entering={FadeInDown.delay(220).duration(320)} style={g.infoCard}>
-        <Ionicons name="trending-up-outline" size={16} color={C.lime} style={{ marginBottom: 6 }} />
-        <Text style={g.infoTitle}>{t('progressOverload', lang)}</Text>
-        <Text style={g.infoDesc}>{t('progressDesc', lang)}</Text>
-      </AnimatedRN.View>
     </ScrollView>
   );
 }
 
 const g = StyleSheet.create({
-  summaryCard: { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)', marginBottom: 12, overflow: 'hidden' },
-  statsRow:    { flexDirection: 'row' },
-  stat:        { flex: 1, alignItems: 'center' },
-  statVal:     { color: C.text, fontSize: 24, fontWeight: '900' },
-  statLbl:     { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 2, textAlign: 'center' },
-  statDiv:     { width: 1, backgroundColor: C.border },
-  card:        { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 12 },
-  cardTitle:   { color: C.text, fontSize: 13, fontWeight: '800', marginBottom: 14 },
-  weekRow:     { flexDirection: 'row', justifyContent: 'space-between' },
-  dayCol:      { alignItems: 'center', gap: 6 },
-  dayDot:      { width: 28, height: 28, borderRadius: 8, backgroundColor: C.s3 },
-  dayLbl:      { color: C.dim, fontSize: 10, fontWeight: '600' },
-  weekSub:     { color: C.dim, fontSize: 11, marginTop: 10, textAlign: 'center' },
-  bestRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
-  bestDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: C.orange },
-  bestName:    { flex: 1, color: C.text, fontSize: 13, fontWeight: '600' },
-  bestVal:     { color: C.orange, fontSize: 12, fontWeight: '700' },
-  infoCard:    { backgroundColor: 'rgba(232,244,74,0.06)', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)' },
-  infoTitle:   { color: C.lime, fontSize: 14, fontWeight: '800', marginBottom: 4 },
-  infoDesc:    { color: C.muted, fontSize: 12, lineHeight: 18 },
+  summaryCard:  { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)', marginBottom: 12, overflow: 'hidden' },
+  statsRow:     { flexDirection: 'row' },
+  stat:         { flex: 1, alignItems: 'center' },
+  statVal:      { color: C.text, fontSize: 24, fontWeight: '900' },
+  statLbl:      { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 2, textAlign: 'center' },
+  statDiv:      { width: 1, backgroundColor: C.border },
+
+  // Mascot section
+  mascotSection:{ backgroundColor: C.s1, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', marginBottom: 12, overflow: 'hidden', paddingBottom: 20 },
+  mascotWrap:   { alignItems: 'center', paddingTop: 20, paddingBottom: 8 },
+  measureList:  { paddingHorizontal: 24, gap: 0 },
+  measureRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  measureLabel: { color: C.muted, fontSize: 13, fontWeight: '600', width: 110 },
+  measureDivider:{ flex: 1, height: 1, backgroundColor: 'rgba(220,38,38,0.15)', marginHorizontal: 8 },
+  measureValue: { color: '#dc2626', fontSize: 15, fontWeight: '800' },
+  measureUnit:  { color: C.dim, fontSize: 11, fontWeight: '600', marginLeft: 4, width: 28 },
+  noMeasure:    { color: C.dim, fontSize: 12, textAlign: 'center', paddingVertical: 12, paddingHorizontal: 20 },
+
+  card:         { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 12 },
+  cardTitle:    { color: C.text, fontSize: 13, fontWeight: '800', marginBottom: 14 },
+  weekRow:      { flexDirection: 'row', justifyContent: 'space-between' },
+  dayCol:       { alignItems: 'center', gap: 6 },
+  dayDot:       { width: 28, height: 28, borderRadius: 8, backgroundColor: C.s3 },
+  dayLbl:       { color: C.dim, fontSize: 10, fontWeight: '600' },
+  weekSub:      { color: C.dim, fontSize: 11, marginTop: 10, textAlign: 'center' },
+  bestRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
+  bestDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: C.orange },
+  bestName:     { flex: 1, color: C.text, fontSize: 13, fontWeight: '600' },
+  bestVal:      { color: C.orange, fontSize: 12, fontWeight: '700' },
 });
 
 // ─── Measurement tab ──────────────────────────────────────────────────────────
@@ -550,7 +604,7 @@ export default function ProgressScreen() {
 
       {/* Tab 0 — Genel Durum */}
       {activeTab === 0 && (
-        <GeneralTab workoutLogs={workoutLogs} lang={lang} weightUnit={weightUnit} />
+        <GeneralTab workoutLogs={workoutLogs} lang={lang} weightUnit={weightUnit} lengthUnit={lengthUnit} />
       )}
 
       {/* Tab 1 — Progressive Overload */}
