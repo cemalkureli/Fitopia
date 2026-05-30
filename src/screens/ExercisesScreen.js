@@ -1120,11 +1120,33 @@ function TemplatesTab({ lang }) {
           {/* Days */}
           <Text style={ft.detailSection}>{lang === 'tr' ? 'Haftalık Gün' : 'Days per Week'}</Text>
           <View style={ft.tagRow}><View style={ft.tag}><Text style={ft.tagTxt}>{selected.days} {lang === 'tr' ? 'gün' : 'days'}</Text></View></View>
-          {/* Workouts */}
+          {/* Workouts — each tappable to set as active program */}
           <Text style={ft.detailSection}>{lang === 'tr' ? 'Antrenmanlar' : 'Workouts'}</Text>
           {selected.workouts.map((w, i) => (
             <Animated.View key={i} entering={FadeInDown.delay(i * 50).duration(280)} style={ft.workoutItem}>
-              <Text style={ft.workoutItemTitle}>{w.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={ft.workoutItemTitle}>{w.name}</Text>
+                <TouchableOpacity
+                  style={ft.setActiveBtn}
+                  onPress={async () => {
+                    await setActiveProgram({
+                      id:          `${selected.id}-${i}`,
+                      title:       `${selected.title} — ${w.name}`,
+                      description: selected.description,
+                      exercises:   w.exercises.map(ex => ({ name: ex })),
+                    });
+                    Alert.alert(
+                      lang === 'tr' ? '✓ Program Ayarlandı' : '✓ Program Set',
+                      lang === 'tr'
+                        ? `"${w.name}" artık aktif programın.`
+                        : `"${w.name}" is now your active program.`
+                    );
+                  }}
+                >
+                  <Ionicons name="calendar-outline" size={12} color={C.lime} />
+                  <Text style={ft.setActiveTxt}>{lang === 'tr' ? 'Aktif Yap' : 'Set Active'}</Text>
+                </TouchableOpacity>
+              </View>
               {w.exercises.map((ex, j) => (
                 <Text key={j} style={ft.workoutExercise}>• {ex}</Text>
               ))}
