@@ -342,6 +342,11 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           style={StyleSheet.absoluteFill}
         />
 
+        {/* 3D Turntable mascot (transparent PNG, drag to spin) */}
+        <View style={g.mascotWrap}>
+          <TurntableMascot gender={gender} width={220} height={400} autoSpin />
+        </View>
+
         {/* Measurement values */}
         {measureRows.length > 0 ? (
           <View style={g.measureList}>
