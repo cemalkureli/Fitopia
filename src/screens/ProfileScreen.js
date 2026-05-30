@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Modal, Alert, ActivityIndicator, Image, Dimensions, Linking,
+  TextInput, Modal, Alert, ActivityIndicator, Image,
+  Animated, Dimensions, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, FadeInLeft, FadeIn } from 'react-native-reanimated';
+import AnimatedRN, { FadeInDown, FadeInLeft, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../utils/theme';
@@ -17,16 +18,96 @@ import { t } from '../utils/i18n';
 const { width } = Dimensions.get('window');
 const SUPPORT_EMAIL = 'cemalkureli@gmail.com';
 
+const GOAL_KEYS = ['goalGainWeight', 'goalLoseFat', 'goalGainMuscle'];
+
+// ─── Particle system ──────────────────────────────────────────────────────────
+function Particles() {
+  const particles = useRef(
+    Array.from({ length: 8 }, (_, i) => ({
+      x: Math.random() * width,
+      y: new Animated.Value(200 + Math.random() * 80),
+      opacity: new Animated.Value(0),
+      size: Math.random() * 3 + 2,
+      delay: i * 400,
+    }))
+  ).current;
+
+  useEffect(() => {
+    particles.forEach((p) => {
+      const animate = () => {
+        p.y.setValue(180 + Math.random() * 60);
+        p.opacity.setValue(0);
+        Animated.parallel([
+          Animated.timing(p.y, { toValue: -20, duration: 3500 + Math.random() * 2000, useNativeDriver: true }),
+          Animated.sequence([
+            Animated.timing(p.opacity, { toValue: 0.7, duration: 600, useNativeDriver: true }),
+            Animated.timing(p.opacity, { toValue: 0, duration: 2800, useNativeDriver: true }),
+          ]),
+        ]).start(animate);
+      };
+      setTimeout(animate, p.delay);
+    });
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {particles.map((p, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: 'absolute',
+            left: p.x,
+            width: p.size,
+            height: p.size,
+            borderRadius: p.size / 2,
+            backgroundColor: i % 3 === 0 ? '#dc2626' : i % 3 === 1 ? '#f87171' : '#fca5a5',
+            transform: [{ translateY: p.y }],
+            opacity: p.opacity,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ─── Glow pulse ───────────────────────────────────────────────────────────────
+function GlowPulse() {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 2200, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 2200, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.32] });
+  const scale   = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] });
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        width: 180, height: 180,
+        borderRadius: 90,
+        backgroundColor: '#dc2626',
+        top: 14, alignSelf: 'center',
+        opacity, transform: [{ scale }],
+      }}
+      pointerEvents="none"
+    />
+  );
+}
+
 // ─── Sub-screen header ────────────────────────────────────────────────────────
 function SubHeader({ title, onBack }) {
   return (
-    <Animated.View entering={FadeInDown.duration(300)} style={sh.wrap}>
+    <AnimatedRN.View entering={FadeInDown.duration(280)} style={sh.wrap}>
       <TouchableOpacity onPress={onBack} style={sh.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
         <Ionicons name="arrow-back" size={20} color={C.text} />
       </TouchableOpacity>
       <Text style={sh.title}>{title}</Text>
       <View style={{ width: 44 }} />
-    </Animated.View>
+    </AnimatedRN.View>
   );
 }
 const sh = StyleSheet.create({
@@ -35,11 +116,11 @@ const sh = StyleSheet.create({
   title:   { color: C.text, fontSize: 17, fontWeight: '800' },
 });
 
-// ─── Sub-screen background gradient ───────────────────────────────────────────
+// ─── Sub-screen background ────────────────────────────────────────────────────
 function SubBg({ colors }) {
   return (
     <LinearGradient
-      colors={colors ?? ['rgba(232,244,74,0.10)', 'rgba(7,8,11,0)']}
+      colors={colors ?? ['rgba(220,38,38,0.12)', 'rgba(2,6,23,0)']}
       locations={[0, 0.6]}
       style={StyleSheet.absoluteFill}
       pointerEvents="none"
@@ -50,55 +131,89 @@ function SubBg({ colors }) {
 // ─── Radio option ─────────────────────────────────────────────────────────────
 function RadioOption({ label, selected, onPress, delay = 0 }) {
   return (
-    <Animated.View entering={FadeInLeft.delay(delay).duration(280)}>
+    <AnimatedRN.View entering={FadeInLeft.delay(delay).duration(260)}>
       <TouchableOpacity style={ro.row} onPress={onPress} activeOpacity={0.7}>
-        <View style={[ro.circle, selected && { borderColor: C.lime, borderWidth: 2.5 }]}>
+        <View style={[ro.circle, selected && { borderColor: '#dc2626', borderWidth: 2.5 }]}>
           {selected && <View style={ro.dot} />}
         </View>
         <Text style={[ro.label, selected && { color: C.text, fontWeight: '700' }]}>{label}</Text>
-        {selected && <Ionicons name="checkmark-circle" size={18} color={C.lime} style={{ marginLeft: 'auto' }} />}
+        {selected && <Ionicons name="checkmark-circle" size={18} color="#dc2626" style={{ marginLeft: 'auto' }} />}
       </TouchableOpacity>
-    </Animated.View>
+    </AnimatedRN.View>
   );
 }
 const ro = StyleSheet.create({
   row:    { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 18, paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: C.border },
   circle: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.dim, alignItems: 'center', justifyContent: 'center' },
-  dot:    { width: 9, height: 9, borderRadius: 5, backgroundColor: C.lime },
+  dot:    { width: 9, height: 9, borderRadius: 5, backgroundColor: '#dc2626' },
   label:  { color: C.muted, fontSize: 16, fontWeight: '500', flex: 1 },
 });
 
-// ─── Section label ─────────────────────────────────────────────────────────────
-function SubSectionLabel({ text, delay = 0 }) {
+// ─── Sub section label ────────────────────────────────────────────────────────
+function SubDesc({ text, delay = 60 }) {
   return (
-    <Animated.Text entering={FadeInDown.delay(delay).duration(250)} style={ssl.text}>
+    <AnimatedRN.Text entering={FadeInDown.delay(delay).duration(240)} style={{ color: C.muted, fontSize: 13, paddingHorizontal: 24, paddingVertical: 16 }}>
       {text}
-    </Animated.Text>
+    </AnimatedRN.Text>
   );
 }
-const ssl = StyleSheet.create({
-  text: { color: C.muted, fontSize: 12, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 8 },
+
+// ─── Number edit sub-screen ───────────────────────────────────────────────────
+function NumberSub({ title, unit, value, desc, onBack, onSave, bgColors }) {
+  const [val, setVal] = useState(value || '');
+  return (
+    <View style={ss.fill}>
+      <SubBg colors={bgColors} />
+      <SubHeader title={title} onBack={onBack} />
+      <SubDesc text={desc} />
+      <AnimatedRN.View entering={FadeInDown.delay(120).duration(280)} style={ss.numWrap}>
+        <View style={ss.numRow}>
+          <TextInput
+            style={ss.numInput}
+            value={val}
+            onChangeText={setVal}
+            keyboardType="decimal-pad"
+            placeholderTextColor={C.dim}
+            placeholder="0"
+            autoFocus
+          />
+          <Text style={ss.numUnit}>{unit}</Text>
+        </View>
+        <TouchableOpacity style={ss.saveBtn} onPress={() => onSave(val)}>
+          <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ss.saveGrad}>
+            <Text style={ss.saveTxt}>Kaydet</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </AnimatedRN.View>
+    </View>
+  );
+}
+const ss = StyleSheet.create({
+  fill:    { flex: 1, backgroundColor: C.bg },
+  numWrap: { padding: 24 },
+  numRow:  { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginBottom: 28 },
+  numInput:{ flex: 1, fontSize: 52, fontWeight: '900', color: C.text, borderBottomWidth: 2, borderBottomColor: '#dc2626', paddingBottom: 8 },
+  numUnit: { color: C.muted, fontSize: 20, fontWeight: '700', paddingBottom: 12 },
+  saveBtn: { borderRadius: 16, overflow: 'hidden' },
+  saveGrad:{ height: 52, alignItems: 'center', justifyContent: 'center' },
+  saveTxt: { color: '#fff', fontWeight: '900', fontSize: 16 },
 });
 
 // ─── Settings row ─────────────────────────────────────────────────────────────
-function Row({ label, value, onPress, danger, last, noChevron, delay = 0 }) {
+function Row({ label, value, onPress, danger, last, noChevron }) {
   return (
-    <Animated.View entering={FadeInDown.delay(delay).duration(280)}>
-      <TouchableOpacity
-        style={[rw.row, last && { borderBottomWidth: 0 }]}
-        onPress={onPress}
-        disabled={!onPress}
-        activeOpacity={onPress ? 0.65 : 1}
-      >
-        <Text style={[rw.label, danger && { color: C.red }]}>{label}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {value ? <Text style={rw.value}>{value}</Text> : null}
-          {!noChevron && onPress && (
-            <Ionicons name="chevron-forward" size={15} color={danger ? C.red + '70' : C.dim} />
-          )}
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+    <TouchableOpacity
+      style={[rw.row, last && { borderBottomWidth: 0 }]}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={onPress ? 0.65 : 1}
+    >
+      <Text style={[rw.label, danger && { color: '#ef4444' }]}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {value ? <Text style={rw.value}>{value}</Text> : null}
+        {!noChevron && onPress && <Ionicons name="chevron-forward" size={15} color={danger ? '#ef4444' : C.dim} />}
+      </View>
+    </TouchableOpacity>
   );
 }
 const rw = StyleSheet.create({
@@ -108,31 +223,147 @@ const rw = StyleSheet.create({
 });
 
 // ─── Info card ────────────────────────────────────────────────────────────────
-function InfoCard({ label, value, onPress, accent, delay = 0 }) {
+function InfoCard({ label, value, onPress, delay = 0 }) {
   return (
-    <Animated.View entering={FadeInDown.delay(delay).duration(320)} style={{ flex: 1 }}>
-      <TouchableOpacity
-        style={[ic.card, accent && { borderColor: accent + '50' }]}
-        onPress={onPress}
-        disabled={!onPress}
-        activeOpacity={onPress ? 0.75 : 1}
-      >
-        {accent && (
-          <LinearGradient
-            colors={[accent + '18', 'transparent']}
-            style={StyleSheet.absoluteFill}
-          />
-        )}
+    <AnimatedRN.View entering={FadeInDown.delay(delay).duration(300)} style={{ flex: 1 }}>
+      <TouchableOpacity style={ic.card} onPress={onPress} disabled={!onPress} activeOpacity={0.75}>
+        <LinearGradient colors={['rgba(220,38,38,0.08)', 'transparent']} style={StyleSheet.absoluteFill} />
         <Text style={ic.label}>{label}</Text>
-        <Text style={[ic.value, accent && { color: accent }]} numberOfLines={2}>{value || '—'}</Text>
+        <Text style={ic.value} numberOfLines={2}>{value || '—'}</Text>
+        {onPress && <Ionicons name="pencil" size={11} color={C.dim} style={{ position: 'absolute', top: 10, right: 10 }} />}
       </TouchableOpacity>
-    </Animated.View>
+    </AnimatedRN.View>
   );
 }
 const ic = StyleSheet.create({
-  card:  { borderRadius: 16, padding: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1, minHeight: 72, overflow: 'hidden' },
+  card:  { borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(220,38,38,0.25)', backgroundColor: C.s1, minHeight: 72, overflow: 'hidden' },
   label: { color: C.muted, fontSize: 10, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8 },
   value: { color: C.text, fontSize: 16, fontWeight: '800' },
+});
+
+// ─── Delete Account modal ─────────────────────────────────────────────────────
+function DeleteModal({ visible, onClose, lang, userEmail, onDeleted }) {
+  const [step,      setStep]      = useState(0); // 0=info, 1=enter code
+  const [code,      setCode]      = useState('');
+  const [sending,   setSending]   = useState(false);
+  const [deleting,  setDeleting]  = useState(false);
+  const [codeSent,  setCodeSent]  = useState(false);
+
+  const sendCode = async () => {
+    setSending(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email: userEmail, options: { shouldCreateUser: false } });
+      if (error) throw error;
+      setCodeSent(true);
+      setStep(1);
+    } catch (e) {
+      Alert.alert(t('error', lang), e.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const verifyAndDelete = async () => {
+    if (!code.trim()) return;
+    setDeleting(true);
+    try {
+      const { error: verifyErr } = await supabase.auth.verifyOtp({ email: userEmail, token: code.trim(), type: 'email' });
+      if (verifyErr) { Alert.alert(t('error', lang), t('wrongCode', lang)); setDeleting(false); return; }
+      Alert.alert(
+        t('deleteAccount', lang),
+        t('deleteConfirm', lang),
+        [
+          { text: t('cancel', lang), style: 'cancel', onPress: () => setDeleting(false) },
+          {
+            text: t('deleteAccount', lang), style: 'destructive',
+            onPress: async () => {
+              try {
+                await supabase.rpc('delete_user');
+                Alert.alert('✓', t('deleteSuccess', lang));
+                onDeleted?.();
+              } catch (e) {
+                Alert.alert(t('error', lang), e.message);
+              } finally {
+                setDeleting(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch (e) {
+      Alert.alert(t('error', lang), e.message);
+      setDeleting(false);
+    }
+  };
+
+  const reset = () => { setStep(0); setCode(''); setCodeSent(false); };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { reset(); onClose(); }}>
+      <TouchableOpacity style={dm.overlay} activeOpacity={1} onPress={() => { reset(); onClose(); }}>
+        <AnimatedRN.View entering={FadeIn.duration(200)} style={dm.sheet}>
+          <View style={dm.handle} />
+          <View style={dm.iconWrap}>
+            <LinearGradient colors={['rgba(220,38,38,0.2)', 'transparent']} style={StyleSheet.absoluteFill} />
+            <Ionicons name="warning-outline" size={32} color="#ef4444" />
+          </View>
+          <Text style={dm.title}>{t('deleteAccount', lang)}</Text>
+
+          {step === 0 ? (
+            <>
+              <Text style={dm.desc}>{t('deleteStep1', lang)}</Text>
+              <Text style={dm.email}>{userEmail}</Text>
+              <TouchableOpacity style={dm.btn} onPress={sendCode} disabled={sending}>
+                {sending
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={dm.btnTxt}>{t('sendCode', lang)}</Text>
+                }
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={dm.desc}>{t('codeSent', lang)}</Text>
+              <Text style={dm.enterLabel}>{t('enterCode', lang)}</Text>
+              <TextInput
+                style={dm.codeInput}
+                value={code}
+                onChangeText={setCode}
+                keyboardType="number-pad"
+                placeholder="______"
+                placeholderTextColor={C.dim}
+                maxLength={6}
+                textAlign="center"
+                autoFocus
+              />
+              <TouchableOpacity style={[dm.btn, dm.btnDanger]} onPress={verifyAndDelete} disabled={deleting || !code.trim()}>
+                {deleting
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={dm.btnTxt}>{t('verifyAndDelete', lang)}</Text>
+                }
+              </TouchableOpacity>
+              <TouchableOpacity onPress={reset} style={{ marginTop: 12, alignItems: 'center' }}>
+                <Text style={{ color: C.muted, fontSize: 13 }}>← {t('cancel', lang)}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </AnimatedRN.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+const dm = StyleSheet.create({
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
+  sheet:      { backgroundColor: C.s1, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)', overflow: 'hidden' },
+  handle:     { width: 40, height: 4, backgroundColor: C.s3, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  iconWrap:   { width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(220,38,38,0.1)', borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)', alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: 14, overflow: 'hidden' },
+  title:      { color: C.text, fontSize: 20, fontWeight: '900', textAlign: 'center', marginBottom: 10 },
+  desc:       { color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 8 },
+  email:      { color: '#ef4444', fontSize: 14, fontWeight: '700', textAlign: 'center', marginBottom: 20 },
+  enterLabel: { color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 10, marginTop: 4 },
+  codeInput:  { backgroundColor: C.s2, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(220,38,38,0.4)', height: 56, fontSize: 24, fontWeight: '900', color: C.text, letterSpacing: 8, marginBottom: 20 },
+  btn:        { backgroundColor: C.s2, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border },
+  btnDanger:  { backgroundColor: '#dc2626', borderColor: '#dc2626' },
+  btnTxt:     { color: '#fff', fontWeight: '900', fontSize: 15 },
 });
 
 // ─── Main Profile Screen ──────────────────────────────────────────────────────
@@ -140,15 +371,16 @@ export default function ProfileScreen({ onSignOut }) {
   const { lang, setLang } = useLang();
   const { weightUnit, lengthUnit, setWeightUnit, setLengthUnit } = useUnits();
 
-  const [user,      setUser]      = useState(null);
-  const [profile,   setProfile]   = useState(null);
-  const [logs,      setLogs]      = useState({});
-  const [editModal, setEditModal] = useState(false);
-  const [form,      setForm]      = useState({ full_name: '', weight: '', height: '', goal: '', gender: '' });
-  const [saving,    setSaving]    = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [sub,       setSub]       = useState(null);
+  const [user,        setUser]        = useState(null);
+  const [profile,     setProfile]     = useState(null);
+  const [logs,        setLogs]        = useState({});
+  const [editModal,   setEditModal]   = useState(false);
+  const [form,        setForm]        = useState({ full_name: '', weight: '', height: '', goal: '', gender: '' });
+  const [saving,      setSaving]      = useState(false);
+  const [avatarUrl,   setAvatarUrl]   = useState(null);
+  const [uploading,   setUploading]   = useState(false);
+  const [sub,         setSub]         = useState(null);
+  const [deleteModal, setDeleteModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -158,13 +390,7 @@ export default function ProfileScreen({ onSignOut }) {
         if (p) {
           setProfile(p);
           setAvatarUrl(p.avatar_url || null);
-          setForm({
-            full_name: p.full_name || '',
-            weight:    String(p.weight || ''),
-            height:    String(p.height || ''),
-            goal:      p.goal || '',
-            gender:    p.gender || '',
-          });
+          setForm({ full_name: p.full_name || '', weight: String(p.weight || ''), height: String(p.height || ''), goal: p.goal || '', gender: p.gender || '' });
         }
       });
     });
@@ -174,7 +400,19 @@ export default function ProfileScreen({ onSignOut }) {
   const fullName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('athlete', lang);
   const initials = fullName.trim().split(' ').filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || '?';
   const totalSessions = Object.values(logs).reduce((a, b) => a + b.length, 0);
+
+  const goalDisplay = GOAL_KEYS.includes(profile?.goal) ? t(profile.goal, lang) : profile?.goal || null;
   const genderDisplay = profile?.gender === 'male' ? t('male', lang) : profile?.gender === 'female' ? t('female', lang) : profile?.gender || null;
+
+  const saveField = async (field, val) => {
+    if (!user) return;
+    const num = ['weight', 'height'].includes(field) ? parseFloat(val) || null : val;
+    try {
+      await updateProfile(user.id, { [field]: num });
+      setProfile(p => ({ ...p, [field]: num }));
+      setSub(null);
+    } catch (e) { Alert.alert(t('error', lang), e.message); }
+  };
 
   const pickAvatar = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -186,23 +424,19 @@ export default function ProfileScreen({ onSignOut }) {
       const asset = result.assets[0];
       const ext   = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
       const path  = `${user.id}/avatar.${ext}`;
-      const resp  = await fetch(asset.uri);
-      const blob  = await resp.blob();
-      const arr   = await blob.arrayBuffer();
+      const resp  = await fetch(asset.uri); const blob = await resp.blob(); const arr = await blob.arrayBuffer();
       const { error: upErr } = await supabase.storage.from('avatars').upload(path, arr, { contentType: ext === 'png' ? 'image/png' : 'image/jpeg', upsert: true });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
       const url = `${publicUrl}?t=${Date.now()}`;
       await updateProfile(user.id, { avatar_url: url });
-      setAvatarUrl(url);
-      setProfile(p => ({ ...p, avatar_url: url }));
+      setAvatarUrl(url); setProfile(p => ({ ...p, avatar_url: url }));
     } catch (e) { Alert.alert(t('error', lang), e.message); }
     finally { setUploading(false); }
   };
 
   const handleSave = async () => {
-    if (!user) return;
-    setSaving(true);
+    if (!user) return; setSaving(true);
     try {
       const updates = { full_name: form.full_name, weight: parseFloat(form.weight) || null, height: parseFloat(form.height) || null, goal: form.goal, gender: form.gender || null, email: user.email };
       await updateProfile(user.id, updates);
@@ -217,68 +451,89 @@ export default function ProfileScreen({ onSignOut }) {
     { text: t('signOut', lang), style: 'destructive', onPress: async () => { try { await signOut(); } catch {} onSignOut?.(); } },
   ]);
 
-  const handleDelete = () => Alert.alert(t('deleteAccount', lang), t('deleteConfirm', lang), [
-    { text: t('cancel', lang), style: 'cancel' },
-    { text: t('deleteAccount', lang), style: 'destructive', onPress: () => {} },
-  ]);
-
   const handleContact = () => {
     const subject = encodeURIComponent(t('mailSubject', lang));
     const body    = encodeURIComponent(t('mailBody', lang) + (user?.email ?? ''));
     Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`);
   };
 
-  const updateGender = async (g) => {
-    if (!user) return;
-    try {
-      await updateProfile(user.id, { gender: g });
-      setProfile(p => ({ ...p, gender: g }));
-    } catch (e) { Alert.alert(t('error', lang), e.message); }
-  };
-
   // ── Sub-screens ──────────────────────────────────────────────────────────────
-  if (sub === 'language') return (
-    <View style={s.fill}>
-      <SubBg colors={['rgba(56,189,248,0.14)', 'rgba(7,8,11,0)']} />
-      <SubHeader title={t('language', lang)} onBack={() => setSub(null)} />
-      <SubSectionLabel text={lang === 'tr' ? 'Uygulama dilini değiştir.' : 'Change the app language.'} delay={80} />
-      <RadioOption label="English" selected={lang === 'en'} onPress={() => setLang('en')} delay={140} />
-      <RadioOption label="Türkçe"  selected={lang === 'tr'} onPress={() => setLang('tr')} delay={200} />
-    </View>
+  if (sub === 'height') return (
+    <NumberSub
+      title={t('changeHeight', lang)}
+      unit={lengthUnit} value={profile?.height ? String(profile.height) : ''}
+      desc={lang === 'tr' ? 'Boyunuzu girin.' : 'Enter your height.'}
+      bgColors={['rgba(20,184,166,0.12)', 'rgba(2,6,23,0)']}
+      onBack={() => setSub(null)}
+      onSave={v => saveField('height', v)}
+    />
   );
 
-  if (sub === 'appearance') return (
-    <View style={s.fill}>
-      <SubBg colors={['rgba(139,92,246,0.14)', 'rgba(7,8,11,0)']} />
-      <SubHeader title={t('appearance', lang)} onBack={() => setSub(null)} />
-      <SubSectionLabel text={lang === 'tr' ? 'Uygulama temasını seç.' : 'Choose app theme.'} delay={80} />
-      <RadioOption label={lang === 'tr' ? 'Karanlık' : 'Dark'} selected onPress={() => {}} delay={140} />
-      <RadioOption label={lang === 'tr' ? 'Açık (yakında)' : 'Light (coming soon)'} selected={false} onPress={() => {}} delay={200} />
-    </View>
+  if (sub === 'weight') return (
+    <NumberSub
+      title={t('changeWeight', lang)}
+      unit={weightUnit} value={profile?.weight ? String(profile.weight) : ''}
+      desc={lang === 'tr' ? 'Kilonuzu girin.' : 'Enter your weight.'}
+      bgColors={['rgba(56,189,248,0.12)', 'rgba(2,6,23,0)']}
+      onBack={() => setSub(null)}
+      onSave={v => saveField('weight', v)}
+    />
   );
 
-  if (sub === 'units') return (
-    <View style={s.fill}>
-      <SubBg colors={['rgba(20,184,166,0.14)', 'rgba(7,8,11,0)']} />
-      <SubHeader title={t('units', lang)} onBack={() => setSub(null)} />
-      <SubSectionLabel text={t('weightUnitDesc', lang)} delay={80} />
-      <RadioOption label="kg" selected={weightUnit === 'kg'} onPress={() => setWeightUnit('kg')} delay={130} />
-      <RadioOption label="lb" selected={weightUnit === 'lb'} onPress={() => setWeightUnit('lb')} delay={180} />
-      <SubSectionLabel text={t('lengthUnitDesc', lang)} delay={240} />
-      <RadioOption label="cm" selected={lengthUnit === 'cm'} onPress={() => setLengthUnit('cm')} delay={290} />
-      <RadioOption label="in" selected={lengthUnit === 'in'} onPress={() => setLengthUnit('in')} delay={340} />
+  if (sub === 'goal') return (
+    <View style={ss.fill}>
+      <SubBg colors={['rgba(251,146,60,0.12)', 'rgba(2,6,23,0)']} />
+      <SubHeader title={t('goalSelectTitle', lang)} onBack={() => setSub(null)} />
+      <SubDesc text={lang === 'tr' ? 'Fitness hedefinizi seçin.' : 'Choose your fitness goal.'} />
+      {GOAL_KEYS.map((key, i) => (
+        <RadioOption key={key} label={t(key, lang)} selected={profile?.goal === key}
+          onPress={() => saveField('goal', key)} delay={80 + i * 60} />
+      ))}
     </View>
   );
 
   if (sub === 'gender') return (
-    <View style={s.fill}>
-      <SubBg colors={['rgba(232,244,74,0.12)', 'rgba(7,8,11,0)']} />
+    <View style={ss.fill}>
+      <SubBg colors={['rgba(220,38,38,0.10)', 'rgba(2,6,23,0)']} />
       <SubHeader title={t('gender', lang)} onBack={() => setSub(null)} />
-      <SubSectionLabel text={lang === 'tr' ? 'Cinsiyetini seç.' : 'Select your gender.'} delay={80} />
+      <SubDesc text={lang === 'tr' ? 'Cinsiyetinizi seçin.' : 'Select your gender.'} />
       {['male', 'female', 'other'].map((g, i) => (
         <RadioOption key={g} label={t(g, lang)} selected={profile?.gender === g}
-          onPress={() => updateGender(g)} delay={130 + i * 60} />
+          onPress={async () => { await saveField('gender', g); setSub(null); }} delay={80 + i * 60} />
       ))}
+    </View>
+  );
+
+  if (sub === 'language') return (
+    <View style={ss.fill}>
+      <SubBg colors={['rgba(56,189,248,0.12)', 'rgba(2,6,23,0)']} />
+      <SubHeader title={t('language', lang)} onBack={() => setSub(null)} />
+      <SubDesc text={lang === 'tr' ? 'Uygulama dilini değiştir.' : 'Change the app language.'} />
+      <RadioOption label="English" selected={lang === 'en'} onPress={() => setLang('en')} delay={80} />
+      <RadioOption label="Türkçe"  selected={lang === 'tr'} onPress={() => setLang('tr')} delay={140} />
+    </View>
+  );
+
+  if (sub === 'appearance') return (
+    <View style={ss.fill}>
+      <SubBg colors={['rgba(167,139,250,0.12)', 'rgba(2,6,23,0)']} />
+      <SubHeader title={t('appearance', lang)} onBack={() => setSub(null)} />
+      <SubDesc text={lang === 'tr' ? 'Uygulama temasını seç.' : 'Choose app theme.'} />
+      <RadioOption label={lang === 'tr' ? 'Karanlık' : 'Dark'} selected onPress={() => {}} delay={80} />
+      <RadioOption label={lang === 'tr' ? 'Açık (yakında)' : 'Light (coming soon)'} selected={false} onPress={() => {}} delay={140} />
+    </View>
+  );
+
+  if (sub === 'units') return (
+    <View style={ss.fill}>
+      <SubBg colors={['rgba(20,184,166,0.12)', 'rgba(2,6,23,0)']} />
+      <SubHeader title={t('units', lang)} onBack={() => setSub(null)} />
+      <SubDesc text={t('weightUnitDesc', lang)} />
+      <RadioOption label="kg" selected={weightUnit === 'kg'} onPress={() => setWeightUnit('kg')} delay={80} />
+      <RadioOption label="lb" selected={weightUnit === 'lb'} onPress={() => setWeightUnit('lb')} delay={130} />
+      <SubDesc text={t('lengthUnitDesc', lang)} delay={0} />
+      <RadioOption label="cm" selected={lengthUnit === 'cm'} onPress={() => setLengthUnit('cm')} delay={80} />
+      <RadioOption label="in" selected={lengthUnit === 'in'} onPress={() => setLengthUnit('in')} delay={130} />
     </View>
   );
 
@@ -287,46 +542,44 @@ export default function ProfileScreen({ onSignOut }) {
     <View style={s.fill}>
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-        {/* Hero — fluid lime-to-teal gradient */}
+        {/* Hero — red/black dramatic gradient */}
         <View style={s.hero}>
           <LinearGradient
-            colors={['rgba(232,244,74,0.30)', 'rgba(20,184,166,0.16)', 'rgba(7,8,11,0)']}
-            locations={[0, 0.5, 1]}
+            colors={['rgba(220,38,38,0.55)', 'rgba(127,29,29,0.30)', 'rgba(2,6,23,0)']}
+            locations={[0, 0.45, 1]}
             style={s.heroGrad}
           />
-          <Animated.View entering={FadeIn.delay(50).duration(400)} style={s.avatarWrap}>
+          <Particles />
+          <GlowPulse />
+
+          {/* Avatar */}
+          <AnimatedRN.View entering={FadeIn.delay(60).duration(400)} style={s.avatarWrap}>
             <TouchableOpacity onPress={pickAvatar} activeOpacity={0.85}>
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} style={s.avatarImg} />
               ) : (
                 <View style={s.avatarBox}>
-                  <LinearGradient
-                    colors={['rgba(232,244,74,0.18)', 'rgba(7,8,11,0.95)']}
-                    style={StyleSheet.absoluteFill}
-                  />
+                  <LinearGradient colors={['rgba(220,38,38,0.20)', 'rgba(2,6,23,0.95)']} style={StyleSheet.absoluteFill} />
                   <Text style={s.avatarInitials}>{initials}</Text>
                 </View>
               )}
               <View style={s.cameraBadge}>
                 {uploading
-                  ? <ActivityIndicator size="small" color={C.bg} />
-                  : <Ionicons name="camera" size={13} color={C.bg} />
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="camera" size={13} color="#fff" />
                 }
               </View>
             </TouchableOpacity>
-          </Animated.View>
+          </AnimatedRN.View>
 
-          <Animated.Text entering={FadeInDown.delay(120).duration(350)} style={s.userName}>
-            {fullName}
-          </Animated.Text>
-          <Animated.View entering={FadeInDown.delay(180).duration(300)}>
+          <AnimatedRN.Text entering={FadeInDown.delay(120).duration(320)} style={s.userName}>{fullName}</AnimatedRN.Text>
+          <AnimatedRN.View entering={FadeInDown.delay(180).duration(280)}>
             <TouchableOpacity onPress={() => setEditModal(true)} hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}>
               <Text style={s.editLink}>{t('editProfileLink', lang)}</Text>
             </TouchableOpacity>
-          </Animated.View>
+          </AnimatedRN.View>
 
-          {/* Mini stats */}
-          <Animated.View entering={FadeInDown.delay(240).duration(320)} style={s.heroStats}>
+          <AnimatedRN.View entering={FadeInDown.delay(240).duration(300)} style={s.heroStats}>
             <View style={s.heroStat}>
               <Text style={s.heroStatVal}>{totalSessions}</Text>
               <Text style={s.heroStatLbl}>{t('sessions', lang)}</Text>
@@ -336,98 +589,82 @@ export default function ProfileScreen({ onSignOut }) {
               <Text style={s.heroStatVal}>{Object.keys(logs).length}</Text>
               <Text style={s.heroStatLbl}>{t('exerciseCount', lang)}</Text>
             </View>
-          </Animated.View>
+          </AnimatedRN.View>
         </View>
 
-        {/* Info grid — 2×2 */}
+        {/* Info cards — all tappable */}
         <View style={s.infoGrid}>
-          <InfoCard label={t('gender', lang)} value={genderDisplay} onPress={() => setSub('gender')} accent={C.lime} delay={80} />
-          <InfoCard label={t('height', lang)} value={profile?.height ? fmtHeight(profile.height, lengthUnit) : null} accent={C.teal} delay={130} />
-          <InfoCard label={t('weight', lang)} value={profile?.weight ? fmtWeight(profile.weight, weightUnit) : null} accent={C.blue} delay={180} />
-          <InfoCard label={t('goal', lang)} value={profile?.goal} accent={C.orange} delay={230} />
+          <InfoCard label={t('gender', lang)} value={genderDisplay} onPress={() => setSub('gender')} delay={80} />
+          <InfoCard label={t('height', lang)} value={profile?.height ? fmtHeight(profile.height, lengthUnit) : null} onPress={() => setSub('height')} delay={130} />
+          <InfoCard label={t('weight', lang)} value={profile?.weight ? fmtWeight(profile.weight, weightUnit) : null} onPress={() => setSub('weight')} delay={180} />
+          <InfoCard label={t('goal', lang)}   value={goalDisplay} onPress={() => setSub('goal')} delay={230} />
         </View>
 
-        {/* Account section */}
-        <Animated.View entering={FadeInDown.delay(280).duration(320)} style={s.section}>
+        {/* Account */}
+        <AnimatedRN.View entering={FadeInDown.delay(270).duration(300)} style={s.section}>
           <Text style={s.sectionTitle}>{t('account', lang)}</Text>
           <View style={s.card}>
             <Row label="Email" value={user?.email?.length > 22 ? user.email.slice(0, 22) + '…' : user?.email} noChevron last />
           </View>
           <View style={s.card}>
-            <Row label={t('language', lang)}   value={lang === 'tr' ? 'Türkçe' : 'English'} onPress={() => setSub('language')} delay={0} />
-            <Row label={t('appearance', lang)} value={t('dark', lang)}                       onPress={() => setSub('appearance')} delay={0} />
-            <Row label={t('units', lang)}      value={`${weightUnit} / ${lengthUnit}`}        onPress={() => setSub('units')} last delay={0} />
+            <Row label={t('language', lang)}   value={lang === 'tr' ? 'Türkçe' : 'English'} onPress={() => setSub('language')} />
+            <Row label={t('appearance', lang)} value={t('dark', lang)}                       onPress={() => setSub('appearance')} />
+            <Row label={t('units', lang)}      value={`${weightUnit} / ${lengthUnit}`}        onPress={() => setSub('units')} last />
           </View>
-        </Animated.View>
+        </AnimatedRN.View>
 
-        {/* App section */}
-        <Animated.View entering={FadeInDown.delay(340).duration(320)} style={s.section}>
+        {/* App */}
+        <AnimatedRN.View entering={FadeInDown.delay(320).duration(300)} style={s.section}>
           <Text style={s.sectionTitle}>{t('app', lang)}</Text>
           <View style={s.card}>
             <Row label={t('rateApp', lang)}   onPress={() => {}} />
             <Row label={t('becomePro', lang)} onPress={() => {}} />
             <Row label={t('contactUs', lang)} onPress={handleContact} last />
           </View>
-        </Animated.View>
+        </AnimatedRN.View>
 
-        {/* Danger zone */}
-        <Animated.View entering={FadeInDown.delay(400).duration(320)} style={s.section}>
+        {/* Danger */}
+        <AnimatedRN.View entering={FadeInDown.delay(370).duration(300)} style={s.section}>
           <View style={s.card}>
             <Row label={t('signOut', lang)}       onPress={handleSignOut} danger />
-            <Row label={t('deleteAccount', lang)} onPress={handleDelete}  danger last />
+            <Row label={t('deleteAccount', lang)} onPress={() => setDeleteModal(true)} danger last />
           </View>
-        </Animated.View>
+        </AnimatedRN.View>
 
       </ScrollView>
 
-      {/* Edit modal */}
+      {/* Edit modal (full name only) */}
       <Modal visible={editModal} transparent animationType="slide" onRequestClose={() => setEditModal(false)}>
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setEditModal(false)}>
-          <Animated.View entering={FadeIn.duration(200)} style={s.editModal}>
+          <AnimatedRN.View entering={FadeIn.duration(200)} style={s.editModal}>
             <View style={s.editHandle} />
             <Text style={s.editTitle}>{t('editProfile', lang)}</Text>
-
             <Text style={s.inputLabel}>{t('fullName', lang)}</Text>
             <TextInput style={s.inputField} value={form.full_name}
               onChangeText={v => setForm(f => ({ ...f, full_name: v }))}
               placeholder={t('fullName', lang)} placeholderTextColor={C.dim} autoCapitalize="words" />
-
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.inputLabel}>{t('weightKg', lang)}</Text>
-                <TextInput style={s.inputField} value={form.weight}
-                  onChangeText={v => setForm(f => ({ ...f, weight: v }))}
-                  placeholder="75" placeholderTextColor={C.dim} keyboardType="decimal-pad" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.inputLabel}>{t('heightCm', lang)}</Text>
-                <TextInput style={s.inputField} value={form.height}
-                  onChangeText={v => setForm(f => ({ ...f, height: v }))}
-                  placeholder="175" placeholderTextColor={C.dim} keyboardType="decimal-pad" />
-              </View>
-            </View>
-
-            <Text style={s.inputLabel}>{t('goal', lang)}</Text>
-            <TextInput style={s.inputField} value={form.goal}
-              onChangeText={v => setForm(f => ({ ...f, goal: v }))}
-              placeholder={t('goalPlaceholder', lang)} placeholderTextColor={C.dim} autoCapitalize="sentences" />
-
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
               <TouchableOpacity style={s.cancelBtn} onPress={() => setEditModal(false)}>
                 <Text style={{ color: C.muted, fontWeight: '700' }}>{t('cancel', lang)}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saving}>
-                <LinearGradient colors={['#e8f44a', '#a3c200']} style={s.saveGrad}>
-                  {saving
-                    ? <ActivityIndicator color={C.bg} size="small" />
-                    : <Text style={{ color: C.bg, fontWeight: '900' }}>{t('save', lang)}</Text>
-                  }
+                <LinearGradient colors={['#dc2626', '#7f1d1d']} style={s.saveGrad}>
+                  {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '900' }}>{t('save', lang)}</Text>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </Animated.View>
+          </AnimatedRN.View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Delete account modal */}
+      <DeleteModal
+        visible={deleteModal}
+        onClose={() => setDeleteModal(false)}
+        lang={lang}
+        userEmail={user?.email ?? ''}
+        onDeleted={() => { setDeleteModal(false); try { signOut(); } catch {} onSignOut?.(); }}
+      />
     </View>
   );
 }
@@ -436,23 +673,22 @@ const s = StyleSheet.create({
   fill:    { flex: 1, backgroundColor: C.bg },
   content: { paddingBottom: 48 },
 
-  hero:            { alignItems: 'center', paddingTop: 28, paddingBottom: 28 },
-  heroGrad:        { position: 'absolute', top: 0, left: 0, right: 0, height: 320 },
-  avatarWrap:      { marginBottom: 14 },
-  avatarImg:       { width: 110, height: 110, borderRadius: 26, borderWidth: 2.5, borderColor: C.lime },
-  avatarBox:       { width: 110, height: 110, borderRadius: 26, backgroundColor: C.s1, borderWidth: 2.5, borderColor: 'rgba(232,244,74,0.35)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarInitials:  { color: C.lime, fontSize: 38, fontWeight: '900', letterSpacing: 2 },
-  cameraBadge:     { position: 'absolute', bottom: -2, right: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: C.lime, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
-  userName:        { color: C.text, fontSize: 24, fontWeight: '900', marginBottom: 6 },
+  hero:            { alignItems: 'center', paddingTop: 32, paddingBottom: 28, overflow: 'hidden' },
+  heroGrad:        { position: 'absolute', top: 0, left: 0, right: 0, height: 340 },
+  avatarWrap:      { marginBottom: 14, zIndex: 1 },
+  avatarImg:       { width: 112, height: 112, borderRadius: 28, borderWidth: 2.5, borderColor: '#dc2626' },
+  avatarBox:       { width: 112, height: 112, borderRadius: 28, backgroundColor: C.s1, borderWidth: 2.5, borderColor: 'rgba(220,38,38,0.45)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarInitials:  { color: '#f87171', fontSize: 40, fontWeight: '900', letterSpacing: 2 },
+  cameraBadge:     { position: 'absolute', bottom: -2, right: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
+  userName:        { color: C.text, fontSize: 24, fontWeight: '900', marginBottom: 6, zIndex: 1 },
   editLink:        { color: C.muted, fontSize: 13, marginBottom: 20 },
-  heroStats:       { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, borderWidth: 1, borderColor: C.border, paddingVertical: 12, paddingHorizontal: 8 },
+  heroStats:       { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', paddingVertical: 12, paddingHorizontal: 8 },
   heroStat:        { flex: 1, alignItems: 'center' },
   heroStatVal:     { color: C.text, fontSize: 20, fontWeight: '900' },
   heroStatLbl:     { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 2 },
-  heroStatDivider: { width: 1, height: 28, backgroundColor: C.border },
+  heroStatDivider: { width: 1, height: 28, backgroundColor: 'rgba(220,38,38,0.25)' },
 
   infoGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16, marginBottom: 8 },
-
   section:      { paddingHorizontal: 16, marginBottom: 12 },
   sectionTitle: { color: C.dim, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8, marginLeft: 4 },
   card:         { backgroundColor: C.s1, borderRadius: 18, borderWidth: 1, borderColor: C.border, overflow: 'hidden', marginBottom: 8 },

@@ -120,6 +120,24 @@ export const TRANSLATIONS = {
     'lengthUnitDesc': 'Uzunluk birimini değiştir.',
     'mailSubject':    'Fitopia - Destek',
     'mailBody':       'Merhaba,\n\n(Mesajınızı buraya yazın)\n\n---- Lütfen bu satırın üstüne yazın ----\n\nUygulama: Fitopia v1.0\nKullanıcı: ',
+    // Goal options
+    'goalGainWeight':   'Kilo Al',
+    'goalLoseFat':      'Yağ Yak',
+    'goalGainMuscle':   'Kas Kazan ve Yağ Yak',
+    'goalSelectTitle':  'Hedefinizi seçin',
+    // Edit sub-screens
+    'changeHeight':     'Boy Güncelle',
+    'changeWeight':     'Kilo Güncelle',
+    'save':             'Kaydet',
+    // Delete account OTP
+    'deleteStep1':      'E-posta adresinize doğrulama kodu göndereceğiz.',
+    'sendCode':         'Kod Gönder',
+    'codeSent':         'Kod gönderildi! E-postanızı kontrol edin.',
+    'enterCode':        'Doğrulama kodunu girin:',
+    'verifyAndDelete':  'Doğrula ve Hesabı Sil',
+    'deleting':         'Siliniyor...',
+    'wrongCode':        'Hatalı kod. Lütfen tekrar deneyin.',
+    'deleteSuccess':    'Hesabınız silindi.',
     // Profile
     'tapToClose':     'Kapatmak için dokunun',
     'heightCm':       'Boy (cm)',
@@ -267,6 +285,24 @@ export const TRANSLATIONS = {
     'lengthUnitDesc': 'Change the length unit.',
     'mailSubject':    'Fitopia - Support',
     'mailBody':       'Hello,\n\n(Write your message here)\n\n---- Please write above this line ----\n\nApp: Fitopia v1.0\nUser: ',
+    // Goal options
+    'goalGainWeight':   'Gain Weight',
+    'goalLoseFat':      'Lose Fat',
+    'goalGainMuscle':   'Gain Muscle & Lose Fat',
+    'goalSelectTitle':  'Select your goal',
+    // Edit sub-screens
+    'changeHeight':     'Update Height',
+    'changeWeight':     'Update Weight',
+    'save':             'Save',
+    // Delete account OTP
+    'deleteStep1':      'We will send a verification code to your email address.',
+    'sendCode':         'Send Code',
+    'codeSent':         'Code sent! Check your email.',
+    'enterCode':        'Enter verification code:',
+    'verifyAndDelete':  'Verify & Delete Account',
+    'deleting':         'Deleting...',
+    'wrongCode':        'Invalid code. Please try again.',
+    'deleteSuccess':    'Your account has been deleted.',
     // Profile
     'tapToClose':     'Tap to close',
     'heightCm':       'Height (cm)',

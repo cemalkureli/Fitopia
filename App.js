@@ -13,7 +13,6 @@ import { C } from './src/utils/theme';
 import { supabase } from './src/lib/supabase';
 import { LanguageProvider, useLang } from './src/context/LanguageContext';
 import { UnitsProvider } from './src/context/UnitsContext';
-import LangToggle from './src/components/LangToggle';
 import { t } from './src/utils/i18n';
 
 import LoginScreen    from './src/screens/auth/LoginScreen';
@@ -75,7 +74,6 @@ function Header() {
       <Text style={{ color:C.lime, fontSize:20, fontWeight:'900', letterSpacing:1 }}>
         FITO<Text style={{ color:C.muted }}>/PIA</Text>
       </Text>
-      <LangToggle />
       <View style={{ alignItems:'flex-end' }}>
         <Text style={{ color:C.text, fontSize:16, fontWeight:'800' }}>
           {h}:{m}<Text style={{ color:C.muted, fontSize:11 }}>:{sec}</Text>
