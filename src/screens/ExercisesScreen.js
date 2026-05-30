@@ -15,14 +15,34 @@ import { t, CATEGORY_LABELS, MUSCLE_LABELS } from '../utils/i18n';
 
 const { width, height } = Dimensions.get('window');
 
-// Kategori filtre listesi (DB değerleri)
 const CAT_KEYS = ['Göğüs','Sırt','Omuz','Kol','Bacak','Core','Kardio','Compound'];
 
 const CAT_COLOR = {
-  'Göğüs':   C.orange, 'Sırt':   C.blue,  'Omuz':    C.purple,
-  'Kol':     C.teal,   'Bacak':  C.green,  'Core':    C.lime,
-  'Kardio':  C.red,    'Compound':C.muted,
+  'Göğüs':    C.orange, 'Sırt':    C.blue,  'Omuz':    C.purple,
+  'Kol':      C.teal,   'Bacak':   C.green,  'Core':    C.lime,
+  'Kardio':   C.red,    'Compound':C.muted,
 };
+
+const CAT_ICON = {
+  '':         'apps-outline',
+  'Göğüs':   'body-outline',
+  'Sırt':    'accessibility-outline',
+  'Omuz':    'barbell-outline',
+  'Kol':     'fitness-outline',
+  'Bacak':   'walk-outline',
+  'Core':    'radio-button-on-outline',
+  'Kardio':  'heart-outline',
+  'Compound':'flash-outline',
+};
+
+const DIFF_META = [
+  { key: 'all',   color: C.muted,  icon: 'options-outline'     },
+  { key: 'diff1', color: C.green,  icon: 'leaf-outline'        },
+  { key: 'diff2', color: C.teal,   icon: 'trending-up-outline' },
+  { key: 'diff3', color: C.lime,   icon: 'flame-outline'       },
+  { key: 'diff4', color: C.orange, icon: 'alert-outline'       },
+  { key: 'diff5', color: C.red,    icon: 'skull-outline'       },
+];
 
 // ─── Yıldız ──────────────────────────────────────────────────────────────────
 function Stars({ value, max = 5, size = 14, onPress }) {
@@ -391,15 +411,19 @@ export default function ExercisesScreen() {
   }, [cat, diff, search]);
 
   const renderItem   = useCallback(({ item }) => <ExerciseRow item={item} onPress={setSelected} lang={lang} />, [lang]);
-  const renderCat    = useCallback(({ item: c }) => {
-    const label = c === '' ? t('all', lang) : (CATEGORY_LABELS[lang]?.[c] ?? c);
-    const color = CAT_COLOR[c] ?? C.lime;
+  const renderCat = useCallback(({ item: c }) => {
+    const label  = c === '' ? t('all', lang) : (CATEGORY_LABELS[lang]?.[c] ?? c);
+    const color  = CAT_COLOR[c] ?? C.lime;
+    const icon   = CAT_ICON[c] ?? 'apps-outline';
+    const active = cat === c;
     return (
       <TouchableOpacity
-        style={[s.catBtn, cat === c && { backgroundColor: color + '20', borderColor: color }]}
+        style={[s.catBtn, active && { backgroundColor: color, borderColor: color }]}
         onPress={() => setCat(c)}
+        activeOpacity={0.75}
       >
-        <Text style={[s.catTxt, cat === c && { color, fontWeight: '700' }]}>{label}</Text>
+        <Ionicons name={icon} size={14} color={active ? '#0a0c0f' : color} />
+        <Text style={[s.catTxt, active && { color: '#0a0c0f', fontWeight: '800' }]}>{label}</Text>
       </TouchableOpacity>
     );
   }, [cat, lang]);
@@ -434,24 +458,28 @@ export default function ExercisesScreen() {
       />
 
       {/* Zorluk filtresi */}
-      <View style={s.diffRow}>
-        {[0,1,2,3,4,5].map(d => {
-          const DIFF_KEYS = ['all','diff1','diff2','diff3','diff4','diff5'];
-          const label = t(DIFF_KEYS[d], lang);
-          const DIFF_COLORS = [C.muted, C.green, C.teal, C.lime, C.orange, C.red];
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={s.diffScroll}
+        contentContainerStyle={s.diffContent}
+      >
+        {DIFF_META.map((dm, d) => {
+          const label  = t(dm.key, lang);
           const active = diff === d;
-          const col = DIFF_COLORS[d];
           return (
             <TouchableOpacity
               key={d}
-              style={[s.diffBtn, active && { backgroundColor: col + '22', borderColor: col }]}
+              style={[s.diffBtn, active && { backgroundColor: dm.color, borderColor: dm.color }]}
               onPress={() => setDiff(d)}
+              activeOpacity={0.75}
             >
-              <Text style={[s.diffTxt, active && { color: col, fontWeight: '700' }]}>{label}</Text>
+              <Ionicons name={dm.icon} size={13} color={active ? '#0a0c0f' : dm.color} />
+              <Text style={[s.diffTxt, active && { color: '#0a0c0f', fontWeight: '800' }]}>{label}</Text>
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
 
       {/* Sayaç */}
       <Text style={s.countTxt}>{loading ? '...' : `${exercises.length}+ ${t('exercises', lang)}`}</Text>
@@ -494,12 +522,13 @@ const s = StyleSheet.create({
   fill:       { flex: 1, backgroundColor: C.bg },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.s1, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, height: 46, margin: 16, marginBottom: 10 },
   searchInput:{ flex: 1, color: C.text, fontSize: 14 },
-  catList:    { flexGrow: 0, flexShrink: 0, marginBottom: 6 },
-  catBtn:     { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
-  catTxt:     { color: C.muted, fontSize: 12, fontWeight: '600' },
-  diffRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, marginBottom: 8 },
-  diffBtn:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
-  diffTxt:    { color: C.muted, fontSize: 11, fontWeight: '600' },
+  catList:    { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
+  catBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 22, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s1 },
+  catTxt:     { color: C.muted, fontSize: 12, fontWeight: '700' },
+  diffScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
+  diffContent:{ paddingHorizontal: 16, gap: 8, flexDirection: 'row', alignItems: 'center' },
+  diffBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s1 },
+  diffTxt:    { color: C.muted, fontSize: 11, fontWeight: '700' },
   countTxt:   { color: C.dim, fontSize: 11, fontWeight: '600', paddingHorizontal: 16, marginBottom: 6 },
   list:       { paddingHorizontal: 16, paddingBottom: 32 },
   exRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.s1, borderRadius: 14, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: C.border },
