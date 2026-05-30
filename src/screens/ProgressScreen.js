@@ -22,6 +22,7 @@ const MEASURE_TYPES = [
   { key: 'bodyFat',    labelKey: 'mBodyFat',    unit: '%',    infoKey: 'mInfoBodyFat' },
   { key: 'ffmi',       labelKey: 'mFFMI',       unit: 'kg/m²', infoKey: 'mInfoFFMI' },
   { key: 'bodyWeight', labelKey: 'mBodyWeight', unitType: 'weight' },
+  { key: 'height',     labelKey: 'mHeight',     unitType: 'length' },
   { key: 'neck',       labelKey: 'mNeck',       unitType: 'length' },
   { key: 'shoulder',   labelKey: 'mShoulder',   unitType: 'length' },
   { key: 'chest',      labelKey: 'mChest',      unitType: 'length' },
@@ -268,13 +269,12 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
   const [gender,       setGender]       = useState('male');
   const [latestMeasure, setLatestMeasure] = useState({});
 
-  useEffect(() => {
-    // Load gender from profile
+  // Reload gender + measurements every time this tab is focused
+  useFocusEffect(useCallback(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data?.user) return;
       supabase.from('profiles').select('gender').eq('id', data.user.id).single()
         .then(({ data: p }) => { if (p?.gender) setGender(p.gender); });
-      // Load latest measurements
       supabase.from('body_measurements').select('type, value, unit')
         .eq('user_id', data.user.id).order('measured_at', { ascending: false })
         .then(({ data: ms }) => {
@@ -283,7 +283,7 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           setLatestMeasure(latest);
         });
     });
-  }, []);
+  }, []));
 
   const totalSessions = Object.values(workoutLogs).reduce((a, b) => a + b.length, 0);
   const totalSets     = Object.values(workoutLogs).reduce((a, b) => a + b.reduce((c, s) => c + (s.sets?.length ?? 0), 0), 0);

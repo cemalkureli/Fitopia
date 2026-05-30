@@ -471,16 +471,18 @@ function WorkoutsTab({ lang }) {
   };
 
   // ── Exercise detail sub-view ───────────────────────────────────────────────
-  const [editEx,    setEditEx]    = useState(null);
-  const [setsData,  setSetsData]  = useState([]); // [{weight:'',reps:''}]
-  const [editRir,   setEditRir]   = useState('1');
-  const [editSaving,setEditSaving]= useState(false);
+  const [editEx,       setEditEx]       = useState(null);
+  const [setsData,     setSetsData]     = useState([]);
+  const [editRir,      setEditRir]      = useState('1');
+  const [editIntensity,setEditIntensity]= useState(null); // null | 'failure' | 'superset' | 'finisher'
+  const [editSaving,   setEditSaving]   = useState(false);
 
   const openEdit = (ex) => {
     setEditEx(ex);
     const sd = ex.sets_data?.length ? ex.sets_data : Array.from({ length: ex.sets || 3 }, () => ({ weight: String(ex.weight || ''), reps: String(ex.reps || 10) }));
     setSetsData(sd.map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
     setEditRir(String(ex.rir ?? 1));
+    setEditIntensity(ex.intensity ?? null);
     setView('exerciseDetail');
   };
 
@@ -499,6 +501,7 @@ function WorkoutsTab({ lang }) {
         weight:    cleanSets[0]?.weight || 0,
         rir:       parseFloat(editRir) || 1,
         sets_data: cleanSets,
+        intensity: editIntensity,
       }).eq('id', editEx.id);
       await loadWorkoutExercises(active.id);
       setEditEx(null);
@@ -693,6 +696,28 @@ function WorkoutsTab({ lang }) {
                   </TouchableOpacity>
                 ))}
               </View>
+            </View>
+
+            {/* Intensity type */}
+            <View style={ed.intensityRow}>
+              {[
+                { key: 'failure',  label: 'Failure',  icon: 'flash' },
+                { key: 'superset', label: 'Superset', icon: 'repeat' },
+                { key: 'finisher', label: 'Finisher', icon: 'flag' },
+              ].map(({ key, label, icon }) => {
+                const active = editIntensity === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[ed.intensityBtn, active && ed.intensityBtnActive]}
+                    onPress={() => setEditIntensity(active ? null : key)}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name={`${icon}${active ? '' : '-outline'}`} size={16} color={active ? '#fff' : C.muted} />
+                    <Text style={[ed.intensityTxt, active && { color: '#fff', fontWeight: '800' }]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* Terim açıklamaları */}
@@ -902,6 +927,10 @@ const ed = StyleSheet.create({
   rirBtn:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s2 },
   rirBtnActive: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
   rirBtnTxt:    { color: C.muted, fontSize: 14, fontWeight: '600' },
+  intensityRow:    { flexDirection: 'row', gap: 8, marginTop: 14 },
+  intensityBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s1 },
+  intensityBtnActive: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
+  intensityTxt:    { color: C.muted, fontSize: 12, fontWeight: '600' },
   termSection:  { marginTop: 20, backgroundColor: C.s1, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border },
   termSectionTitle: { color: C.text, fontSize: 13, fontWeight: '800', marginBottom: 12 },
   termItem:     { marginBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 14 },

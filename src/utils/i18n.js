@@ -96,6 +96,7 @@ export const TRANSLATIONS = {
     'noLogsYet':       'Henüz kayıt yok',
     // Measurements
     'mAddMeasurement': 'Ölçüm Ekle',
+    'mHeight':         'Boy',
     'mBodyFat':        'Vücut Yağı',
     'mFFMI':           'FFMI',
     'mBodyWeight':     'Vücut Ağırlığı',
@@ -292,6 +293,7 @@ export const TRANSLATIONS = {
     'noLogsYet':       'No records yet',
     // Measurements
     'mAddMeasurement': 'Add Measurement',
+    'mHeight':         'Height',
     'mBodyFat':        'Body Fat',
     'mFFMI':           'FFMI',
     'mBodyWeight':     'Body Weight',
