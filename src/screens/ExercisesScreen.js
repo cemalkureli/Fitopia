@@ -513,8 +513,8 @@ function WorkoutsTab({ lang }) {
 
   const addSet = () =>
     setSetsData(prev => [...prev, {
-      weight: prev[prev.length - 1]?.weight ?? '',
-      reps:   prev[prev.length - 1]?.reps ?? '',
+      weight: '',
+      reps:   '',
       _key:   `new-${Date.now()}-${Math.random()}`,
     }]);
 
@@ -627,8 +627,6 @@ function WorkoutsTab({ lang }) {
 
   // ── Exercise detail (set-by-set logging) ──────────────────────────────────
   if (view === 'exerciseDetail' && editEx) {
-    // Mini volume chart
-    const maxW = Math.max(...setsData.map(s => parseFloat(s.weight) || 0), 1);
     const totalVol = setsData.reduce((a, s) => a + (parseFloat(s.weight)||0)*(parseInt(s.reps)||0), 0);
 
     return (
@@ -674,23 +672,6 @@ function WorkoutsTab({ lang }) {
               </View>
             </View>
 
-            {/* Mini bar chart (weight per set) */}
-            {setsData.length > 0 && setsData.some(s => parseFloat(s.weight) > 0) && (
-              <View style={ed.chartWrap}>
-                <View style={ed.chartBars}>
-                  {setsData.map((s, i) => {
-                    const h = Math.max(4, ((parseFloat(s.weight)||0) / maxW) * 56);
-                    return (
-                      <View key={i} style={ed.chartBarCol}>
-                        <View style={[ed.chartBar, { height: h }]} />
-                        <Text style={ed.chartBarLbl}>{i+1}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-                <Text style={ed.chartTitle}>{lang === 'tr' ? 'Set Başına Ağırlık (kg)' : 'Weight per Set (kg)'}</Text>
-              </View>
-            )}
 
             {/* Column headers */}
             <View style={ed.tableHeader}>
@@ -736,11 +717,11 @@ function WorkoutsTab({ lang }) {
 
             {/* Unified mode selector — mutually exclusive */}
             <View style={{ marginTop: 16 }}>
-              <Text style={ed.rirLabel}>{lang === 'tr' ? 'Yoğunluk / RIR' : 'Intensity / RIR'}</Text>
+              <Text style={ed.modeSectionLabel}>{lang === 'tr' ? 'Yoğunluk / RIR' : 'Intensity / RIR'}</Text>
 
               {/* RIR row */}
-              <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 8 }}>
-                <Text style={[ed.rirLabel, { width: 36, lineHeight: 36 }]}>RIR</Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 8, alignItems: 'center' }}>
+                <Text style={ed.rirPrefixLabel}>RIR</Text>
                 {['0','1','2','3','4'].map(v => {
                   const key = `rir${v}`;
                   const active = editMode === key;
@@ -1095,7 +1076,9 @@ const ed = StyleSheet.create({
   addSetRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, justifyContent: 'center', borderTopWidth: 1, borderTopColor: C.border, marginTop: 4 },
   addSetTxt:    { color: '#dc2626', fontSize: 15, fontWeight: '700' },
   rirRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, backgroundColor: C.s1, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
-  rirLabel:     { color: C.muted, fontSize: 13, fontWeight: '800', width: 36 },
+  rirLabel:         { color: C.muted, fontSize: 13, fontWeight: '800' },
+  modeSectionLabel: { color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  rirPrefixLabel:   { color: C.muted, fontSize: 12, fontWeight: '700', width: 30 },
   rirBtn:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s2 },
   rirBtnActive: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
   rirBtnTxt:    { color: C.muted, fontSize: 14, fontWeight: '600' },
