@@ -238,13 +238,13 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
                   </Text>
                   <EffBar
                     value={item.muscle_activations[activeMuscle]}
-                    label={lang === 'tr' ? 'Aktivasyon' : 'Activation'}
+                    label={t('activation', lang)}
                     color={color}
                   />
                   <Text style={det.activationNote}>
                     {lang === 'tr'
-                      ? `Bu egzersizde ${MUSCLE_LABELS.tr[activeMuscle] ?? activeMuscle} ${item.muscle_activations[activeMuscle] >= 4 ? 'primer olarak çalışır' : 'yardımcı olarak katılır'}.`
-                      : `${MUSCLE_LABELS.en[activeMuscle] ?? activeMuscle} acts as ${item.muscle_activations[activeMuscle] >= 4 ? 'primary mover' : 'secondary stabilizer'} in this exercise.`
+                      ? `${t('inThisExercise', lang)} ${MUSCLE_LABELS.tr[activeMuscle] ?? activeMuscle} ${item.muscle_activations[activeMuscle] >= 4 ? t('actsPrimary', lang) : t('actsSecondary', lang)}.`
+                      : `${MUSCLE_LABELS.en[activeMuscle] ?? activeMuscle} ${item.muscle_activations[activeMuscle] >= 4 ? t('actsPrimary', lang) : t('actsSecondary', lang)} ${t('inThisExercise', lang)}`
                     }
                   </Text>
                 </View>
@@ -294,7 +294,7 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
               )}
               {submitted && (
                 <Text style={{ color: C.dim, fontSize: 11, marginTop: 4 }}>
-                  {lang === 'tr' ? 'Oyunu değiştirebilirsin' : 'You can change your rating'}
+                  {t('ratingChangeable', lang)}
                 </Text>
               )}
 
@@ -392,7 +392,7 @@ export default function ExercisesScreen() {
 
   const renderItem   = useCallback(({ item }) => <ExerciseRow item={item} onPress={setSelected} lang={lang} />, [lang]);
   const renderCat    = useCallback(({ item: c }) => {
-    const label = c === '' ? (lang === 'tr' ? 'Tümü' : 'All') : (CATEGORY_LABELS[lang]?.[c] ?? c);
+    const label = c === '' ? t('all', lang) : (CATEGORY_LABELS[lang]?.[c] ?? c);
     const color = CAT_COLOR[c] ?? C.lime;
     return (
       <TouchableOpacity
@@ -436,9 +436,8 @@ export default function ExercisesScreen() {
       {/* Zorluk filtresi */}
       <View style={s.diffRow}>
         {[0,1,2,3,4,5].map(d => {
-          const DIFF_LABELS = ['Tümü','Kolay','Orta-Kolay','Orta','Zor','Çok Zor'];
-          const DIFF_LABELS_EN = ['All','Easy','Easy-Med','Medium','Hard','Very Hard'];
-          const label = lang === 'tr' ? DIFF_LABELS[d] : DIFF_LABELS_EN[d];
+          const DIFF_KEYS = ['all','diff1','diff2','diff3','diff4','diff5'];
+          const label = t(DIFF_KEYS[d], lang);
           const DIFF_COLORS = [C.muted, C.green, C.teal, C.lime, C.orange, C.red];
           const active = diff === d;
           const col = DIFF_COLORS[d];

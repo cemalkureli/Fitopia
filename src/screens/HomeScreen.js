@@ -8,17 +8,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '../utils/theme';
 import { getAllWorkoutLogs } from '../utils/storage';
 import { supabase } from '../lib/supabase';
+import { useLang } from '../context/LanguageContext';
+import { t, DAYS_SHORT, MONTHS_SHORT } from '../utils/i18n';
 
-const GUNLER = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
-const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
-
-function greeting() {
+function greeting(lang) {
   const h = new Date().getHours();
-  if (h < 6)  return 'Gece yarısı';
-  if (h < 12) return 'Günaydın';
-  if (h < 17) return 'İyi günler';
-  if (h < 21) return 'İyi akşamlar';
-  return 'İyi geceler';
+  if (h < 6)  return t('greeting_night', lang);
+  if (h < 12) return t('greeting_morning', lang);
+  if (h < 17) return t('greeting_noon', lang);
+  if (h < 21) return t('greeting_evening', lang);
+  return t('greeting_late', lang);
 }
 
 function StatCard({ icon, value, label, color, delay }) {
@@ -33,10 +32,10 @@ function StatCard({ icon, value, label, color, delay }) {
   );
 }
 
-// 7-günlük aktivite çubuğu
-function ActivityWeek({ logs }) {
-  const today  = new Date();
-  const days   = Array.from({ length: 7 }, (_, i) => {
+function ActivityWeek({ logs, lang }) {
+  const days    = DAYS_SHORT[lang] ?? DAYS_SHORT.tr;
+  const today   = new Date();
+  const week    = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() - 6 + i);
     return d;
@@ -49,8 +48,8 @@ function ActivityWeek({ logs }) {
 
   return (
     <View style={s.activityRow}>
-      {days.map((d, i) => {
-        const active = logDates.has(d.toDateString());
+      {week.map((d, i) => {
+        const active  = logDates.has(d.toDateString());
         const isToday = d.toDateString() === today.toDateString();
         return (
           <View key={i} style={s.activityDay}>
@@ -60,7 +59,7 @@ function ActivityWeek({ logs }) {
               isToday && !active && { borderColor: C.lime, borderWidth: 1.5 },
             ]} />
             <Text style={[s.activityDayLabel, isToday && { color: C.lime }]}>
-              {GUNLER[d.getDay()]}
+              {days[d.getDay()]}
             </Text>
           </View>
         );
@@ -69,18 +68,18 @@ function ActivityWeek({ logs }) {
   );
 }
 
-// Bugünkü program özeti
 const TODAY_PROGRAM = {
-  0: { tip: 'DİNLENME', renk: C.muted,   icon: 'bed-outline' },
-  1: { tip: 'DİNLENME', renk: C.muted,   icon: 'bed-outline' },
-  2: { tip: 'PUSH',     renk: C.lime,    icon: 'barbell-outline' },
-  3: { tip: 'PULL',     renk: C.blue,    icon: 'fitness-outline' },
-  4: { tip: 'LEG+ÖN KOL', renk: C.orange, icon: 'walk-outline' },
-  5: { tip: 'DİNLENME', renk: C.muted,   icon: 'bed-outline' },
-  6: { tip: 'PUSH',     renk: C.lime,    icon: 'barbell-outline' },
+  0: { tipKey: 'rest',     renk: C.muted,  icon: 'bed-outline'      },
+  1: { tipKey: 'rest',     renk: C.muted,  icon: 'bed-outline'      },
+  2: { tipKey: 'push',     renk: C.lime,   icon: 'barbell-outline'  },
+  3: { tipKey: 'pull',     renk: C.blue,   icon: 'fitness-outline'  },
+  4: { tipKey: 'legsArms', renk: C.orange, icon: 'walk-outline'     },
+  5: { tipKey: 'rest',     renk: C.muted,  icon: 'bed-outline'      },
+  6: { tipKey: 'push',     renk: C.lime,   icon: 'barbell-outline'  },
 };
 
 export default function HomeScreen() {
+  const { lang } = useLang();
   const [logs,    setLogs]    = useState({});
   const [profile, setProfile] = useState(null);
 
@@ -89,32 +88,40 @@ export default function HomeScreen() {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
         const meta = data.user.user_metadata;
-        setProfile({ name: meta?.full_name || data.user.email?.split('@')[0] || 'Sporcu' });
+        setProfile({ name: meta?.full_name || data.user.email?.split('@')[0] || t('athlete', lang) });
       }
     });
   }, []);
 
-  // Haftalık stats
+  const months   = MONTHS_SHORT[lang] ?? MONTHS_SHORT.tr;
+  const days     = DAYS_SHORT[lang]   ?? DAYS_SHORT.tr;
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   weekStart.setHours(0, 0, 0, 0);
 
-  let weekSessions = 0, weekSets = 0, exercises = new Set();
+  let weekSessions = 0, weekSets = 0, exerciseSet = new Set();
   Object.entries(logs).forEach(([exName, sessions]) => {
     sessions.forEach(s => {
       const d = new Date(s.date);
       if (d >= weekStart) {
         weekSessions++;
         weekSets += s.sets?.length ?? 0;
-        exercises.add(exName);
+        exerciseSet.add(exName);
       }
     });
   });
 
   const totalLogs = Object.values(logs).reduce((acc, arr) => acc + arr.length, 0);
   const today     = TODAY_PROGRAM[new Date().getDay()];
-  const dayName   = GUNLER[new Date().getDay()];
-  const dateStr   = `${new Date().getDate()} ${MONTHS[new Date().getMonth()]}`;
+  const dayName   = days[new Date().getDay()];
+  const dateStr   = `${new Date().getDate()} ${months[new Date().getMonth()]}`;
+
+  function fmtWhen(iso) {
+    const diff = Math.floor((Date.now() - new Date(iso)) / 86400000);
+    if (diff === 0) return t('today', lang);
+    if (diff === 1) return t('yesterday', lang);
+    return `${diff}${t('daysAgo', lang)}`;
+  }
 
   return (
     <ScrollView
@@ -124,8 +131,8 @@ export default function HomeScreen() {
     >
       {/* Selamlama */}
       <Animated.View entering={FadeInDown.duration(450)} style={s.greetWrap}>
-        <Text style={s.greetSub}>{greeting()}, {dayName} · {dateStr}</Text>
-        <Text style={s.greetTitle}>{profile?.name ?? 'Sporcu'} 👋</Text>
+        <Text style={s.greetSub}>{greeting(lang)}, {dayName} · {dateStr}</Text>
+        <Text style={s.greetTitle}>{profile?.name ?? t('athlete', lang)} 👋</Text>
       </Animated.View>
 
       {/* Bugünkü antrenman */}
@@ -136,45 +143,42 @@ export default function HomeScreen() {
         >
           <View style={s.todayHeader}>
             <Ionicons name={today.icon} size={22} color={today.renk} />
-            <Text style={[s.todayType, { color: today.renk }]}>{today.tip}</Text>
+            <Text style={[s.todayType, { color: today.renk }]}>{t(today.tipKey, lang)}</Text>
           </View>
-          <Text style={s.todayLabel}>Bugünkü Antrenman</Text>
-          {today.tip === 'DİNLENME'
-            ? <Text style={s.todaySub}>Bugün dinlenme günü. Kaslarını iyi dinlendir! 🛌</Text>
-            : <Text style={s.todaySub}>Program sekmesini aç ve bugünkü seti tamamla.</Text>
+          <Text style={s.todayLabel}>{t('todayWorkout', lang)}</Text>
+          {today.tipKey === 'rest'
+            ? <Text style={s.todaySub}>{t('restDay', lang)} 🛌</Text>
+            : <Text style={s.todaySub}>{t('openProgram', lang)}</Text>
           }
         </LinearGradient>
       </Animated.View>
 
       {/* Bu hafta aktivitesi */}
       <Animated.View entering={FadeInDown.delay(160).duration(400)} style={s.sectionCard}>
-        <Text style={s.sectionTitle}>Bu Hafta</Text>
-        <ActivityWeek logs={logs} />
+        <Text style={s.sectionTitle}>{t('thisWeek', lang)}</Text>
+        <ActivityWeek logs={logs} lang={lang} />
       </Animated.View>
 
       {/* İstatistikler */}
       <Animated.View entering={FadeInDown.delay(220).duration(400)}>
-        <Text style={s.sectionTitle}>İstatistikler</Text>
+        <Text style={s.sectionTitle}>{t('stats', lang)}</Text>
         <View style={s.statsGrid}>
-          <StatCard icon="barbell-outline"     value={weekSessions}  label="Bu Hafta Seans"  color={C.lime}   delay={240} />
-          <StatCard icon="layers-outline"      value={weekSets}      label="Bu Hafta Set"    color={C.teal}   delay={300} />
-          <StatCard icon="fitness-outline"     value={exercises.size} label="Farklı Egzersiz" color={C.blue}   delay={360} />
-          <StatCard icon="trophy-outline"      value={totalLogs}     label="Toplam Seans"    color={C.orange} delay={420} />
+          <StatCard icon="barbell-outline"  value={weekSessions}    label={t('weekSessions', lang)}   color={C.lime}   delay={240} />
+          <StatCard icon="layers-outline"   value={weekSets}        label={t('weekSets', lang)}        color={C.teal}   delay={300} />
+          <StatCard icon="fitness-outline"  value={exerciseSet.size} label={t('diffExercises', lang)} color={C.blue}   delay={360} />
+          <StatCard icon="trophy-outline"   value={totalLogs}       label={t('totalSessions', lang)}  color={C.orange} delay={420} />
         </View>
       </Animated.View>
 
       {/* Son antrenmanlar */}
       {Object.keys(logs).length > 0 && (
         <Animated.View entering={FadeInDown.delay(300).duration(400)} style={s.sectionCard}>
-          <Text style={s.sectionTitle}>Son Kayıtlar</Text>
+          <Text style={s.sectionTitle}>{t('recentLogs', lang)}</Text>
           {Object.entries(logs)
             .flatMap(([ex, sessions]) => sessions.slice(0, 1).map(s => ({ ex, ...s })))
             .sort((a, b) => new Date(b.date) - new Date(a.date))
             .slice(0, 5)
             .map((item, i) => {
-              const d    = new Date(item.date);
-              const diff = Math.floor((Date.now() - d) / 86400000);
-              const when = diff === 0 ? 'Bugün' : diff === 1 ? 'Dün' : `${diff}g önce`;
               const setsStr = item.sets ? `${item.sets.length} set · ${item.sets[0]?.kg ?? 0}kg` : '';
               return (
                 <Animated.View
@@ -187,7 +191,7 @@ export default function HomeScreen() {
                     <Text style={s.recentEx}>{item.ex}</Text>
                     <Text style={s.recentSets}>{setsStr}</Text>
                   </View>
-                  <Text style={s.recentWhen}>{when}</Text>
+                  <Text style={s.recentWhen}>{fmtWhen(item.date)}</Text>
                 </Animated.View>
               );
             })}
@@ -211,13 +215,13 @@ const s = StyleSheet.create({
   todayLabel:  { color: C.muted, fontSize: 11, fontWeight: '600', marginBottom: 4 },
   todaySub:    { color: C.text, fontSize: 14, lineHeight: 20 },
 
-  sectionCard: { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 16 },
+  sectionCard:  { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 16 },
   sectionTitle: { color: C.text, fontSize: 15, fontWeight: '800', marginBottom: 14 },
 
-  activityRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  activityDay: { alignItems: 'center', gap: 6 },
-  activityDot: { width: 28, height: 28, borderRadius: 8, backgroundColor: C.s3 },
-  activityDayLabel: { color: C.dim, fontSize: 10, fontWeight: '600' },
+  activityRow:     { flexDirection: 'row', justifyContent: 'space-between' },
+  activityDay:     { alignItems: 'center', gap: 6 },
+  activityDot:     { width: 28, height: 28, borderRadius: 8, backgroundColor: C.s3 },
+  activityDayLabel:{ color: C.dim, fontSize: 10, fontWeight: '600' },
 
   statsGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   statCard:   { flex: 1, minWidth: '44%', backgroundColor: C.s1, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border, alignItems: 'center', gap: 6 },

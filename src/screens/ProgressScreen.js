@@ -9,18 +9,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../utils/theme';
 import { saveWorkoutSession, getAllWorkoutLogs } from '../utils/storage';
+import { useLang } from '../context/LanguageContext';
+import { t, MONTHS_SHORT } from '../utils/i18n';
 
 const { width } = Dimensions.get('window');
 
-const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
-
-function fmtDate(iso) {
+function fmtDate(iso, lang) {
+  const months = MONTHS_SHORT[lang] ?? MONTHS_SHORT.tr;
   const d = new Date(iso), now = new Date();
   const diff = Math.floor((now - d) / 86400000);
-  if (diff === 0) return 'Bugün';
-  if (diff === 1) return 'Dün';
-  if (diff < 7)  return `${diff}g önce`;
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  if (diff === 0) return t('today', lang);
+  if (diff === 1) return t('yesterday', lang);
+  if (diff < 7)  return `${diff}${t('daysAgo', lang)}`;
+  return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
 function fmtSets(sets) {
@@ -58,17 +59,16 @@ function MiniChart({ sessions }) {
 }
 
 const mc = StyleSheet.create({
-  wrap:   { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 40, marginTop: 8 },
+  wrap:    { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 40, marginTop: 8 },
   barWrap: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
-  bar:    { width: '100%', backgroundColor: C.teal, borderRadius: 3, minHeight: 4 },
+  bar:     { width: '100%', backgroundColor: C.teal, borderRadius: 3, minHeight: 4 },
 });
 
-// ─── Egzersiz Kartı ───────────────────────────────────────────────────────────
-function ExerciseCard({ name, sessions, onLog, index }) {
+function ExerciseCard({ name, sessions, onLog, index, lang }) {
   const [expanded, setExpanded] = useState(false);
-  const last    = sessions[0];
-  const best    = calcBestSet(sessions);
-  const trend   = sessions.length >= 2 && sessions[0].sets && sessions[1].sets
+  const last  = sessions[0];
+  const best  = calcBestSet(sessions);
+  const trend = sessions.length >= 2 && sessions[0].sets && sessions[1].sets
     ? (sessions[0].sets[0]?.kg || 0) >= (sessions[1].sets[0]?.kg || 0) ? 'up' : 'down'
     : null;
 
@@ -87,8 +87,8 @@ function ExerciseCard({ name, sessions, onLog, index }) {
               {trend === 'down' && <Ionicons name="trending-down" size={14} color={C.red}    style={{ marginLeft: 6 }} />}
             </View>
             {last
-              ? <Text style={s.exLast}>{fmtDate(last.date)} — {fmtSets(last.sets)}</Text>
-              : <Text style={s.exNoData}>Henüz kayıt yok</Text>
+              ? <Text style={s.exLast}>{fmtDate(last.date, lang)} — {fmtSets(last.sets)}</Text>
+              : <Text style={s.exNoData}>{t('noRecord', lang)}</Text>
             }
           </View>
           <View style={s.exActions}>
@@ -99,25 +99,21 @@ function ExerciseCard({ name, sessions, onLog, index }) {
           </View>
         </TouchableOpacity>
 
-        {/* Mini grafik */}
         {sessions.length >= 2 && <MiniChart sessions={sessions} />}
 
-        {/* Genişletilmiş geçmiş */}
         {expanded && (
           <View style={s.historyWrap}>
-            {/* PR bilgisi */}
             {best && (
               <View style={s.prRow}>
                 <Ionicons name="trophy-outline" size={13} color={C.orange} />
                 <Text style={s.prText}>
-                  PR: {best.reps}t × {best.kg}kg — {fmtDate(best.date)}
+                  PR: {best.reps}t × {best.kg}kg — {fmtDate(best.date, lang)}
                 </Text>
               </View>
             )}
-            {/* Oturumlar */}
             {sessions.slice(0, 10).map((session, j) => (
               <Animated.View key={j} entering={FadeInRight.delay(j * 40).duration(280)} style={s.sessionRow}>
-                <Text style={s.sessionDate}>{fmtDate(session.date)}</Text>
+                <Text style={s.sessionDate}>{fmtDate(session.date, lang)}</Text>
                 <View style={s.chipRow}>
                   {session.sets?.map((set, k) => (
                     <View key={k} style={s.setChip}>
@@ -134,7 +130,6 @@ function ExerciseCard({ name, sessions, onLog, index }) {
   );
 }
 
-// ─── Ana Ekran ────────────────────────────────────────────────────────────────
 const EXERCISE_LIST = [
   'Plate Loaded Chest Press','Smith Machine Low Incline Press','Chest Fly Machine',
   'Shoulder Press Machine','Lateral Raise','Triceps Pushdown','Overhead Rope Extension',
@@ -145,6 +140,7 @@ const EXERCISE_LIST = [
 ];
 
 export default function ProgressScreen() {
+  const { lang } = useLang();
   const [workoutLogs, setWorkoutLogs] = useState({});
   const [logModal,    setLogModal]    = useState(null);
   const [logSets,     setLogSets]     = useState([{ reps: '', kg: '' }, { reps: '', kg: '' }, { reps: '', kg: '' }]);
@@ -186,36 +182,38 @@ export default function ProgressScreen() {
   const totalSessions = Object.values(workoutLogs).reduce((a, b) => a + b.length, 0);
   const totalSets     = Object.values(workoutLogs).reduce((a, b) => a + b.reduce((c, s) => c + (s.sets?.length ?? 0), 0), 0);
 
+  const FILTERS = [
+    { key: 'all',    label: t('all', lang) },
+    { key: 'logged', label: t('logged', lang) },
+  ];
+
   return (
     <View style={s.fill}>
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {/* Özet kart */}
         <Animated.View entering={FadeInDown.duration(350)} style={s.summaryCard}>
           <Ionicons name="trending-up-outline" size={16} color={C.lime} style={{ marginBottom: 6 }} />
-          <Text style={s.summaryTitle}>Progressive Overload</Text>
-          <Text style={s.summaryText}>Her antrenmanda bir öncekine göre daha fazla ağırlık veya tekrar yap.</Text>
+          <Text style={s.summaryTitle}>{t('progressOverload', lang)}</Text>
+          <Text style={s.summaryText}>{t('progressDesc', lang)}</Text>
           <View style={s.summaryStats}>
             <View style={s.summaryStat}>
               <Text style={s.summaryStatVal}>{totalSessions}</Text>
-              <Text style={s.summaryStatLabel}>Toplam Seans</Text>
+              <Text style={s.summaryStatLabel}>{t('totalSessionsP', lang)}</Text>
             </View>
             <View style={[s.summaryStat, s.summaryStatMid]}>
               <Text style={s.summaryStatVal}>{totalSets}</Text>
-              <Text style={s.summaryStatLabel}>Toplam Set</Text>
+              <Text style={s.summaryStatLabel}>{t('totalSetsP', lang)}</Text>
             </View>
             <View style={s.summaryStat}>
               <Text style={s.summaryStatVal}>{EXERCISE_LIST.filter(ex => (workoutLogs[ex] || []).length > 0).length}</Text>
-              <Text style={s.summaryStatLabel}>Egzersiz</Text>
+              <Text style={s.summaryStatLabel}>{t('exerciseCount', lang)}</Text>
             </View>
           </View>
         </Animated.View>
 
         {/* Filtre */}
         <Animated.View entering={FadeInDown.delay(80).duration(350)} style={s.filterRow}>
-          {[
-            { key: 'all',    label: 'Tümü' },
-            { key: 'logged', label: 'Kayıtlı' },
-          ].map(f => (
+          {FILTERS.map(f => (
             <TouchableOpacity
               key={f.key}
               style={[s.filterBtn, filter === f.key && s.filterBtnActive]}
@@ -236,6 +234,7 @@ export default function ProgressScreen() {
             sessions={workoutLogs[ex] || []}
             onLog={openLog}
             index={i}
+            lang={lang}
           />
         ))}
       </ScrollView>
@@ -250,17 +249,17 @@ export default function ProgressScreen() {
 
                 {logModal.lastSession && (
                   <View style={s.prevSessionBox}>
-                    <Text style={s.prevLabel}>Önceki oturum</Text>
+                    <Text style={s.prevLabel}>{t('prevSession', lang)}</Text>
                     <Text style={s.prevVal}>
-                      {fmtDate(logModal.lastSession.date)} — {fmtSets(logModal.lastSession.sets)}
+                      {fmtDate(logModal.lastSession.date, lang)} — {fmtSets(logModal.lastSession.sets)}
                     </Text>
                   </View>
                 )}
 
                 <View style={s.logHeader}>
-                  <Text style={[s.logHeaderText, { width: 36 }]}>Set</Text>
-                  <Text style={[s.logHeaderText, { flex: 1 }]}>Tekrar</Text>
-                  <Text style={[s.logHeaderText, { flex: 1 }]}>Ağırlık (kg)</Text>
+                  <Text style={[s.logHeaderText, { width: 36 }]}>{t('set', lang)}</Text>
+                  <Text style={[s.logHeaderText, { flex: 1 }]}>{t('reps', lang)}</Text>
+                  <Text style={[s.logHeaderText, { flex: 1 }]}>{t('weightKg', lang)}</Text>
                 </View>
 
                 {logSets.map((set, i) => (
@@ -292,16 +291,18 @@ export default function ProgressScreen() {
                 <TouchableOpacity style={s.addSetBtn}
                   onPress={() => setLogSets(p => [...p, { reps: '', kg: '' }])}>
                   <Ionicons name="add-circle-outline" size={16} color={C.teal} />
-                  <Text style={{ color: C.teal, fontSize: 13, fontWeight: '700', marginLeft: 4 }}>Set Ekle</Text>
+                  <Text style={{ color: C.teal, fontSize: 13, fontWeight: '700', marginLeft: 4 }}>
+                    {t('addSet', lang)}
+                  </Text>
                 </TouchableOpacity>
 
                 <View style={s.logActions}>
                   <TouchableOpacity style={s.cancelBtn} onPress={() => setLogModal(null)}>
-                    <Text style={{ color: C.muted, fontWeight: '700' }}>İptal</Text>
+                    <Text style={{ color: C.muted, fontWeight: '700' }}>{t('cancel', lang)}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={s.saveBtn} onPress={saveLog}>
                     <LinearGradient colors={['#e8f44a', '#a3c200']} style={s.saveGrad}>
-                      <Text style={{ color: C.bg, fontWeight: '900' }}>Kaydet ✓</Text>
+                      <Text style={{ color: C.bg, fontWeight: '900' }}>{t('save_check', lang)}</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
@@ -327,11 +328,11 @@ const s = StyleSheet.create({
   summaryStatVal:   { color: C.text,  fontSize: 22, fontWeight: '900' },
   summaryStatLabel: { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 2 },
 
-  filterRow:      { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  filterBtn:      { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
-  filterBtnActive:{ backgroundColor: C.lime + '18', borderColor: C.lime },
-  filterText:     { color: C.muted, fontSize: 13, fontWeight: '600' },
-  filterTextActive: { color: C.lime, fontWeight: '700' },
+  filterRow:       { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  filterBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
+  filterBtnActive: { backgroundColor: C.lime + '18', borderColor: C.lime },
+  filterText:      { color: C.muted, fontSize: 13, fontWeight: '600' },
+  filterTextActive:{ color: C.lime, fontWeight: '700' },
 
   exCard:       { backgroundColor: C.s1, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 14, marginBottom: 8 },
   exCardHeader: { flexDirection: 'row', alignItems: 'center' },
@@ -342,31 +343,31 @@ const s = StyleSheet.create({
   exActions:    { flexDirection: 'row', gap: 10, alignItems: 'center' },
   addBtn:       { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(232,244,74,0.12)', borderWidth: 1, borderColor: C.lime, alignItems: 'center', justifyContent: 'center' },
 
-  prRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
-  prText:    { color: C.orange, fontSize: 11, fontWeight: '700' },
+  prRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
+  prText: { color: C.orange, fontSize: 11, fontWeight: '700' },
 
-  historyWrap:  { borderTopWidth: 1, borderTopColor: C.border, marginTop: 8, paddingTop: 8 },
-  sessionRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
-  sessionDate:  { color: C.dim,  fontSize: 10, width: 66, paddingTop: 3 },
-  chipRow:      { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  setChip:      { backgroundColor: C.s2, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: C.border },
-  setChipText:  { color: C.text, fontSize: 11 },
+  historyWrap: { borderTopWidth: 1, borderTopColor: C.border, marginTop: 8, paddingTop: 8 },
+  sessionRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
+  sessionDate: { color: C.dim,  fontSize: 10, width: 66, paddingTop: 3 },
+  chipRow:     { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  setChip:     { backgroundColor: C.s2, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: C.border },
+  setChipText: { color: C.text, fontSize: 11 },
 
-  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  logModalBox:  { backgroundColor: C.s1, borderRadius: 24, padding: 20, borderWidth: 1, borderColor: C.border, width: '100%', maxWidth: 400 },
+  overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  logModalBox:   { backgroundColor: C.s1, borderRadius: 24, padding: 20, borderWidth: 1, borderColor: C.border, width: '100%', maxWidth: 400 },
   logModalTitle: { color: C.text, fontSize: 16, fontWeight: '900', marginBottom: 14, textAlign: 'center' },
-  prevSessionBox: { backgroundColor: 'rgba(232,244,74,0.06)', borderRadius: 12, padding: 10, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)' },
-  prevLabel:    { color: C.muted, fontSize: 10, fontWeight: '700', marginBottom: 2 },
-  prevVal:      { color: C.lime,  fontSize: 12, fontWeight: '700' },
-  logHeader:    { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  prevSessionBox:{ backgroundColor: 'rgba(232,244,74,0.06)', borderRadius: 12, padding: 10, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)' },
+  prevLabel:     { color: C.muted, fontSize: 10, fontWeight: '700', marginBottom: 2 },
+  prevVal:       { color: C.lime,  fontSize: 12, fontWeight: '700' },
+  logHeader:     { flexDirection: 'row', gap: 8, marginBottom: 8 },
   logHeaderText: { color: C.muted, fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  logRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  setNumBox:    { width: 36, height: 36, borderRadius: 18, backgroundColor: C.s2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border },
-  setNumText:   { color: C.lime, fontWeight: '800', fontSize: 12 },
-  logInput:     { flex: 1, height: 36, backgroundColor: C.s2, borderRadius: 10, borderWidth: 1, borderColor: C.border, color: C.text, textAlign: 'center', fontSize: 14, fontWeight: '700' },
-  addSetBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
-  logActions:   { flexDirection: 'row', gap: 10, marginTop: 12 },
-  cancelBtn:    { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  saveBtn:      { flex: 2, borderRadius: 12, overflow: 'hidden' },
-  saveGrad:     { height: 46, alignItems: 'center', justifyContent: 'center' },
+  logRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  setNumBox:     { width: 36, height: 36, borderRadius: 18, backgroundColor: C.s2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border },
+  setNumText:    { color: C.lime, fontWeight: '800', fontSize: 12 },
+  logInput:      { flex: 1, height: 36, backgroundColor: C.s2, borderRadius: 10, borderWidth: 1, borderColor: C.border, color: C.text, textAlign: 'center', fontSize: 14, fontWeight: '700' },
+  addSetBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+  logActions:    { flexDirection: 'row', gap: 10, marginTop: 12 },
+  cancelBtn:     { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  saveBtn:       { flex: 2, borderRadius: 12, overflow: 'hidden' },
+  saveGrad:      { height: 46, alignItems: 'center', justifyContent: 'center' },
 });

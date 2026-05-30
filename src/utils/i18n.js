@@ -80,6 +80,27 @@ export const TRANSLATIONS = {
     'difficulty':       'Zorluk',
     'instructions':     'Detaylar',
     'diff1': 'Kolay', 'diff2': 'Orta-Kolay', 'diff3': 'Orta', 'diff4': 'Zor', 'diff5': 'Çok Zor',
+    // Workout log modal
+    'set':            'Set',
+    'reps':           'Tekrar',
+    'weightKg':       'Ağırlık (kg)',
+    'noRecord':       'Henüz kayıt yok',
+    'prevSession':    'Önceki oturum',
+    'addSet':         'Set Ekle',
+    'save_check':     'Kaydet ✓',
+    // Today program types
+    'rest':           'DİNLENME',
+    'push':           'PUSH',
+    'pull':           'PULL',
+    'legsArms':       'LEG + ÖN KOL',
+    // Home
+    'athlete':        'Sporcu',
+    // Muscle activation
+    'activation':         'Aktivasyon',
+    'inThisExercise':     'Bu egzersizde',
+    'actsPrimary':        'primer olarak çalışır',
+    'actsSecondary':      'yardımcı olarak katılır',
+    'ratingChangeable':   'Oyunu değiştirebilirsin',
     // Profile
     'editProfile':      'Profili Düzenle',
     'bodyInfo':         'Vücut Bilgileri',
@@ -180,6 +201,27 @@ export const TRANSLATIONS = {
     'difficulty':       'Difficulty',
     'instructions':     'Details',
     'diff1': 'Easy', 'diff2': 'Easy-Med', 'diff3': 'Medium', 'diff4': 'Hard', 'diff5': 'Very Hard',
+    // Workout log modal
+    'set':            'Set',
+    'reps':           'Reps',
+    'weightKg':       'Weight (kg)',
+    'noRecord':       'No records yet',
+    'prevSession':    'Previous session',
+    'addSet':         'Add Set',
+    'save_check':     'Save ✓',
+    // Today program types
+    'rest':           'REST',
+    'push':           'PUSH',
+    'pull':           'PULL',
+    'legsArms':       'LEGS + FOREARMS',
+    // Home
+    'athlete':        'Athlete',
+    // Muscle activation
+    'activation':         'Activation',
+    'inThisExercise':     'In this exercise,',
+    'actsPrimary':        'acts as primary mover',
+    'actsSecondary':      'acts as secondary stabilizer',
+    'ratingChangeable':   'You can change your rating',
     // Profile
     'editProfile':      'Edit Profile',
     'bodyInfo':         'Body Info',
@@ -208,6 +250,16 @@ export function t(key, lang = 'tr') {
 export const CATEGORY_LABELS = {
   tr: { 'Göğüs':'Göğüs','Sırt':'Sırt','Omuz':'Omuz','Kol':'Kol','Bacak':'Bacak','Core':'Core','Kardio':'Kardio','Compound':'Bileşik' },
   en: { 'Göğüs':'Chest','Sırt':'Back','Omuz':'Shoulder','Kol':'Arms','Bacak':'Legs','Core':'Core','Kardio':'Cardio','Compound':'Compound' },
+};
+
+export const DAYS_SHORT = {
+  tr: ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'],
+  en: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+};
+
+export const MONTHS_SHORT = {
+  tr: ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'],
+  en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
 };
 
 export const MUSCLE_LABELS = {
