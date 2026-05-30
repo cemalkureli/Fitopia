@@ -67,6 +67,53 @@ function TerimPill({ terim, lang }) {
   );
 }
 
+// ─── Day card (expandable) ────────────────────────────────────────────────────
+function DayCard({ workout, index, workoutLogs, onLog, lang }) {
+  const [open, setOpen] = useState(index === 0); // first day open by default
+  const exercises = workout.exercises ?? [];
+  const DAY_COLORS = [C.lime, C.blue, C.orange, C.teal, C.purple, C.green, C.red];
+  const color = DAY_COLORS[index % DAY_COLORS.length];
+
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 60).duration(320)}>
+      <TouchableOpacity
+        style={[s.card, open && { borderColor: color + '55' }]}
+        onPress={() => setOpen(v => !v)}
+        activeOpacity={0.85}
+      >
+        <View style={[s.cardBar, { backgroundColor: color }]} />
+        <View style={s.cardHeader}>
+          <View style={[s.tipBadge, { backgroundColor: color + '20' }]}>
+            <Text style={[s.tipText, { color }]}>
+              {lang === 'tr' ? `GÜN ${index + 1}` : `DAY ${index + 1}`}
+            </Text>
+          </View>
+          <Text style={s.cardTitle}>{workout.name}</Text>
+          <Ionicons
+            name={open ? 'chevron-up' : 'chevron-down'}
+            size={18} color={C.dim}
+            style={{ position: 'absolute', right: 0, top: 0 }}
+          />
+        </View>
+
+        {open && exercises.length > 0 && (
+          <View style={s.exList}>
+            {exercises.map((ex, j) => (
+              <ExerciseRow key={j} hareket={ex} onLog={onLog} lang={lang} />
+            ))}
+          </View>
+        )}
+
+        {open && exercises.length === 0 && (
+          <Text style={{ color: C.dim, fontSize: 12, padding: 14 }}>
+            {lang === 'tr' ? 'Egzersiz yok.' : 'No exercises.'}
+          </Text>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 // ─── Exercise row ──────────────────────────────────────────────────────────────
 function ExerciseRow({ hareket, onLog, lang }) {
   const name = typeof hareket === 'string' ? hareket : hareket.name;
@@ -168,57 +215,47 @@ export default function ProgramScreen() {
     );
   }
 
-  const exercises = activeProgram.exercises ?? [];
+  // Support both old format (exercises[]) and new format (workouts[])
+  const workouts = activeProgram.workouts
+    ? activeProgram.workouts
+    : activeProgram.exercises?.length
+      ? [{ name: activeProgram.title, exercises: activeProgram.exercises }]
+      : [];
 
   return (
     <View style={s.fill}>
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-        {/* Program card */}
-        <Animated.View entering={FadeInDown.duration(320)}>
-          <TouchableOpacity
-            style={[s.card, open && { borderColor: C.lime + '55' }]}
-            onPress={() => setOpen(v => !v)}
-            activeOpacity={0.85}
-          >
-            <View style={[s.cardBar, { backgroundColor: C.lime }]} />
-            <View style={s.cardHeader}>
-              <View style={[s.tipBadge, { backgroundColor: C.lime + '20' }]}>
-                <Text style={[s.tipText, { color: C.lime }]}>
-                  {lang === 'tr' ? 'AKTİF PROGRAM' : 'ACTIVE PROGRAM'}
-                </Text>
-              </View>
-              <Text style={s.cardTitle}>{activeProgram.title}</Text>
-              {activeProgram.description ? (
-                <Text style={s.cardDesc} numberOfLines={2}>{activeProgram.description}</Text>
-              ) : null}
-              <Ionicons
-                name={open ? 'chevron-up' : 'chevron-down'}
-                size={18} color={C.dim}
-                style={{ position: 'absolute', right: 0, top: 0 }}
-              />
-            </View>
-
-            {open && exercises.length > 0 && (
-              <View style={s.exList}>
-                {exercises.map((ex, j) => (
-                  <ExerciseRow
-                    key={j}
-                    hareket={ex}
-                    onLog={openLog}
-                    lang={lang}
-                  />
-                ))}
-              </View>
-            )}
-
-            {open && exercises.length === 0 && (
-              <Text style={{ color: C.dim, fontSize: 12, padding: 14 }}>
-                {lang === 'tr' ? 'Bu programda egzersiz yok.' : 'No exercises in this program.'}
-              </Text>
-            )}
-          </TouchableOpacity>
+        {/* Program header */}
+        <Animated.View entering={FadeInDown.duration(300)} style={s.programHeader}>
+          <View style={[s.tipBadge, { backgroundColor: C.lime + '20', marginBottom: 6 }]}>
+            <Text style={[s.tipText, { color: C.lime }]}>
+              {lang === 'tr' ? 'AKTİF PROGRAM' : 'ACTIVE PROGRAM'}
+            </Text>
+          </View>
+          <Text style={s.programTitle}>{activeProgram.title}</Text>
+          {activeProgram.description ? (
+            <Text style={s.cardDesc} numberOfLines={2}>{activeProgram.description}</Text>
+          ) : null}
         </Animated.View>
+
+        {/* Workout day cards */}
+        {workouts.map((w, wi) => (
+          <DayCard
+            key={wi}
+            workout={w}
+            index={wi}
+            workoutLogs={workoutLogs}
+            onLog={openLog}
+            lang={lang}
+          />
+        ))}
+
+        {workouts.length === 0 && (
+          <Text style={{ color: C.dim, fontSize: 12, textAlign: 'center', marginTop: 24 }}>
+            {lang === 'tr' ? 'Bu programda egzersiz yok.' : 'No exercises in this program.'}
+          </Text>
+        )}
 
       </ScrollView>
 
@@ -285,6 +322,8 @@ const s = StyleSheet.create({
   fill:    { flex: 1, backgroundColor: C.bg },
   content: { padding: 16, paddingBottom: 32 },
 
+  programHeader: { marginBottom: 16 },
+  programTitle:  { color: C.text, fontSize: 20, fontWeight: '900', marginBottom: 4 },
   card:       { backgroundColor: C.s1, borderWidth: 1, borderColor: C.border, borderRadius: 16, marginBottom: 10, overflow: 'hidden' },
   cardBar:    { height: 3, width: '100%' },
   cardHeader: { padding: 14, paddingRight: 36 },

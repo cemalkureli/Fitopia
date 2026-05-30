@@ -1220,25 +1220,29 @@ function TemplatesTab({ lang }) {
           {/* Days */}
           <Text style={ft.detailSection}>{lang === 'tr' ? 'Haftalık Gün' : 'Days per Week'}</Text>
           <View style={ft.tagRow}><View style={ft.tag}><Text style={ft.tagTxt}>{selected.days} {lang === 'tr' ? 'gün' : 'days'}</Text></View></View>
-          {/* Workouts — each tappable to set as active program */}
+          {/* Workouts list */}
           <Text style={ft.detailSection}>{lang === 'tr' ? 'Antrenmanlar' : 'Workouts'}</Text>
           {selected.workouts.map((w, i) => (
             <Animated.View key={i} entering={FadeInDown.delay(i * 50).duration(280)} style={ft.workoutItem}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={ft.workoutItemTitle}>{w.name}</Text>
-                <TouchableOpacity
-                  style={ft.setActiveBtn}
-                  onPress={() => setConfirmAct({ plan: selected, workout: w, idx: i })}
-                >
-                  <Ionicons name="calendar-outline" size={12} color={C.lime} />
-                  <Text style={ft.setActiveTxt}>{lang === 'tr' ? 'Aktif Yap' : 'Set Active'}</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={ft.workoutItemTitle}>{w.name}</Text>
               {w.exercises.map((ex, j) => (
-                <Text key={j} style={ft.workoutExercise}>• {ex}</Text>
+                <Text key={j} style={ft.workoutExercise}>• {typeof ex === 'string' ? ex : ex.name}</Text>
               ))}
             </Animated.View>
           ))}
+
+          {/* Single Set Active button for entire template */}
+          <TouchableOpacity
+            style={ft.setActivePlanBtn}
+            onPress={() => setConfirmAct({ plan: selected, workout: null, isFullPlan: true })}
+          >
+            <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ft.setActivePlanGrad}>
+              <Ionicons name="calendar-outline" size={18} color="#fff" />
+              <Text style={ft.setActivePlanTxt}>
+                {lang === 'tr' ? 'Aktif Program Olarak Ayarla' : 'Set as Active Program'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     );
@@ -1272,21 +1276,25 @@ function TemplatesTab({ lang }) {
       <ConfirmModal
         visible={!!confirmAct}
         title={lang === 'tr' ? 'Aktif Program Yap' : 'Set Active Program'}
-        message={confirmAct ? (lang === 'tr' ? `"${confirmAct.workout?.name}" aktif program olarak ayarlanacak.` : `"${confirmAct.workout?.name}" will be set as your active program.`) : ''}
+        message={confirmAct ? (lang === 'tr' ? `"${confirmAct.plan?.title}" tüm günleriyle birlikte aktif program olacak.` : `"${confirmAct.plan?.title}" with all days will be set as your active program.`) : ''}
         confirmLabel={lang === 'tr' ? 'Ayarla' : 'Set'}
         confirmColor={C.lime}
         lang={lang}
         onCancel={() => setConfirmAct(null)}
         onConfirm={async () => {
-          const { plan, workout, idx } = confirmAct;
+          const { plan, isFullPlan } = confirmAct;
           await setActiveProgram({
-            id:          `${plan.id}-${idx}`,
-            title:       `${plan.title} — ${workout.name}`,
+            id:          plan.id,
+            title:       plan.title,
             description: plan.description,
-            exercises:   workout.exercises.map(ex => (typeof ex === 'string' ? { name: ex } : ex)),
+            // Full plan: multiple workouts; single workout: wrapped in array
+            workouts:    plan.workouts.map(w => ({
+              name:      w.name,
+              exercises: (w.exercises || []).map(ex => (typeof ex === 'string' ? { name: ex } : ex)),
+            })),
           });
           setConfirmAct(null);
-          showToast(lang === 'tr' ? `✓ "${workout.name}" aktif program oldu!` : `✓ "${workout.name}" set as active!`, 'success');
+          showToast(lang === 'tr' ? `✓ "${plan.title}" aktif program!` : `✓ "${plan.title}" set as active!`, 'success');
         }}
       />
 
@@ -1399,8 +1407,11 @@ const ft = StyleSheet.create({
   subTabActive: { borderBottomColor: '#dc2626' },
   subTabTxt:    { color: C.muted, fontSize: 13, fontWeight: '600' },
   subTabTxtActive: { color: C.text, fontWeight: '800' },
-  setActiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(232,244,74,0.3)', backgroundColor: 'rgba(232,244,74,0.08)' },
-  setActiveTxt: { color: C.lime, fontSize: 11, fontWeight: '700' },
+  setActiveBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(232,244,74,0.3)', backgroundColor: 'rgba(232,244,74,0.08)' },
+  setActiveTxt:     { color: C.lime, fontSize: 11, fontWeight: '700' },
+  setActivePlanBtn: { borderRadius: 16, overflow: 'hidden', marginTop: 20 },
+  setActivePlanGrad:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 54 },
+  setActivePlanTxt: { color: '#fff', fontWeight: '900', fontSize: 15 },
   // Filter
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.border },
   title:      { color: C.text, fontSize: 20, fontWeight: '900' },
