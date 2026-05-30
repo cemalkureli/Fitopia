@@ -13,6 +13,7 @@ import { saveWorkoutSession, getAllWorkoutLogs, getFavorites } from '../utils/st
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
 import FitnessMascot from '../components/FitnessMascot';
+import TurntableMascot from '../components/TurntableMascot';
 import { t, MONTHS_SHORT, DAYS_SHORT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
 
@@ -341,9 +342,9 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Mascot figure */}
+        {/* Turntable mascot — drag to rotate */}
         <View style={g.mascotWrap}>
-          <FitnessMascot gender={gender} />
+          <TurntableMascot gender={gender} width={200} height={360} autoSpin />
         </View>
 
         {/* Measurement values below figure */}
