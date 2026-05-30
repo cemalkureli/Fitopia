@@ -31,13 +31,24 @@ const FEMALE_FRAMES = [
 ];
 
 // Try to load each frame
-// Frames loaded as WebP (quality=90, max 1024px height, ~35-50KB each)
-const KEYS = ['000','045','090','135','180','225','270','315'];
+// Static requires — Metro bundler cannot resolve dynamic template literals
+try { MALE_FRAMES[0] = require('../../assets/mascot_male/000.webp'); } catch {}
+try { MALE_FRAMES[1] = require('../../assets/mascot_male/045.webp'); } catch {}
+try { MALE_FRAMES[2] = require('../../assets/mascot_male/090.webp'); } catch {}
+try { MALE_FRAMES[3] = require('../../assets/mascot_male/135.webp'); } catch {}
+try { MALE_FRAMES[4] = require('../../assets/mascot_male/180.webp'); } catch {}
+try { MALE_FRAMES[5] = require('../../assets/mascot_male/225.webp'); } catch {}
+try { MALE_FRAMES[6] = require('../../assets/mascot_male/270.webp'); } catch {}
+try { MALE_FRAMES[7] = require('../../assets/mascot_male/315.webp'); } catch {}
 
-KEYS.forEach((k, i) => {
-  try { MALE_FRAMES[i]   = require(`../../assets/mascot_male/${k}.webp`);   } catch {}
-  try { FEMALE_FRAMES[i] = require(`../../assets/mascot_female/${k}.webp`); } catch {}
-});
+try { FEMALE_FRAMES[0] = require('../../assets/mascot_female/000.webp'); } catch {}
+try { FEMALE_FRAMES[1] = require('../../assets/mascot_female/045.webp'); } catch {}
+try { FEMALE_FRAMES[2] = require('../../assets/mascot_female/090.webp'); } catch {}
+try { FEMALE_FRAMES[3] = require('../../assets/mascot_female/135.webp'); } catch {}
+try { FEMALE_FRAMES[4] = require('../../assets/mascot_female/180.webp'); } catch {}
+try { FEMALE_FRAMES[5] = require('../../assets/mascot_female/225.webp'); } catch {}
+try { FEMALE_FRAMES[6] = require('../../assets/mascot_female/270.webp'); } catch {}
+try { FEMALE_FRAMES[7] = require('../../assets/mascot_female/315.webp'); } catch {}
 
 const FRAME_COUNT = 8;
 const DEG_PER_FRAME = 360 / FRAME_COUNT; // 45°
