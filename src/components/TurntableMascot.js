@@ -31,14 +31,12 @@ const FEMALE_FRAMES = [
 ];
 
 // Try to load each frame
-const maleKeys   = ['000','045','090','135','180','225','270','315'];
-const femaleKeys = ['000','045','090','135','180','225','270','315'];
+// Frames loaded as WebP (quality=90, max 1024px height, ~35-50KB each)
+const KEYS = ['000','045','090','135','180','225','270','315'];
 
-maleKeys.forEach((k, i) => {
-  try { MALE_FRAMES[i]   = require(`../../assets/mascot_male/${k}.png`); }   catch {}
-});
-femaleKeys.forEach((k, i) => {
-  try { FEMALE_FRAMES[i] = require(`../../assets/mascot_female/${k}.png`); } catch {}
+KEYS.forEach((k, i) => {
+  try { MALE_FRAMES[i]   = require(`../../assets/mascot_male/${k}.webp`);   } catch {}
+  try { FEMALE_FRAMES[i] = require(`../../assets/mascot_female/${k}.webp`); } catch {}
 });
 
 const FRAME_COUNT = 8;
