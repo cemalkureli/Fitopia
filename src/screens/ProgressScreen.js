@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../utils/theme';
-import { saveWorkoutSession, getAllWorkoutLogs, getFavorites } from '../utils/storage';
+import { saveWorkoutSession, getAllWorkoutLogs, getFavorites, deleteWorkoutSession, updateWorkoutSession, getActiveProgram } from '../utils/storage';
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
 import FitnessMascot from '../components/FitnessMascot';
@@ -84,7 +84,7 @@ const mc = StyleSheet.create({
 });
 
 // ─── Exercise card (Progressive tab) ─────────────────────────────────────────
-function ExerciseCard({ name, sessions, onLog, index, lang }) {
+function ExerciseCard({ name, sessions, onLog, index, lang, onReload }) {
   const [expanded, setExpanded] = useState(false);
   const last = sessions[0];
   const best = calcBestSet(sessions);
@@ -133,6 +133,24 @@ function ExerciseCard({ name, sessions, onLog, index, lang }) {
                     </View>
                   ))}
                 </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    Alert.alert(
+                      lang === 'tr' ? 'Kaydı Sil' : 'Delete Record',
+                      lang === 'tr' ? 'Bu kaydı silmek istediğine emin misin?' : 'Are you sure you want to delete this record?',
+                      [
+                        { text: t('cancel', lang), style: 'cancel' },
+                        { text: lang === 'tr' ? 'Sil' : 'Delete', style: 'destructive', onPress: async () => {
+                          await deleteWorkoutSession(name, j);
+                          onReload?.();
+                        }},
+                      ]
+                    );
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="trash-outline" size={14} color={C.dim} />
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -699,7 +717,8 @@ export default function ProgressScreen() {
               </AnimatedRN.View>
             ) : (
               filteredProg.map((ex, i) => (
-                <ExerciseCard key={ex} name={ex} sessions={workoutLogs[ex] || []} onLog={openLog} index={i} lang={lang} />
+                <ExerciseCard key={ex} name={ex} sessions={workoutLogs[ex] || []} onLog={openLog} index={i} lang={lang}
+                  onReload={() => getAllWorkoutLogs().then(setWorkoutLogs)} />
               ))
             )}
           </ScrollView>

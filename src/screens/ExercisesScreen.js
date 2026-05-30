@@ -14,6 +14,7 @@ import { useLang } from '../context/LanguageContext';
 import { t, CATEGORY_LABELS, MUSCLE_LABELS } from '../utils/i18n';
 import { getFavorites, toggleFavorite } from '../utils/storage';
 import { TRAINING_PLANS, PLAN_FILTERS } from '../data/trainingPlans';
+import { setActiveProgram } from '../utils/storage';
 
 // Workout terminology definitions (shared with ProgramScreen)
 const TERIMLER = {
@@ -792,6 +793,35 @@ function WorkoutsTab({ lang }) {
               <Text style={wt.addExTxt}>{lang === 'tr' ? 'Egzersiz Ekle' : 'Add Exercises'}</Text>
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* Set as Active Program */}
+          <TouchableOpacity
+            style={wt.activeProgramBtn}
+            onPress={async () => {
+              await setActiveProgram({
+                id:          active.id,
+                title:       active.title,
+                description: active.description,
+                exercises:   wkExercises.map(e => ({
+                  name: e.exercise_name,
+                  sets: e.sets,
+                  reps: e.reps,
+                  rir:  e.rir,
+                })),
+              });
+              Alert.alert(
+                lang === 'tr' ? '✓ Program Güncellendi' : '✓ Program Updated',
+                lang === 'tr'
+                  ? `"${active.title}" artık aktif programın.`
+                  : `"${active.title}" is now your active program.`
+              );
+            }}
+          >
+            <Ionicons name="calendar-outline" size={16} color={C.lime} />
+            <Text style={wt.activeProgramTxt}>
+              {lang === 'tr' ? 'Aktif Program Olarak Ayarla' : 'Set as Active Program'}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
 
       </View>
@@ -892,6 +922,8 @@ const wt = StyleSheet.create({
   exCardMeta:     { flexDirection: 'row', gap: 10 },
   exMetaItem:     { flexDirection: 'row', alignItems: 'center', gap: 3 },
   exMetaTxt:      { color: C.dim, fontSize: 10 },
+  activeProgramBtn:{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center', paddingVertical: 14, marginTop: 8, borderTopWidth: 1, borderTopColor: C.border },
+  activeProgramTxt:{ color: C.lime, fontSize: 14, fontWeight: '700' },
   addExBtn:       { borderRadius: 14, overflow: 'hidden', marginTop: 16 },
   addExGrad:      { height: 52, alignItems: 'center', justifyContent: 'center' },
   addExTxt:       { color: '#fff', fontWeight: '900', fontSize: 15 },

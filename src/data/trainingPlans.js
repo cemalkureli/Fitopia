@@ -3,6 +3,25 @@
 
 export const TRAINING_PLANS = [
   {
+    id: 'guray-hypertrophy',
+    title: 'Guray HyperTrophy',
+    description: 'Kişiselleştirilmiş hipertrofi programı. Push/Pull/Legs + ön kol bölünmesi, RIR bazlı yükleme. Haftada 5 aktif gün, 2 dinlenme günü.',
+    level: 'intermediate',
+    days: 5,
+    goals: ['bodybuilding', 'hypertrophy'],
+    targetMuscles: ['chest', 'back', 'shoulders', 'arms', 'legs'],
+    environment: ['fully_equipped'],
+    athleteCount: 1,
+    isPaid: false,
+    workouts: [
+      { name: 'Push A (Salı)', exercises: ['Plate Loaded Chest Press 2×5-6 RIR1', 'Smith Machine Low Incline Press 2×5-6 RIR1', 'Chest Fly Machine 1×6-8 Failure', 'Shoulder Press Machine 2×6-8 RIR1', 'Lateral Raise 3×8-10 Failure', 'Triceps Pushdown 2×6-8 Failure', 'Overhead Rope Extension 2×8-10 Failure', 'Cable Crunch 3×10'] },
+      { name: 'Pull A (Çarşamba)', exercises: ['Lat Pulldown 2×6-8 RIR1-Failure', 'Plate Loaded Wide Grip Row 3×6-8 RIR1-Failure', 'Cable Row 1×8-10 Failure', 'Incline Dumbbell Curl 2×6-8 Failure', 'Cable Curl 2×6-8 Failure', 'Hammer Curl + Reverse Barbell Curl 2×8-10 Süperset'] },
+      { name: 'Leg + Ön Kol (Perşembe)', exercises: ['Leg Press 2×6-8 RIR1-2', 'Smith Machine Squat 2×6-8 RIR1-2', 'Leg Extension 2×8-10 Failure', 'Seated Leg Curl 3×8-10 RIR1', 'Wrist Curl 3×12-15 Failure', 'Reverse Wrist Curl 3×12-15 Failure', 'Cable Crunch 3×12-15'] },
+      { name: 'Push B (Cumartesi)', exercises: ['Shoulder Press Machine 2×6-8 RIR1', 'Lateral Raise 3×8-10 Failure', 'Smith Machine Low Incline Press 2×5-6 RIR1', 'Chest Fly Machine 2×6-8 Failure', 'Cable Rear Delt Fly 2×8-10 Failure', 'Triceps Pushdown 2×6-8 Failure', 'Overhead Rope Extension 2×8-10 Failure'] },
+      { name: 'Pull + (Pazar)', exercises: ['Plate Loaded Wide Grip Row 3×6-8 RIR1-Failure', 'Lat Pulldown 3×6-8 RIR1-Failure', 'Romanian Deadlift 2×5-6 RIR1-2', 'Cable Curl 2×6-8 Failure', 'Hammer Curl + Reverse Curl 2×8-10 Süperset', 'Leg Extension 2×6-8 Failure', 'Seated Leg Curl 1×8-10 Failure'] },
+    ],
+  },
+  {
     id: 'ppl',
     title: 'Push Pull Legs Hypertrophy',
     description: 'One of the most popular and effective 3-day splits for muscle growth. Each muscle group is trained twice per week with optimal recovery between sessions.',

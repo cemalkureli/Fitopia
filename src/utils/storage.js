@@ -126,6 +126,23 @@ export async function getAllWorkoutLogs() {
   return raw ? JSON.parse(raw) : {};
 }
 
+export async function deleteWorkoutSession(exerciseName, index) {
+  const raw  = await AsyncStorage.getItem(KEY_WORKOUT);
+  const logs = raw ? JSON.parse(raw) : {};
+  if (!logs[exerciseName]) return;
+  logs[exerciseName].splice(index, 1);
+  if (logs[exerciseName].length === 0) delete logs[exerciseName];
+  await AsyncStorage.setItem(KEY_WORKOUT, JSON.stringify(logs));
+}
+
+export async function updateWorkoutSession(exerciseName, index, sets) {
+  const raw  = await AsyncStorage.getItem(KEY_WORKOUT);
+  const logs = raw ? JSON.parse(raw) : {};
+  if (!logs[exerciseName]?.[index]) return;
+  logs[exerciseName][index].sets = sets;
+  await AsyncStorage.setItem(KEY_WORKOUT, JSON.stringify(logs));
+}
+
 // ─── Vücut Ölçümleri ─────────────────────────────────────────────────────────
 export async function saveBodyMeasurement(data) {
   const raw = await AsyncStorage.getItem(KEY_BODY);
@@ -185,6 +202,22 @@ export async function getVitaminStock() {
 
 export async function saveVitaminStock(data) {
   await AsyncStorage.setItem(KEY_VITAMIN_STOCK, JSON.stringify(data));
+}
+
+// ─── Active Program ───────────────────────────────────────────────────────────
+const KEY_ACTIVE_PROGRAM = 'fitopia_active_program';
+
+export async function getActiveProgram() {
+  const raw = await AsyncStorage.getItem(KEY_ACTIVE_PROGRAM);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function setActiveProgram(program) {
+  await AsyncStorage.setItem(KEY_ACTIVE_PROGRAM, JSON.stringify(program));
+}
+
+export async function clearActiveProgram() {
+  await AsyncStorage.removeItem(KEY_ACTIVE_PROGRAM);
 }
 
 // ─── Favorites ────────────────────────────────────────────────────────────────
