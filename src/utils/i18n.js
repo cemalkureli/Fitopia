@@ -102,6 +102,13 @@ export const TRANSLATIONS = {
     'actsSecondary':      'yardımcı olarak katılır',
     'ratingChangeable':   'Oyunu değiştirebilirsin',
     // Profile
+    'tapToClose':     'Kapatmak için dokunun',
+    'heightCm':       'Boy (cm)',
+    'goalPlaceholder':'Kas yapma, zayıflama...',
+    'permRequired':   'İzin Gerekli',
+    'galleryPerm':    'Galeri erişimi için izin ver.',
+    'error':          'Hata',
+    // Profile
     'editProfile':      'Profili Düzenle',
     'bodyInfo':         'Vücut Bilgileri',
     'weight':           'Ağırlık',
@@ -223,6 +230,13 @@ export const TRANSLATIONS = {
     'actsSecondary':      'acts as secondary stabilizer',
     'ratingChangeable':   'You can change your rating',
     // Profile
+    'tapToClose':     'Tap to close',
+    'heightCm':       'Height (cm)',
+    'goalPlaceholder':'Muscle gain, weight loss...',
+    'permRequired':   'Permission Required',
+    'galleryPerm':    'Please allow gallery access.',
+    'error':          'Error',
+    // Profile
     'editProfile':      'Edit Profile',
     'bodyInfo':         'Body Info',
     'weight':           'Weight',
@@ -250,6 +264,11 @@ export function t(key, lang = 'tr') {
 export const CATEGORY_LABELS = {
   tr: { 'Göğüs':'Göğüs','Sırt':'Sırt','Omuz':'Omuz','Kol':'Kol','Bacak':'Bacak','Core':'Core','Kardio':'Kardio','Compound':'Bileşik' },
   en: { 'Göğüs':'Chest','Sırt':'Back','Omuz':'Shoulder','Kol':'Arms','Bacak':'Legs','Core':'Core','Kardio':'Cardio','Compound':'Compound' },
+};
+
+export const PROGRAM_DAYS = {
+  tr: ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'],
+  en: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
 };
 
 export const DAYS_SHORT = {
