@@ -438,15 +438,15 @@ function WorkoutsTab({ lang }) {
     finally { setSaving(false); }
   };
 
-  const deleteWorkout = async () => {
-    Alert.alert(lang === 'tr' ? 'Antrenmanı Sil' : 'Delete Workout', lang === 'tr' ? 'Emin misin?' : 'Are you sure?', [
-      { text: t('cancel', lang), style: 'cancel' },
-      { text: lang === 'tr' ? 'Sil' : 'Delete', style: 'destructive', onPress: async () => {
-        await supabase.from('custom_workouts').delete().eq('id', active.id);
-        setView('main'); setActive(null);
-        await loadWorkouts(userId);
-      }},
-    ]);
+  const [confirmDeleteWorkout, setConfirmDeleteWorkout] = useState(false);
+
+  const deleteWorkout = () => setConfirmDeleteWorkout(true);
+  const doDeleteWorkout = async () => {
+    await supabase.from('custom_workouts').delete().eq('id', active.id);
+    setConfirmDeleteWorkout(false);
+    setView('main'); setActive(null);
+    await loadWorkouts(userId);
+    showToast(lang === 'tr' ? 'Antrenman silindi.' : 'Workout deleted.', 'error');
   };
 
   const loadPicker = async () => {
@@ -747,7 +747,17 @@ function WorkoutsTab({ lang }) {
   // ── Workout detail screen ──────────────────────────────────────────────────
   if (view === 'detail' && active) {
     return (
-      <View style={[wt.fill, { backgroundColor: C.bg }]}>
+      <View style={[wt.fill, { backgroundColor: C.bg, position: 'relative' }]}>
+        <ConfirmModal
+          visible={confirmDeleteWorkout}
+          title={lang === 'tr' ? 'Antrenmanı Sil' : 'Delete Workout'}
+          message={lang === 'tr' ? `"${active.title}" ve tüm egzersizleri silinecek.` : `"${active.title}" and all its exercises will be deleted.`}
+          confirmLabel={lang === 'tr' ? 'Sil' : 'Delete'}
+          confirmColor="#dc2626"
+          lang={lang}
+          onCancel={() => setConfirmDeleteWorkout(false)}
+          onConfirm={doDeleteWorkout}
+        />
         <SubHdr
           title={active.title}
           onBack={() => { setView('main'); setActive(null); }}
