@@ -200,10 +200,10 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
               </View>
 
               {/* Detaylar */}
-              {(item.description || item.instructions) ? (
+              {(lang === 'en' ? (item.instructions_en || item.instructions) : item.instructions) ? (
                 <>
                   <Text style={det.sectionTitle}>{t('instructions', lang)}</Text>
-                  <Text style={det.instrTxt}>{item.description || item.instructions}</Text>
+                  <Text style={det.instrTxt}>{lang === 'en' ? (item.instructions_en || item.instructions) : item.instructions}</Text>
                 </>
               ) : null}
 
@@ -391,7 +391,7 @@ export default function ExercisesScreen() {
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => fetchExercises(true), search ? 400 : 0);
     return () => clearTimeout(searchTimer.current);
-  }, [cat, search]);
+  }, [cat, diff, search]);
 
   const renderItem   = useCallback(({ item }) => <ExerciseRow item={item} onPress={setSelected} lang={lang} />, [lang]);
   const renderCat    = useCallback(({ item: c }) => {
