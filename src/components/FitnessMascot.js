@@ -6,10 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 // ─── Asset loading (graceful fallback if files don't exist yet) ───────────────
 let IMG = { male_front: null, male_back: null, female_front: null, female_back: null };
 // Static requires only — Metro cannot resolve dynamic paths
-try { IMG.male_front   = require('../../assets/mascot_male/000.webp');   } catch {}
-try { IMG.male_back    = require('../../assets/mascot_male/180.webp');   } catch {}
-try { IMG.female_front = require('../../assets/mascot_female/000.webp'); } catch {}
-try { IMG.female_back  = require('../../assets/mascot_female/180.webp'); } catch {}
+try { IMG.male_front   = require('../../assets/mascot_male/000.png');   } catch {}
+try { IMG.male_back    = require('../../assets/mascot_male/180.png');   } catch {}
+try { IMG.female_front = require('../../assets/mascot_female/000.png'); } catch {}
+try { IMG.female_back  = require('../../assets/mascot_female/180.png'); } catch {}
 
 // ─── Fallback View-based figure ───────────────────────────────────────────────
 const DARK  = '#060810';  const MID   = '#101424';

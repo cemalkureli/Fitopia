@@ -32,23 +32,24 @@ const FEMALE_FRAMES = [
 
 // Try to load each frame
 // Static requires — Metro bundler cannot resolve dynamic template literals
-try { MALE_FRAMES[0] = require('../../assets/mascot_male/000.webp'); } catch {}
-try { MALE_FRAMES[1] = require('../../assets/mascot_male/045.webp'); } catch {}
-try { MALE_FRAMES[2] = require('../../assets/mascot_male/090.webp'); } catch {}
-try { MALE_FRAMES[3] = require('../../assets/mascot_male/135.webp'); } catch {}
-try { MALE_FRAMES[4] = require('../../assets/mascot_male/180.webp'); } catch {}
-try { MALE_FRAMES[5] = require('../../assets/mascot_male/225.webp'); } catch {}
-try { MALE_FRAMES[6] = require('../../assets/mascot_male/270.webp'); } catch {}
-try { MALE_FRAMES[7] = require('../../assets/mascot_male/315.webp'); } catch {}
+// Transparent PNG frames (background removed with alpha mask)
+try { MALE_FRAMES[0] = require('../../assets/mascot_male/000.png'); } catch {}
+try { MALE_FRAMES[1] = require('../../assets/mascot_male/045.png'); } catch {}
+try { MALE_FRAMES[2] = require('../../assets/mascot_male/090.png'); } catch {}
+try { MALE_FRAMES[3] = require('../../assets/mascot_male/135.png'); } catch {}
+try { MALE_FRAMES[4] = require('../../assets/mascot_male/180.png'); } catch {}
+try { MALE_FRAMES[5] = require('../../assets/mascot_male/225.png'); } catch {}
+try { MALE_FRAMES[6] = require('../../assets/mascot_male/270.png'); } catch {}
+try { MALE_FRAMES[7] = require('../../assets/mascot_male/315.png'); } catch {}
 
-try { FEMALE_FRAMES[0] = require('../../assets/mascot_female/000.webp'); } catch {}
-try { FEMALE_FRAMES[1] = require('../../assets/mascot_female/045.webp'); } catch {}
-try { FEMALE_FRAMES[2] = require('../../assets/mascot_female/090.webp'); } catch {}
-try { FEMALE_FRAMES[3] = require('../../assets/mascot_female/135.webp'); } catch {}
-try { FEMALE_FRAMES[4] = require('../../assets/mascot_female/180.webp'); } catch {}
-try { FEMALE_FRAMES[5] = require('../../assets/mascot_female/225.webp'); } catch {}
-try { FEMALE_FRAMES[6] = require('../../assets/mascot_female/270.webp'); } catch {}
-try { FEMALE_FRAMES[7] = require('../../assets/mascot_female/315.webp'); } catch {}
+try { FEMALE_FRAMES[0] = require('../../assets/mascot_female/000.png'); } catch {}
+try { FEMALE_FRAMES[1] = require('../../assets/mascot_female/045.png'); } catch {}
+try { FEMALE_FRAMES[2] = require('../../assets/mascot_female/090.png'); } catch {}
+try { FEMALE_FRAMES[3] = require('../../assets/mascot_female/135.png'); } catch {}
+try { FEMALE_FRAMES[4] = require('../../assets/mascot_female/180.png'); } catch {}
+try { FEMALE_FRAMES[5] = require('../../assets/mascot_female/225.png'); } catch {}
+try { FEMALE_FRAMES[6] = require('../../assets/mascot_female/270.png'); } catch {}
+try { FEMALE_FRAMES[7] = require('../../assets/mascot_female/315.png'); } catch {}
 
 const FRAME_COUNT = 8;
 const DEG_PER_FRAME = 360 / FRAME_COUNT; // 45°

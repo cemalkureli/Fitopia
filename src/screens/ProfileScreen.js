@@ -497,7 +497,7 @@ export default function ProfileScreen({ onSignOut }) {
       <SubBg colors={['rgba(220,38,38,0.10)', 'rgba(2,6,23,0)']} />
       <SubHeader title={t('gender', lang)} onBack={() => setSub(null)} />
       <SubDesc text={lang === 'tr' ? 'Cinsiyetinizi seçin.' : 'Select your gender.'} />
-      {['male', 'female', 'other'].map((g, i) => (
+      {['male', 'female'].map((g, i) => (
         <RadioOption key={g} label={t(g, lang)} selected={profile?.gender === g}
           onPress={async () => { await saveField('gender', g); setSub(null); }} delay={80 + i * 60} />
       ))}

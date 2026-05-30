@@ -342,12 +342,7 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Turntable mascot — drag to rotate */}
-        <View style={g.mascotWrap}>
-          <TurntableMascot gender={gender} width={200} height={360} autoSpin />
-        </View>
-
-        {/* Measurement values below figure */}
+        {/* Measurement values */}
         {measureRows.length > 0 ? (
           <View style={g.measureList}>
             {measureRows.map((mt, i) => {
