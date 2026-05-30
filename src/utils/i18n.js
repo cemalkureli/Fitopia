@@ -80,6 +80,10 @@ export const TRANSLATIONS = {
     'difficulty':       'Zorluk',
     'instructions':     'Detaylar',
     'diff1': 'Kolay', 'diff2': 'Orta-Kolay', 'diff3': 'Orta', 'diff4': 'Zor', 'diff5': 'Çok Zor',
+    'favorites':       'Favoriler',
+    'noFavorites':     'Henüz favori yok.\nEgzersiz sekmesinden ❤ ile ekle.',
+    'addFavorite':     'Favorilere ekle',
+    'removeFavorite':  'Favorilerden çıkar',
     // Workout log modal
     'set':            'Set',
     'reps':           'Tekrar',
@@ -245,6 +249,10 @@ export const TRANSLATIONS = {
     'difficulty':       'Difficulty',
     'instructions':     'Details',
     'diff1': 'Easy', 'diff2': 'Easy-Med', 'diff3': 'Medium', 'diff4': 'Hard', 'diff5': 'Very Hard',
+    'favorites':       'Favorites',
+    'noFavorites':     'No favorites yet.\nAdd exercises with ❤ from the Exercises tab.',
+    'addFavorite':     'Add to favorites',
+    'removeFavorite':  'Remove from favorites',
     // Workout log modal
     'set':            'Set',
     'reps':           'Reps',

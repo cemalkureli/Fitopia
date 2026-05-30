@@ -11,6 +11,7 @@ import { C } from '../utils/theme';
 import { saveWorkoutSession, getAllWorkoutLogs } from '../utils/storage';
 import { useLang } from '../context/LanguageContext';
 import { t, MONTHS_SHORT } from '../utils/i18n';
+import { getFavorites } from '../utils/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -130,24 +131,17 @@ function ExerciseCard({ name, sessions, onLog, index, lang }) {
   );
 }
 
-const EXERCISE_LIST = [
-  'Plate Loaded Chest Press','Smith Machine Low Incline Press','Chest Fly Machine',
-  'Shoulder Press Machine','Lateral Raise','Triceps Pushdown','Overhead Rope Extension',
-  'Cable Crunch','Lat Pulldown','Plate Loaded Wide Grip Row','Cable Row',
-  'Incline Dumbbell Curl','Cable Curl','Hammer Curl','Leg Press',
-  'Smith Machine Squat','Leg Extension','Seated Leg Curl','Wrist Curl',
-  'Reverse Wrist Curl','Romanian Deadlift','Cable Rear Delt Fly',
-];
-
 export default function ProgressScreen() {
   const { lang } = useLang();
   const [workoutLogs, setWorkoutLogs] = useState({});
+  const [favorites,   setFavorites]   = useState([]);
   const [logModal,    setLogModal]    = useState(null);
   const [logSets,     setLogSets]     = useState([{ reps: '', kg: '' }, { reps: '', kg: '' }, { reps: '', kg: '' }]);
   const [filter,      setFilter]      = useState('all');
 
   useFocusEffect(useCallback(() => {
     getAllWorkoutLogs().then(setWorkoutLogs);
+    getFavorites().then(setFavorites);
   }, []));
 
   const openLog = (exerciseName) => {
@@ -174,16 +168,15 @@ export default function ProgressScreen() {
   const updateSet = (i, field, val) =>
     setLogSets(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
 
-  const filtered = EXERCISE_LIST.filter(ex => {
-    if (filter === 'logged') return (workoutLogs[ex] || []).length > 0;
-    return true;
-  });
+  // all = favorites list, logged = exercises with actual logs
+  const loggedExercises = Object.keys(workoutLogs).filter(ex => (workoutLogs[ex] || []).length > 0);
+  const filtered = filter === 'logged' ? loggedExercises : favorites;
 
   const totalSessions = Object.values(workoutLogs).reduce((a, b) => a + b.length, 0);
   const totalSets     = Object.values(workoutLogs).reduce((a, b) => a + b.reduce((c, s) => c + (s.sets?.length ?? 0), 0), 0);
 
   const FILTERS = [
-    { key: 'all',    label: t('all', lang) },
+    { key: 'all',    label: t('favorites', lang) },
     { key: 'logged', label: t('logged', lang) },
   ];
 
@@ -227,16 +220,23 @@ export default function ProgressScreen() {
         </Animated.View>
 
         {/* Egzersiz kartları */}
-        {filtered.map((ex, i) => (
-          <ExerciseCard
-            key={ex}
-            name={ex}
-            sessions={workoutLogs[ex] || []}
-            onLog={openLog}
-            index={i}
-            lang={lang}
-          />
-        ))}
+        {filtered.length === 0 ? (
+          <Animated.View entering={FadeInDown.duration(350)} style={s.emptyWrap}>
+            <Ionicons name={filter === 'all' ? 'heart-outline' : 'bar-chart-outline'} size={40} color={C.dim} />
+            <Text style={s.emptyTxt}>{t(filter === 'all' ? 'noFavorites' : 'noData', lang)}</Text>
+          </Animated.View>
+        ) : (
+          filtered.map((ex, i) => (
+            <ExerciseCard
+              key={ex}
+              name={ex}
+              sessions={workoutLogs[ex] || []}
+              onLog={openLog}
+              index={i}
+              lang={lang}
+            />
+          ))
+        )}
       </ScrollView>
 
       {/* Kayıt Modalı */}
@@ -365,6 +365,8 @@ const s = StyleSheet.create({
   setNumBox:     { width: 36, height: 36, borderRadius: 18, backgroundColor: C.s2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border },
   setNumText:    { color: C.lime, fontWeight: '800', fontSize: 12 },
   logInput:      { flex: 1, height: 36, backgroundColor: C.s2, borderRadius: 10, borderWidth: 1, borderColor: C.border, color: C.text, textAlign: 'center', fontSize: 14, fontWeight: '700' },
+  emptyWrap:     { alignItems: 'center', paddingVertical: 48, gap: 12 },
+  emptyTxt:      { color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
   addSetBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   logActions:    { flexDirection: 'row', gap: 10, marginTop: 12 },
   cancelBtn:     { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },

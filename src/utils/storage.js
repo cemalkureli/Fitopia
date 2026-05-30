@@ -186,3 +186,19 @@ export async function getVitaminStock() {
 export async function saveVitaminStock(data) {
   await AsyncStorage.setItem(KEY_VITAMIN_STOCK, JSON.stringify(data));
 }
+
+// ─── Favorites ────────────────────────────────────────────────────────────────
+const KEY_FAVORITES = 'fitopia_favorites';
+
+export async function getFavorites() {
+  const raw = await AsyncStorage.getItem(KEY_FAVORITES);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function toggleFavorite(exerciseName) {
+  const favs = await getFavorites();
+  const idx  = favs.indexOf(exerciseName);
+  if (idx === -1) favs.push(exerciseName); else favs.splice(idx, 1);
+  await AsyncStorage.setItem(KEY_FAVORITES, JSON.stringify(favs));
+  return favs;
+}

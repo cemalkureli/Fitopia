@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase';
 import ExerciseMedia from '../components/ExerciseMedia';
 import { useLang } from '../context/LanguageContext';
 import { t, CATEGORY_LABELS, MUSCLE_LABELS } from '../utils/i18n';
+import { getFavorites, toggleFavorite } from '../utils/storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -84,7 +85,7 @@ const eb = StyleSheet.create({
 });
 
 // ─── Egzersiz satırı ─────────────────────────────────────────────────────────
-const ExerciseRow = memo(({ item, onPress, lang }) => {
+const ExerciseRow = memo(({ item, onPress, lang, isFav, onToggleFav }) => {
   const color    = CAT_COLOR[item.category] ?? C.lime;
   const catLabel = CATEGORY_LABELS[lang]?.[item.category] ?? item.category;
   const muscle   = MUSCLE_LABELS[lang]?.[item.primary_muscle] ?? item.primary_muscle;
@@ -113,12 +114,14 @@ const ExerciseRow = memo(({ item, onPress, lang }) => {
           </View>
         )}
       </View>
-      {/* Etki nokta göstergesi */}
-      <View style={s.effWrap}>
-        {Array.from({ length: 5 }, (_, i) => (
-          <View key={i} style={[s.effDot, { backgroundColor: i < (item.effectiveness ?? 0) ? color : C.s3 }]} />
-        ))}
-      </View>
+      {/* Favori butonu */}
+      <TouchableOpacity
+        onPress={e => { e.stopPropagation?.(); onToggleFav(item.name); }}
+        hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+        style={{ padding: 4 }}
+      >
+        <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? C.red : C.dim} />
+      </TouchableOpacity>
       <Ionicons name="chevron-forward" size={14} color={C.dim} />
     </TouchableOpacity>
   );
@@ -357,11 +360,19 @@ export default function ExercisesScreen() {
   const [loadMore,  setLoadMore]  = useState(false);
   const [hasMore,   setHasMore]   = useState(true);
   const [search,    setSearch]    = useState('');
-  const [cat,       setCat]       = useState('');   // '' = Tümü
-  const [diff,      setDiff]      = useState(0);    // 0 = Tümü, 1-5
+  const [cat,       setCat]       = useState('');
+  const [diff,      setDiff]      = useState(0);
   const [selected,  setSelected]  = useState(null);
+  const [favorites, setFavorites] = useState([]);
   const offsetRef   = useRef(0);
   const searchTimer = useRef(null);
+
+  useEffect(() => { getFavorites().then(setFavorites); }, []);
+
+  const handleToggleFav = useCallback(async (exerciseName) => {
+    const updated = await toggleFavorite(exerciseName);
+    setFavorites([...updated]);
+  }, []);
 
   const fetchExercises = useCallback(async (reset = false) => {
     const offset = reset ? 0 : offsetRef.current;
@@ -410,7 +421,15 @@ export default function ExercisesScreen() {
     return () => clearTimeout(searchTimer.current);
   }, [cat, diff, search]);
 
-  const renderItem   = useCallback(({ item }) => <ExerciseRow item={item} onPress={setSelected} lang={lang} />, [lang]);
+  const renderItem = useCallback(({ item }) => (
+    <ExerciseRow
+      item={item}
+      onPress={setSelected}
+      lang={lang}
+      isFav={favorites.includes(item.name)}
+      onToggleFav={handleToggleFav}
+    />
+  ), [lang, favorites, handleToggleFav]);
   const renderCat = useCallback(({ item: c }) => {
     const label  = c === '' ? t('all', lang) : (CATEGORY_LABELS[lang]?.[c] ?? c);
     const color  = CAT_COLOR[c] ?? C.lime;
