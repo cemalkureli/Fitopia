@@ -16,6 +16,8 @@ import { getFavorites, toggleFavorite } from '../utils/storage';
 import { TRAINING_PLANS, PLAN_FILTERS } from '../data/trainingPlans';
 import { setActiveProgram, getMyPlans, saveMyPlan, deleteMyPlan, getActiveProgram, clearActiveProgram } from '../utils/storage';
 import { useToast, ConfirmModal } from '../components/Toast';
+import { cacheGet, cacheSet, TTL } from '../utils/cache';
+import { Image as ExpoImage } from 'expo-image';
 
 // Workout terminology definitions (shared with ProgramScreen)
 const TERIMLER = {
@@ -112,7 +114,13 @@ const ExerciseRow = memo(({ item, onPress, lang, isFav, onToggleFav }) => {
   return (
     <TouchableOpacity style={s.exRow} onPress={() => onPress(item)} activeOpacity={0.8}>
       {item.thumb_url ? (
-        <Image source={{ uri: item.thumb_url }} style={s.thumb} resizeMode="cover" />
+        <ExpoImage
+          source={{ uri: item.thumb_url }}
+          style={s.thumb}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={150}
+        />
       ) : (
         <LinearGradient colors={[color + '33', color + '11']} style={s.thumb}>
           <Text style={[s.thumbLetter, { color }]}>{(item.name ?? '?')[0]}</Text>
@@ -631,8 +639,13 @@ function WorkoutsTab({ lang }) {
               </View>
               <View style={ed.summaryDiv} />
               <View style={ed.summaryItem}>
-                <Text style={ed.summaryVal}>{editRir}</Text>
-                <Text style={ed.summaryLbl}>RIR</Text>
+                <Text style={ed.summaryVal} numberOfLines={1} style={[ed.summaryVal, { fontSize: editMode ? 13 : 22 }]}>
+                  {editMode
+                    ? editMode.startsWith('rir') ? `RIR ${editMode.replace('rir','')}` : editMode
+                    : '—'
+                  }
+                </Text>
+                <Text style={ed.summaryLbl}>{lang === 'tr' ? 'Mod' : 'Mode'}</Text>
               </View>
             </View>
 
@@ -1502,24 +1515,65 @@ function ExercisesLibrary({ lang }) {
 
   const fetchExercises = useCallback(async (reset = false) => {
     const offset = reset ? 0 : offsetRef.current;
-    if (!reset) setLoadMore(true);
-    let q = supabase.from('exercises').select('*').range(offset, offset + PAGE - 1).order('name');
+    if (!reset) { setLoadMore(true); }
+
+    // Cache key includes all filter params
+    const cacheKey = `exercises_${cat}_${diff}_${search.trim()}_${offset}`;
+
+    // Try cache first on reset (instant show)
+    if (reset) {
+      const cached = await cacheGet(cacheKey);
+      if (cached) {
+        setExercises(cached.data);
+        offsetRef.current = cached.data.length;
+        setHasMore(cached.data.length === PAGE);
+        setLoading(false);
+        if (!cached.stale) return; // Fresh cache — no network needed
+        // Stale: continue to fetch in background without spinner
+      }
+    }
+
+    let q = supabase.from('exercises')
+      .select('id,slug,name,name_tr,category,primary_muscle,secondary_muscles,difficulty,effectiveness,muscle_activations,instructions,instructions_en,webm_url,thumb_url')
+      .range(offset, offset + PAGE - 1).order('name');
     if (cat)           q = q.eq('category', cat);
     if (diff > 0)      q = q.eq('difficulty', diff);
     if (search.trim()) q = q.ilike('name', `%${search.trim()}%`);
+
     const { data, error } = await q;
     if (error) { setLoading(false); setLoadMore(false); return; }
+
     const seen = new Set();
     const unique = (data || []).filter(ex => { if (seen.has(ex.slug)) return false; seen.add(ex.slug); return true; });
+
+    // Batch fetch ratings with caching
     if (unique.length > 0) {
       const ids = unique.map(e => e.id);
-      const { data: ratings } = await supabase.from('exercise_rating_summary').select('*').in('exercise_id', ids);
-      const rm = {};
-      (ratings || []).forEach(r => { rm[r.exercise_id] = r; });
+      const ratingsKey = `ratings_${ids.join(',')}`;
+      let rm = {};
+      const cachedRatings = await cacheGet(ratingsKey);
+      if (cachedRatings && !cachedRatings.stale) {
+        rm = cachedRatings.data;
+      } else {
+        const { data: ratings } = await supabase
+          .from('exercise_rating_summary')
+          .select('exercise_id,avg_rating,vote_count')
+          .in('exercise_id', ids);
+        (ratings || []).forEach(r => { rm[r.exercise_id] = r; });
+        await cacheSet(ratingsKey, rm, TTL.RATINGS);
+      }
       unique.forEach(ex => { ex.avg_rating = rm[ex.id]?.avg_rating ?? 0; ex.vote_count = rm[ex.id]?.vote_count ?? 0; });
     }
-    if (reset) { setExercises(unique); offsetRef.current = unique.length; }
-    else { setExercises(prev => { const ex = new Set(prev.map(e => e.slug)); return [...prev, ...unique.filter(e => !ex.has(e.slug))]; }); offsetRef.current += unique.length; }
+
+    // Cache this page
+    if (reset) {
+      await cacheSet(cacheKey, unique, TTL.EXERCISES);
+      setExercises(unique);
+      offsetRef.current = unique.length;
+    } else {
+      setExercises(prev => { const ex = new Set(prev.map(e => e.slug)); return [...prev, ...unique.filter(e => !ex.has(e.slug))]; });
+      offsetRef.current += unique.length;
+    }
     setHasMore(unique.length === PAGE);
     setLoading(false); setLoadMore(false);
   }, [cat, diff, search]);

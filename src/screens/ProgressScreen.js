@@ -17,6 +17,7 @@ import TurntableMascot from '../components/TurntableMascot';
 import { useToast, ConfirmModal } from '../components/Toast';
 import { t, MONTHS_SHORT, DAYS_SHORT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
+import { cacheGet, cacheSet, TTL } from '../utils/cache';
 
 // ─── Measurement types ────────────────────────────────────────────────────────
 const MEASURE_TYPES = [
@@ -96,7 +97,7 @@ function ExerciseCard({ name, sessions, onLog, index, lang, onReload, onDelete }
   return (
     <AnimatedRN.View entering={FadeInDown.delay(index * 40).duration(350)}>
       <View style={[s.exCard, expanded && { borderColor: C.lime + '44' }]}>
-        <TouchableOpacity style={s.exCardHeader} onPress={() => setExpanded(v => !v)} activeOpacity={0.8}>
+        <TouchableOpacity style={s.exCardHeader} onPress={() => { if (sessions.length > 0) setExpanded(v => !v); }} activeOpacity={sessions.length > 0 ? 0.8 : 1}>
           <View style={{ flex: 1 }}>
             <View style={s.exNameRow}>
               <Text style={s.exName} numberOfLines={1}>{name}</Text>
@@ -109,9 +110,12 @@ function ExerciseCard({ name, sessions, onLog, index, lang, onReload, onDelete }
             }
           </View>
           <View style={s.exActions}>
-            <TouchableOpacity style={s.addBtn} onPress={() => onLog(name)}>
-              <Ionicons name="add" size={18} color={C.lime} />
-            </TouchableOpacity>
+            {/* + button only in Logged tab (onDelete present = logged) */}
+            {onDelete && (
+              <TouchableOpacity style={s.addBtn} onPress={() => onLog(name)}>
+                <Ionicons name="add" size={18} color={C.lime} />
+              </TouchableOpacity>
+            )}
             {/* Delete — only in Logged tab */}
             {onDelete && (
               <TouchableOpacity onPress={() => onDelete(name)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -347,18 +351,37 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
   const [gender,       setGender]       = useState('male');
   const [latestMeasure, setLatestMeasure] = useState({});
 
-  // Reload gender + measurements every time this tab is focused
   useFocusEffect(useCallback(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data?.user) return;
-      supabase.from('profiles').select('gender').eq('id', data.user.id).single()
-        .then(({ data: p }) => { if (p?.gender) setGender(p.gender); });
+      const uid = data.user.id;
+
+      // Gender (cached 10 min)
+      const gKey = `profile_gender_${uid}`;
+      const gc = await cacheGet(gKey);
+      if (gc && !gc.stale) {
+        if (gc.data) setGender(gc.data);
+      } else {
+        supabase.from('profiles').select('gender').eq('id', uid).single()
+          .then(async ({ data: p }) => {
+            if (p?.gender) { setGender(p.gender); await cacheSet(gKey, p.gender, TTL.PROFILE); }
+          });
+      }
+
+      // Measurements (cached 2 min)
+      const mKey = `measurements_${uid}`;
+      const mc2 = await cacheGet(mKey);
+      if (mc2) {
+        setLatestMeasure(mc2.data);
+        if (!mc2.stale) return;
+      }
       supabase.from('body_measurements').select('type, value, unit')
-        .eq('user_id', data.user.id).order('measured_at', { ascending: false })
-        .then(({ data: ms }) => {
+        .eq('user_id', uid).order('measured_at', { ascending: false })
+        .then(async ({ data: ms }) => {
           const latest = {};
           (ms || []).forEach(m => { if (!latest[m.type]) latest[m.type] = { value: m.value, unit: m.unit }; });
           setLatestMeasure(latest);
+          await cacheSet(mKey, latest, TTL.WORKOUTS);
         });
     });
   }, []));
