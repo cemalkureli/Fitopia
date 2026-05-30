@@ -264,6 +264,77 @@ const mr = StyleSheet.create({
   infoClose:  { backgroundColor: '#dc2626', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
 });
 
+// ─── Laser measurement row ────────────────────────────────────────────────────
+function MeasureLaserRow({ label, value, unit, delay, index }) {
+  const scanX   = useRef(new Animated.Value(-1)).current;
+  const glow    = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const startDelay = delay + 400;
+    // Scan beam sweeps left to right repeatedly
+    const scan = Animated.loop(
+      Animated.sequence([
+        Animated.delay(startDelay + index * 200),
+        Animated.timing(scanX, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        Animated.timing(scanX, { toValue: -1, duration: 0, useNativeDriver: true }),
+        Animated.delay(2000 + index * 300),
+      ])
+    );
+    // Glow pulse on the value
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.delay(startDelay),
+        Animated.timing(glow, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    scan.start(); pulse.start();
+    return () => { scan.stop(); pulse.stop(); };
+  }, []);
+
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+
+  return (
+    <AnimatedRN.View entering={FadeInLeft.delay(delay).duration(280)} style={lz.row}>
+      {/* Label */}
+      <Text style={lz.label}>{label}</Text>
+
+      {/* Animated laser line */}
+      <View style={lz.lineWrap}>
+        {/* Static dim line */}
+        <View style={lz.lineBase} />
+        {/* Particle dots */}
+        {[0.2, 0.45, 0.7].map((pos, pi) => (
+          <View key={pi} style={[lz.dot, { left: `${pos * 100}%` }]} />
+        ))}
+        {/* Scan beam */}
+        <Animated.View
+          style={[lz.scanBeam, {
+            transform: [{ scaleX: scanX.interpolate({ inputRange: [-1, 1], outputRange: [-1, 1] }) }],
+          }]}
+        />
+      </View>
+
+      {/* Value */}
+      <Animated.Text style={[lz.value, { opacity: glowOpacity }]}>
+        {value}
+      </Animated.Text>
+      <Text style={lz.unit}>{unit}</Text>
+    </AnimatedRN.View>
+  );
+}
+
+const lz = StyleSheet.create({
+  row:      { flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 20 },
+  label:    { color: C.muted, fontSize: 12, fontWeight: '700', width: 90 },
+  lineWrap: { flex: 1, height: 16, justifyContent: 'center', position: 'relative', marginHorizontal: 8 },
+  lineBase: { height: 1, backgroundColor: 'rgba(220,38,38,0.15)', borderRadius: 1 },
+  dot:      { position: 'absolute', width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(220,38,38,0.4)', top: '50%', marginTop: -1.5 },
+  scanBeam: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: 'rgba(220,38,38,0.7)', borderRadius: 1, shadowColor: '#dc2626', shadowOpacity: 0.9, shadowRadius: 6, elevation: 4 },
+  value:    { color: '#dc2626', fontSize: 15, fontWeight: '900', width: 44, textAlign: 'right' },
+  unit:     { color: C.dim, fontSize: 10, fontWeight: '600', width: 26, marginLeft: 4 },
+});
+
 // ─── General Status tab ───────────────────────────────────────────────────────
 function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
   const [gender,       setGender]       = useState('male');
@@ -347,22 +418,20 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           <TurntableMascot gender={gender} width={220} height={400} autoSpin />
         </View>
 
-        {/* Measurement values */}
+        {/* Measurement values — animated laser lines */}
         {measureRows.length > 0 ? (
           <View style={g.measureList}>
             {measureRows.map((mt, i) => {
               const m = latestMeasure[mt.key];
               return (
-                <AnimatedRN.View
+                <MeasureLaserRow
                   key={mt.key}
-                  entering={FadeInLeft.delay(i * 50).duration(260)}
-                  style={g.measureRow}
-                >
-                  <Text style={g.measureLabel}>{t(mt.labelKey, lang)}</Text>
-                  <View style={g.measureDivider} />
-                  <Text style={g.measureValue}>{m.value}</Text>
-                  <Text style={g.measureUnit}>{m.unit}</Text>
-                </AnimatedRN.View>
+                  label={t(mt.labelKey, lang)}
+                  value={m.value}
+                  unit={m.unit}
+                  delay={i * 60}
+                  index={i}
+                />
               );
             })}
           </View>
@@ -423,14 +492,9 @@ const g = StyleSheet.create({
   statDiv:      { width: 1, backgroundColor: C.border },
 
   // Mascot section
-  mascotSection:{ backgroundColor: C.s1, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', marginBottom: 12, overflow: 'hidden', paddingBottom: 20 },
-  mascotWrap:   { alignItems: 'center', paddingTop: 20, paddingBottom: 8 },
-  measureList:  { paddingHorizontal: 24, gap: 0 },
-  measureRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  measureLabel: { color: C.muted, fontSize: 13, fontWeight: '600', width: 110 },
-  measureDivider:{ flex: 1, height: 1, backgroundColor: 'rgba(220,38,38,0.15)', marginHorizontal: 8 },
-  measureValue: { color: '#dc2626', fontSize: 15, fontWeight: '800' },
-  measureUnit:  { color: C.dim, fontSize: 11, fontWeight: '600', marginLeft: 4, width: 28 },
+  mascotSection:{ backgroundColor: C.s1, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', marginBottom: 12, overflow: 'hidden', paddingBottom: 16 },
+  mascotWrap:   { alignItems: 'center', paddingTop: 20, paddingBottom: 4 },
+  measureList:  { paddingVertical: 4 },
   noMeasure:    { color: C.dim, fontSize: 12, textAlign: 'center', paddingVertical: 12, paddingHorizontal: 20 },
 
   card:         { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 12 },

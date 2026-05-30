@@ -1266,7 +1266,7 @@ function ExercisesLibrary({ lang }) {
     const icon  = CAT_ICON[c] ?? 'apps-outline';
     const active = cat === c;
     return (
-      <TouchableOpacity style={[s.catBtn, active && { backgroundColor: color, borderColor: color }]} onPress={() => setCat(c)} activeOpacity={0.75}>
+      <TouchableOpacity style={[s.catBtn, active && { backgroundColor: color, borderColor: color }]} onPress={() => setCat(active ? '' : c)} activeOpacity={0.75}>
         <Ionicons name={icon} size={14} color={active ? '#0a0c0f' : color} />
         <Text style={[s.catTxt, active && { color: '#0a0c0f', fontWeight: '800' }]}>{label}</Text>
       </TouchableOpacity>
@@ -1288,7 +1288,7 @@ function ExercisesLibrary({ lang }) {
         {DIFF_META.map((dm, d) => {
           const active = diff === d;
           return (
-            <TouchableOpacity key={d} style={[s.diffBtn, active && { backgroundColor: dm.color, borderColor: dm.color }]} onPress={() => setDiff(d)} activeOpacity={0.75}>
+            <TouchableOpacity key={d} style={[s.diffBtn, active && { backgroundColor: dm.color, borderColor: dm.color }]} onPress={() => setDiff(active ? 0 : d)} activeOpacity={0.75}>
               <Ionicons name={dm.icon} size={13} color={active ? '#0a0c0f' : dm.color} />
               <Text style={[s.diffTxt, active && { color: '#0a0c0f', fontWeight: '800' }]}>{t(dm.key, lang)}</Text>
             </TouchableOpacity>
