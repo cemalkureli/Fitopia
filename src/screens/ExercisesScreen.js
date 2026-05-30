@@ -1104,7 +1104,7 @@ function TemplatesTab({ lang }) {
     setArr(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
   };
 
-  const hasFilters = filterDays.length + filterLvl.length + filterGoal.length + filterMuscle.length > 0;
+  const hasFilters = filterDays.length + filterLvl.length + filterGoal.length > 0;
 
   // ── Filter modal ────────────────────────────────────────────────────────────
   if (view === 'filter') {

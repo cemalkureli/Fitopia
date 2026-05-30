@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../utils/theme';
-import { saveWorkoutSession, getAllWorkoutLogs, getFavorites, deleteWorkoutSession, updateWorkoutSession, getActiveProgram } from '../utils/storage';
+import { saveWorkoutSession, getAllWorkoutLogs, getFavorites, deleteWorkoutSession, deleteAllExerciseSessions, getActiveProgram } from '../utils/storage';
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
 import FitnessMascot from '../components/FitnessMascot';
@@ -111,6 +111,23 @@ function ExerciseCard({ name, sessions, onLog, index, lang, onReload }) {
             <TouchableOpacity style={s.addBtn} onPress={() => onLog(name)}>
               <Ionicons name="add" size={18} color={C.lime} />
             </TouchableOpacity>
+            {/* Delete entire exercise */}
+            <TouchableOpacity
+              onPress={() => Alert.alert(
+                lang === 'tr' ? 'Egzersizi Sil' : 'Delete Exercise',
+                lang === 'tr' ? `"${name}" ve tüm kayıtları silinecek.` : `"${name}" and all its logs will be deleted.`,
+                [
+                  { text: t('cancel', lang), style: 'cancel' },
+                  { text: lang === 'tr' ? 'Sil' : 'Delete', style: 'destructive', onPress: async () => {
+                    await deleteAllExerciseSessions(name);
+                    onReload?.();
+                  }},
+                ]
+              )}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="trash-outline" size={16} color={C.red} />
+            </TouchableOpacity>
             <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={C.dim} />
           </View>
         </TouchableOpacity>
@@ -133,24 +150,6 @@ function ExerciseCard({ name, sessions, onLog, index, lang, onReload }) {
                     </View>
                   ))}
                 </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    Alert.alert(
-                      lang === 'tr' ? 'Kaydı Sil' : 'Delete Record',
-                      lang === 'tr' ? 'Bu kaydı silmek istediğine emin misin?' : 'Are you sure you want to delete this record?',
-                      [
-                        { text: t('cancel', lang), style: 'cancel' },
-                        { text: lang === 'tr' ? 'Sil' : 'Delete', style: 'destructive', onPress: async () => {
-                          await deleteWorkoutSession(name, j);
-                          onReload?.();
-                        }},
-                      ]
-                    );
-                  }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="trash-outline" size={14} color={C.dim} />
-                </TouchableOpacity>
               </View>
             ))}
           </View>

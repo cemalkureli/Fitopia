@@ -135,6 +135,13 @@ export async function deleteWorkoutSession(exerciseName, index) {
   await AsyncStorage.setItem(KEY_WORKOUT, JSON.stringify(logs));
 }
 
+export async function deleteAllExerciseSessions(exerciseName) {
+  const raw  = await AsyncStorage.getItem(KEY_WORKOUT);
+  const logs = raw ? JSON.parse(raw) : {};
+  delete logs[exerciseName];
+  await AsyncStorage.setItem(KEY_WORKOUT, JSON.stringify(logs));
+}
+
 export async function updateWorkoutSession(exerciseName, index, sets) {
   const raw  = await AsyncStorage.getItem(KEY_WORKOUT);
   const logs = raw ? JSON.parse(raw) : {};
