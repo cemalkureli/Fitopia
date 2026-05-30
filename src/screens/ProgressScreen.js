@@ -104,10 +104,9 @@ function ExerciseCard({ name, sessions, onLog, index, lang, onReload, onDelete }
               {trend === 'up'   && <Ionicons name="trending-up"   size={14} color={C.green}  style={{ marginLeft: 6 }} />}
               {trend === 'down' && <Ionicons name="trending-down" size={14} color={C.red}    style={{ marginLeft: 6 }} />}
             </View>
-            {last
-              ? <Text style={s.exLast}>{fmtDate(last.date, lang)} — {fmtSets(last.sets)}</Text>
-              : <Text style={s.exNoData}>{t('noRecord', lang)}</Text>
-            }
+            {last && (
+              <Text style={s.exLast}>{fmtDate(last.date, lang)} — {fmtSets(last.sets)}</Text>
+            )}
           </View>
           <View style={s.exActions}>
             {/* + button only in Logged tab (onDelete present = logged) */}
