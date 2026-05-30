@@ -236,26 +236,6 @@ export default function ProgramScreen() {
   return (
     <View style={s.fill}>
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        {/* Barfiks bilgi kartı */}
-        <Animated.View entering={FadeInDown.duration(350)} style={s.infoCard}>
-          <Ionicons name="barbell-outline" size={16} color={C.lime} style={{ marginBottom: 4 }} />
-          <Text style={s.infoTitle}>{t('barfiks', lang)}: {reps.label} — {t('dailySessions', lang)}</Text>
-          <Text style={s.infoText}>
-            {lang === 'tr'
-              ? `Her seans ${reps.sets} set × ${reps.reps} tekrar · Toplam: ${reps.total}\nHf1: 3×3 · Hf2: 3×4 · Hf3: 3×5 · Hf4: 3×6`
-              : `Each session ${reps.sets} sets × ${reps.reps} reps · Total: ${reps.total}\nWk1: 3×3 · Wk2: 3×4 · Wk3: 3×5 · Wk4: 3×6`
-            }
-          </Text>
-        </Animated.View>
-
-        {/* Terimler bilgi kartı */}
-        <Animated.View entering={FadeInDown.delay(60).duration(350)} style={[s.infoCard, s.infoCardBlue]}>
-          <Text style={[s.infoTitle, { color: C.blue }]}>{t('terms', lang)}</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-            {TERM_KEYS.map(tk => <TerimPill key={tk} terim={tk} lang={lang} />)}
-          </View>
-        </Animated.View>
-
         {/* Günler */}
         {GUNLER.map((g, i) => (
           <GunKarti

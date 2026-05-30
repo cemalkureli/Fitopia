@@ -15,6 +15,22 @@ import { t, CATEGORY_LABELS, MUSCLE_LABELS } from '../utils/i18n';
 import { getFavorites, toggleFavorite } from '../utils/storage';
 import { TRAINING_PLANS, PLAN_FILTERS } from '../data/trainingPlans';
 
+// Workout terminology definitions (shared with ProgramScreen)
+const TERIMLER = {
+  tr: {
+    'RIR':      'RIR = Reps In Reserve — Sete biterken hâlâ yapabileceğin tekrar sayısı.\nRIR 0 = Failure (kas yetmezliği), RIR 1 = 1 tekrar kaldı, RIR 2 = 2 tekrar kaldı.',
+    'Failure':  'Kas Yetmezliği — 1 tekrar daha fiziksel olarak imkânsız olana kadar sürdür. Maksimum kas stimülasyonu.',
+    'Süperset': 'Süperset — İki egzersizi dinlenmeksizin arka arkaya yap. Antrenman süresini kısaltır.',
+    'Finisher': 'Finisher — Antrenman sonunda yapılan tamamlayıcı set. Kası tamamen tüketmek için.',
+  },
+  en: {
+    'RIR':      'RIR = Reps In Reserve — How many reps you could still do at the end of a set.\nRIR 0 = Failure, RIR 1 = 1 rep left, RIR 2 = 2 reps left.',
+    'Failure':  'Muscular Failure — Continue until one more rep is physically impossible. Maximum muscle stimulation.',
+    'Superset': 'Superset — Perform two exercises back-to-back without rest. Shortens workout duration.',
+    'Finisher': 'Finisher — A finishing set done at the end of a workout to completely exhaust the muscle.',
+  },
+};
+
 const { width, height } = Dimensions.get('window');
 
 const CAT_KEYS = ['Göğüs','Sırt','Omuz','Kol','Bacak','Core','Kardio','Compound'];
@@ -679,6 +695,19 @@ function WorkoutsTab({ lang }) {
               </View>
             </View>
 
+            {/* Terim açıklamaları */}
+            <View style={ed.termSection}>
+              <Text style={ed.termSectionTitle}>{lang === 'tr' ? 'Terimler' : 'Terminology'}</Text>
+              {Object.entries(TERIMLER[lang] ?? TERIMLER.tr).map(([term, desc]) => (
+                <View key={term} style={ed.termItem}>
+                  <View style={ed.termHeader}>
+                    <View style={ed.termBadge}><Text style={ed.termBadgeTxt}>{term}</Text></View>
+                  </View>
+                  <Text style={ed.termDesc}>{desc}</Text>
+                </View>
+              ))}
+            </View>
+
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
@@ -873,6 +902,13 @@ const ed = StyleSheet.create({
   rirBtn:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s2 },
   rirBtnActive: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
   rirBtnTxt:    { color: C.muted, fontSize: 14, fontWeight: '600' },
+  termSection:  { marginTop: 20, backgroundColor: C.s1, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border },
+  termSectionTitle: { color: C.text, fontSize: 13, fontWeight: '800', marginBottom: 12 },
+  termItem:     { marginBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 14 },
+  termHeader:   { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  termBadge:    { backgroundColor: 'rgba(220,38,38,0.15)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)' },
+  termBadgeTxt: { color: '#dc2626', fontSize: 12, fontWeight: '800' },
+  termDesc:     { color: C.muted, fontSize: 12, lineHeight: 18 },
   // Picker (referenced from WorkoutsTab as ed.pickerSearch etc, or keep in wt)
   pickerSearch:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.s1, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, height: 48, margin: 16, marginBottom: 8 },
   pickerInput:    { flex: 1, color: C.text, fontSize: 14 },

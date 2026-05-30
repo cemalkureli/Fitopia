@@ -120,10 +120,8 @@ export default function TurntableMascot({
     }
   };
 
-  useEffect(() => {
-    if (hasFrames) startAutoSpin();
-    return () => stopAutoSpin();
-  }, [hasFrames, autoSpin]);
+  // No auto-spin — manual drag only
+  useEffect(() => { return () => stopAutoSpin(); }, []);
 
   // Drag to rotate
   const panResponder = useRef(
@@ -146,8 +144,6 @@ export default function TurntableMascot({
       },
       onPanResponderRelease: () => {
         setIsDragging(false);
-        // Restart auto-spin after 1.5s idle
-        setTimeout(() => startAutoSpin(), 1500);
       },
     })
   ).current;
