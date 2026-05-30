@@ -9,7 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../utils/theme';
 import { MEDIA_URLS } from '../utils/exerciseUrls';
-import { saveWorkoutSession, getAllWorkoutLogs, getActiveProgram } from '../utils/storage';
+import { saveWorkoutSession, getAllWorkoutLogs, getActiveProgram, clearActiveProgram } from '../utils/storage';
+import { useToast, ConfirmModal } from '../components/Toast';
 import { useLang } from '../context/LanguageContext';
 import { t, MONTHS_SHORT } from '../utils/i18n';
 
@@ -170,6 +171,8 @@ export default function ProgramScreen() {
   const [logModal,      setLogModal]             = useState(null);
   const [logSets,       setLogSets]              = useState([{ reps: '', kg: '' }, { reps: '', kg: '' }, { reps: '', kg: '' }]);
   const [open,          setOpen]                 = useState(true);
+  const [confirmClear,  setConfirmClear]         = useState(false);
+  const { show: showToast, ToastNode }           = useToast();
 
   useFocusEffect(useCallback(() => {
     getActiveProgram().then(p => setActiveProgramState(p));
@@ -200,6 +203,8 @@ export default function ProgramScreen() {
 
   // ── Empty state ──────────────────────────────────────────────────────────────
   if (!activeProgram) {
+    // Make sure confirmClear doesn't linger
+    if (confirmClear) setConfirmClear(false);
     return (
       <View style={[s.fill, { alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
         <Ionicons name="calendar-outline" size={56} color={C.dim} />
@@ -223,7 +228,38 @@ export default function ProgramScreen() {
       : [];
 
   return (
-    <View style={s.fill}>
+    <View style={[s.fill, { position: 'relative' }]}>
+      {ToastNode}
+      <ConfirmModal
+        visible={confirmClear}
+        title={lang === 'tr' ? 'Programı Kaldır' : 'Remove Program'}
+        message={lang === 'tr'
+          ? `"${activeProgram?.title}" aktif programdan kaldırılacak. Exercises → Templates'ten yeni bir program seçebilirsiniz.`
+          : `"${activeProgram?.title}" will be removed as your active program. You can select a new one from Exercises → Templates.`}
+        confirmLabel={lang === 'tr' ? 'Kaldır' : 'Remove'}
+        confirmColor="#dc2626"
+        lang={lang}
+        onCancel={() => setConfirmClear(false)}
+        onConfirm={async () => {
+          await clearActiveProgram();
+          setActiveProgramState(null);
+          setConfirmClear(false);
+          showToast(lang === 'tr' ? 'Program kaldırıldı.' : 'Program removed.', 'error');
+        }}
+      />
+
+      {/* Clear button top-right */}
+      <View style={s.clearBtnWrap}>
+        <TouchableOpacity
+          style={s.clearBtn}
+          onPress={() => setConfirmClear(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="close-circle-outline" size={20} color={C.red} />
+          <Text style={s.clearBtnTxt}>{lang === 'tr' ? 'Programı Kaldır' : 'Remove'}</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
         {/* Program header */}
@@ -322,6 +358,9 @@ const s = StyleSheet.create({
   fill:    { flex: 1, backgroundColor: C.bg },
   content: { padding: 16, paddingBottom: 32 },
 
+  clearBtnWrap: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
+  clearBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)', backgroundColor: 'rgba(248,113,113,0.08)' },
+  clearBtnTxt:  { color: C.red, fontSize: 12, fontWeight: '600' },
   programHeader: { marginBottom: 16 },
   programTitle:  { color: C.text, fontSize: 20, fontWeight: '900', marginBottom: 4 },
   card:       { backgroundColor: C.s1, borderWidth: 1, borderColor: C.border, borderRadius: 16, marginBottom: 10, overflow: 'hidden' },

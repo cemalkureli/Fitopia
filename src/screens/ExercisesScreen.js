@@ -1159,143 +1159,12 @@ function TemplatesTab({ lang }) {
 
   const hasFilters = filterDays.length + filterLvl.length + filterGoal.length > 0;
 
-  // ── Filter modal ────────────────────────────────────────────────────────────
-  if (view === 'filter') {
-    const DayBtn = ({ d }) => (
-      <TouchableOpacity
-        style={[ft.filterChip, filterDays.includes(d) && ft.filterChipActive]}
-        onPress={() => toggleArr(filterDays, setFilterDays, d)}
-      >
-        <Text style={[ft.filterChipTxt, filterDays.includes(d) && ft.filterChipTxtActive]}>{d}</Text>
-      </TouchableOpacity>
-    );
-    const LevelBtn = ({ lv }) => (
-      <TouchableOpacity
-        style={[ft.filterChip, { flex: 1 }, filterLvl.includes(lv) && ft.filterChipActive]}
-        onPress={() => toggleArr(filterLvl, setFilterLvl, lv)}
-      >
-        <Ionicons name="bar-chart-outline" size={18} color={filterLvl.includes(lv) ? '#fff' : C.dim} />
-        <Text style={[ft.filterChipTxt, filterLvl.includes(lv) && ft.filterChipTxtActive]}>{levelLabel(lv)}</Text>
-      </TouchableOpacity>
-    );
-    const GoalBtn = ({ g, icon }) => (
-      <TouchableOpacity
-        style={[ft.filterIconChip, filterGoal.includes(g) && ft.filterChipActive]}
-        onPress={() => toggleArr(filterGoal, setFilterGoal, g)}
-      >
-        <Ionicons name={icon} size={24} color={filterGoal.includes(g) ? '#fff' : C.muted} />
-        <Text style={[ft.filterIconTxt, filterGoal.includes(g) && { color: '#fff' }]}>{goalLabel(g)}</Text>
-      </TouchableOpacity>
-    );
+  // ── Single return — modals always mounted regardless of view ─────────────────
+  const lvColor = selected ? (LEVEL_COLORS[selected.level] ?? C.lime) : C.lime;
 
-    return (
-      <View style={[wt.fill, { backgroundColor: C.bg }]}>
-        <View style={ft.header}>
-          <Text style={ft.title}>{lang === 'tr' ? 'Filtreler' : 'Filters'}</Text>
-          <TouchableOpacity onPress={() => setView('main')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="close" size={24} color={C.text} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
-          {/* Days */}
-          <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Gün Sayısı' : 'Number of days'}</Text>
-          <View style={ft.chipRow}>
-            {[1,2,3,4,5,6].map(d => <DayBtn key={d} d={d} />)}
-          </View>
-          {/* Level */}
-          <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Seviye' : 'Level'}</Text>
-          <View style={[ft.chipRow, { gap: 10 }]}>
-            {['beginner','intermediate','advanced'].map(lv => <LevelBtn key={lv} lv={lv} />)}
-          </View>
-          {/* Goal */}
-          <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Hedef' : 'Goal'}</Text>
-          <View style={ft.iconGrid}>
-            <GoalBtn g="powerlifting" icon="barbell-outline" />
-            <GoalBtn g="bodybuilding" icon="body-outline" />
-            <GoalBtn g="fat_loss"    icon="scale-outline" />
-            <GoalBtn g="athleticism" icon="walk-outline" />
-            <GoalBtn g="strength"    icon="flash-outline" />
-          </View>
-        </ScrollView>
-        {/* Filter CTA */}
-        <View style={{ padding: 16 }}>
-          <TouchableOpacity style={ft.filterBtn} onPress={() => setView('main')}>
-            <LinearGradient colors={['#dc2626','#7f1d1d']} style={ft.filterBtnGrad}>
-              <Text style={ft.filterBtnTxt}>{lang === 'tr' ? 'Filtrele' : 'Filter'}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // ── Plan detail ─────────────────────────────────────────────────────────────
-  if (view === 'detail' && selected) {
-    const lvColor = LEVEL_COLORS[selected.level] ?? C.lime;
-    return (
-      <View style={[wt.fill, { backgroundColor: C.bg }]}>
-        <SubHdr title={selected.title} onBack={() => { setView('main'); setSelected(null); }} />
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-          <Text style={ft.detailDesc}>{selected.description}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Ionicons name="people-outline" size={14} color={C.dim} />
-            <Text style={{ color: C.muted, fontSize: 12 }}>{selected.athleteCount.toLocaleString()} {lang === 'tr' ? 'sporcu bu programı kopyaladı' : 'athletes copied this program'}</Text>
-          </View>
-          {/* Level */}
-          <Text style={ft.detailSection}>{lang === 'tr' ? 'Seviye' : 'Level'}</Text>
-          <View style={ft.tagRow}>
-            <View style={[ft.tag, { backgroundColor: lvColor + '22', borderColor: lvColor + '44' }]}>
-              <Text style={[ft.tagTxt, { color: lvColor }]}>{levelLabel(selected.level)}</Text>
-            </View>
-          </View>
-          {/* Goal */}
-          <Text style={ft.detailSection}>{lang === 'tr' ? 'Hedef' : 'Goal'}</Text>
-          <View style={ft.tagRow}>
-            {selected.goals.map(g => (
-              <View key={g} style={ft.tag}><Text style={ft.tagTxt}>{goalLabel(g)}</Text></View>
-            ))}
-          </View>
-          {/* Days */}
-          <Text style={ft.detailSection}>{lang === 'tr' ? 'Haftalık Gün' : 'Days per Week'}</Text>
-          <View style={ft.tagRow}><View style={ft.tag}><Text style={ft.tagTxt}>{selected.days} {lang === 'tr' ? 'gün' : 'days'}</Text></View></View>
-          {/* Workouts list */}
-          <Text style={ft.detailSection}>{lang === 'tr' ? 'Antrenmanlar' : 'Workouts'}</Text>
-          {selected.workouts.map((w, i) => (
-            <Animated.View key={i} entering={FadeInDown.delay(i * 50).duration(280)} style={ft.workoutItem}>
-              <Text style={ft.workoutItemTitle}>{w.name}</Text>
-              {w.exercises.map((ex, j) => (
-                <Text key={j} style={ft.workoutExercise}>• {typeof ex === 'string' ? ex : ex.name}</Text>
-              ))}
-            </Animated.View>
-          ))}
-
-          {/* Single Set Active button for entire template */}
-          <TouchableOpacity
-            style={ft.setActivePlanBtn}
-            onPress={async () => {
-              const existing = await getActiveProgram();
-              if (existing) {
-                setConfirmReplace({ plan: selected, existing });
-              } else {
-                setConfirmAct({ plan: selected, isFullPlan: true });
-              }
-            }}
-          >
-            <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ft.setActivePlanGrad}>
-              <Ionicons name="calendar-outline" size={18} color="#fff" />
-              <Text style={ft.setActivePlanTxt}>
-                {lang === 'tr' ? 'Aktif Program Olarak Ayarla' : 'Set as Active Program'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  // ── Templates list ──────────────────────────────────────────────────────────
   return (
     <View style={[wt.fill, { position: 'relative' }]}>
+      {/* ── Always-mounted modals ── */}
       {/* Confirm: Replace existing active program */}
       <ConfirmModal
         visible={!!confirmReplace}
@@ -1366,6 +1235,111 @@ function TemplatesTab({ lang }) {
       {/* Toast */}
       {ToastNode}
 
+      {/* ── Filter view ── */}
+      {view === 'filter' && (
+        <View style={[wt.fill, { backgroundColor: C.bg }]}>
+          <View style={ft.header}>
+            <Text style={ft.title}>{lang === 'tr' ? 'Filtreler' : 'Filters'}</Text>
+            <TouchableOpacity onPress={() => setView('main')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close" size={24} color={C.text} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+            <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Gün Sayısı' : 'Number of days'}</Text>
+            <View style={ft.chipRow}>
+              {[1,2,3,4,5,6].map(d => (
+                <TouchableOpacity key={d} style={[ft.filterChip, filterDays.includes(d) && ft.filterChipActive]} onPress={() => toggleArr(filterDays, setFilterDays, d)}>
+                  <Text style={[ft.filterChipTxt, filterDays.includes(d) && ft.filterChipTxtActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Seviye' : 'Level'}</Text>
+            <View style={[ft.chipRow, { gap: 10 }]}>
+              {['beginner','intermediate','advanced'].map(lv => (
+                <TouchableOpacity key={lv} style={[ft.filterChip, { flex: 1 }, filterLvl.includes(lv) && ft.filterChipActive]} onPress={() => toggleArr(filterLvl, setFilterLvl, lv)}>
+                  <Ionicons name="bar-chart-outline" size={18} color={filterLvl.includes(lv) ? '#fff' : C.dim} />
+                  <Text style={[ft.filterChipTxt, filterLvl.includes(lv) && ft.filterChipTxtActive]}>{levelLabel(lv)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Hedef' : 'Goal'}</Text>
+            <View style={ft.iconGrid}>
+              {[{g:'powerlifting',icon:'barbell-outline'},{g:'bodybuilding',icon:'body-outline'},{g:'fat_loss',icon:'scale-outline'},{g:'athleticism',icon:'walk-outline'},{g:'strength',icon:'flash-outline'}].map(({g,icon}) => (
+                <TouchableOpacity key={g} style={[ft.filterIconChip, filterGoal.includes(g) && ft.filterChipActive]} onPress={() => toggleArr(filterGoal, setFilterGoal, g)}>
+                  <Ionicons name={icon} size={24} color={filterGoal.includes(g) ? '#fff' : C.muted} />
+                  <Text style={[ft.filterIconTxt, filterGoal.includes(g) && { color: '#fff' }]}>{goalLabel(g)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          <View style={{ padding: 16 }}>
+            <TouchableOpacity style={ft.filterBtn} onPress={() => setView('main')}>
+              <LinearGradient colors={['#dc2626','#7f1d1d']} style={ft.filterBtnGrad}>
+                <Text style={ft.filterBtnTxt}>{lang === 'tr' ? 'Filtrele' : 'Filter'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* ── Plan detail view ── */}
+      {view === 'detail' && selected && (
+        <View style={[wt.fill, { backgroundColor: C.bg }]}>
+          <SubHdr title={selected.title} onBack={() => { setView('main'); setSelected(null); }} />
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+            <Text style={ft.detailDesc}>{selected.description}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Ionicons name="people-outline" size={14} color={C.dim} />
+              <Text style={{ color: C.muted, fontSize: 12 }}>{(selected.athleteCount || 1).toLocaleString()} {lang === 'tr' ? 'sporcu' : 'athletes'}</Text>
+            </View>
+            <Text style={ft.detailSection}>{lang === 'tr' ? 'Seviye' : 'Level'}</Text>
+            <View style={ft.tagRow}>
+              <View style={[ft.tag, { backgroundColor: lvColor + '22', borderColor: lvColor + '44' }]}>
+                <Text style={[ft.tagTxt, { color: lvColor }]}>{levelLabel(selected.level)}</Text>
+              </View>
+            </View>
+            <Text style={ft.detailSection}>{lang === 'tr' ? 'Hedef' : 'Goal'}</Text>
+            <View style={ft.tagRow}>
+              {(selected.goals || []).map(g => (
+                <View key={g} style={ft.tag}><Text style={ft.tagTxt}>{goalLabel(g)}</Text></View>
+              ))}
+            </View>
+            <Text style={ft.detailSection}>{lang === 'tr' ? 'Haftalık Gün' : 'Days per Week'}</Text>
+            <View style={ft.tagRow}><View style={ft.tag}><Text style={ft.tagTxt}>{selected.days} {lang === 'tr' ? 'gün' : 'days'}</Text></View></View>
+            <Text style={ft.detailSection}>{lang === 'tr' ? 'Antrenmanlar' : 'Workouts'}</Text>
+            {(selected.workouts || []).map((w, i) => (
+              <Animated.View key={i} entering={FadeInDown.delay(i * 50).duration(280)} style={ft.workoutItem}>
+                <Text style={ft.workoutItemTitle}>{w.name}</Text>
+                {(w.exercises || []).map((ex, j) => (
+                  <Text key={j} style={ft.workoutExercise}>• {typeof ex === 'string' ? ex : ex.name}</Text>
+                ))}
+              </Animated.View>
+            ))}
+            <TouchableOpacity
+              style={ft.setActivePlanBtn}
+              onPress={async () => {
+                const existing = await getActiveProgram();
+                if (existing) {
+                  setConfirmReplace({ plan: selected, existing });
+                } else {
+                  setConfirmAct({ plan: selected, isFullPlan: true });
+                }
+              }}
+            >
+              <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ft.setActivePlanGrad}>
+                <Ionicons name="calendar-outline" size={18} color="#fff" />
+                <Text style={ft.setActivePlanTxt}>
+                  {lang === 'tr' ? 'Aktif Program Olarak Ayarla' : 'Set as Active Program'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── Main list view ── */}
+      {view === 'main' && (
+      <View style={{ flex: 1 }}>
       {/* All Plans / My Plans tab */}
       <View style={ft.subTabBar}>
         {[
@@ -1462,6 +1436,8 @@ function TemplatesTab({ lang }) {
           </View>
         )}
       </ScrollView>
+      </View>)}
+
     </View>
   );
 }
