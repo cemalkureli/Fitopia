@@ -199,11 +199,11 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
                 </View>
               </View>
 
-              {/* Nasıl yapılır */}
-              {item.instructions ? (
+              {/* Detaylar */}
+              {(item.description || item.instructions) ? (
                 <>
                   <Text style={det.sectionTitle}>{t('instructions', lang)}</Text>
-                  <Text style={det.instrTxt}>{item.instructions}</Text>
+                  <Text style={det.instrTxt}>{item.description || item.instructions}</Text>
                 </>
               ) : null}
 
@@ -253,10 +253,26 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
                 </View>
               )}
 
-              {/* Etki */}
+              {/* Etki — per-muscle activation */}
               <Text style={det.sectionTitle}>{t('effectiveness', lang)}</Text>
-              <EffBar value={item.effectiveness ?? 3} label={t('generalEffect', lang)} color={color} />
-              <EffBar value={item.difficulty ?? 3}    label={t('difficulty', lang)}    color={C.orange} />
+              {item.muscle_activations && Object.keys(item.muscle_activations).length > 0
+                ? [item.primary_muscle, ...(item.secondary_muscles || [])].filter(Boolean).map(m => {
+                    const val = item.muscle_activations?.[m];
+                    if (val == null) return null;
+                    const isPrimary = m === item.primary_muscle;
+                    const barColor  = isPrimary ? color : C.teal;
+                    return (
+                      <EffBar
+                        key={m}
+                        value={val}
+                        label={MUSCLE_LABELS[lang]?.[m] ?? m}
+                        color={barColor}
+                      />
+                    );
+                  })
+                : <EffBar value={item.effectiveness ?? 3} label={t('generalEffect', lang)} color={color} />
+              }
+              <EffBar value={item.difficulty ?? 3} label={t('difficulty', lang)} color={C.orange} />
 
               {/* Topluluk puanı */}
               <Text style={det.sectionTitle}>{t('communityRating', lang)}</Text>

@@ -78,7 +78,7 @@ export const TRANSLATIONS = {
     'avg':              'Ort.',
     'generalEffect':    'Genel Etki',
     'difficulty':       'Zorluk',
-    'instructions':     'Nasıl Yapılır',
+    'instructions':     'Detaylar',
     'diff1': 'Kolay', 'diff2': 'Orta-Kolay', 'diff3': 'Orta', 'diff4': 'Zor', 'diff5': 'Çok Zor',
     // Profile
     'editProfile':      'Profili Düzenle',
@@ -178,7 +178,7 @@ export const TRANSLATIONS = {
     'avg':              'Avg.',
     'generalEffect':    'Effectiveness',
     'difficulty':       'Difficulty',
-    'instructions':     'How To',
+    'instructions':     'Details',
     'diff1': 'Easy', 'diff2': 'Easy-Med', 'diff3': 'Medium', 'diff4': 'Hard', 'diff5': 'Very Hard',
     // Profile
     'editProfile':      'Edit Profile',

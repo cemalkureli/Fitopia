@@ -21,3 +21,8 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 web-build/
+
+# Claude Code & graphify
+.claude/
+graphify-out/
+.graphifyignore
