@@ -454,6 +454,31 @@ function WorkoutsTab({ lang }) {
     await loadWorkoutExercises(active.id);
   };
 
+  const [editEx,   setEditEx]   = useState(null);
+  const [editForm, setEditForm] = useState({ sets: 3, reps: 10, rir: 1.0 });
+  const [editSaving, setEditSaving] = useState(false);
+
+  const openEdit = (ex) => {
+    setEditEx(ex);
+    setEditForm({ sets: String(ex.sets), reps: String(ex.reps), rir: String(ex.rir) });
+  };
+
+  const saveEdit = async () => {
+    if (!editEx) return;
+    setEditSaving(true);
+    try {
+      await supabase.from('workout_exercises').update({
+        sets: parseInt(editForm.sets) || 3,
+        reps: parseInt(editForm.reps) || 10,
+        rir:  parseFloat(editForm.rir) ?? 1.0,
+      }).eq('id', editEx.id);
+      await loadWorkoutExercises(active.id);
+      setEditEx(null);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   // ── Picker screen ──────────────────────────────────────────────────────────
   if (view === 'picker') {
     const filtered = pickerSearch.trim()
@@ -549,20 +574,25 @@ function WorkoutsTab({ lang }) {
             <>
               <Text style={wt.detailSectionTitle}>{lang === 'tr' ? 'Egzersizler' : 'Exercises'}</Text>
               {wkExercises.map((ex, i) => (
-                <Animated.View key={ex.id} entering={FadeInLeft.delay(i * 40).duration(260)} style={wt.exCard}>
-                  <View style={wt.exCardIcon}>
-                    <Ionicons name="play-circle-outline" size={20} color={C.lime} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={wt.exCardName}>{ex.exercise_name}</Text>
-                    <View style={wt.exCardMeta}>
-                      <View style={wt.exMetaItem}><Ionicons name="copy-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.sets} {lang === 'tr' ? 'set' : 'sets'}</Text></View>
-                      <View style={wt.exMetaItem}><Ionicons name="repeat-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.reps} {lang === 'tr' ? 'tekrar' : 'reps'}</Text></View>
-                      <View style={wt.exMetaItem}><Ionicons name="speedometer-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.rir} RIR</Text></View>
+                <Animated.View key={ex.id} entering={FadeInLeft.delay(i * 40).duration(260)}>
+                  <TouchableOpacity style={wt.exCard} onPress={() => openEdit(ex)} activeOpacity={0.75}>
+                    <View style={wt.exCardIcon}>
+                      <Ionicons name="barbell-outline" size={18} color="#dc2626" />
                     </View>
-                  </View>
-                  <TouchableOpacity onPress={() => removeExercise(ex.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close-circle-outline" size={18} color={C.dim} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={wt.exCardName}>{ex.exercise_name}</Text>
+                      <View style={wt.exCardMeta}>
+                        <View style={wt.exMetaItem}><Ionicons name="copy-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.sets} {lang === 'tr' ? 'set' : 'sets'}</Text></View>
+                        <View style={wt.exMetaItem}><Ionicons name="repeat-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.reps} {lang === 'tr' ? 'tekrar' : 'reps'}</Text></View>
+                        <View style={wt.exMetaItem}><Ionicons name="speedometer-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.rir} RIR</Text></View>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <View style={wt.editBadge}><Ionicons name="pencil" size={12} color="#dc2626" /></View>
+                      <TouchableOpacity onPress={() => removeExercise(ex.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="close-circle-outline" size={18} color={C.dim} />
+                      </TouchableOpacity>
+                    </View>
                   </TouchableOpacity>
                 </Animated.View>
               ))}
@@ -575,6 +605,45 @@ function WorkoutsTab({ lang }) {
             </LinearGradient>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Exercise edit modal */}
+        <Modal visible={!!editEx} transparent animationType="slide" onRequestClose={() => setEditEx(null)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+            <TouchableOpacity style={wt.modalOverlay} activeOpacity={1} onPress={() => setEditEx(null)}>
+              <TouchableOpacity activeOpacity={1} style={wt.editModal} onPress={() => {}}>
+                <View style={wt.createHandle} />
+                <Text style={wt.exCardName} numberOfLines={2}>{editEx?.exercise_name}</Text>
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+                  {[
+                    { label: lang === 'tr' ? 'Set' : 'Sets',         field: 'sets', kb: 'numeric' },
+                    { label: lang === 'tr' ? 'Tekrar' : 'Reps',      field: 'reps', kb: 'numeric' },
+                    { label: 'RIR',                                    field: 'rir',  kb: 'decimal-pad' },
+                  ].map(({ label, field, kb }) => (
+                    <View key={field} style={{ flex: 1, alignItems: 'center' }}>
+                      <Text style={wt.editFieldLabel}>{label}</Text>
+                      <TextInput
+                        style={wt.editFieldInput}
+                        value={editForm[field]}
+                        onChangeText={v => setEditForm(f => ({ ...f, [field]: v }))}
+                        keyboardType={kb}
+                        textAlign="center"
+                        placeholderTextColor={C.dim}
+                      />
+                    </View>
+                  ))}
+                </View>
+                <TouchableOpacity style={[wt.createBtn, { marginTop: 24 }]} onPress={saveEdit} disabled={editSaving}>
+                  <LinearGradient colors={['#dc2626', '#7f1d1d']} style={wt.createBtnGrad}>
+                    {editSaving
+                      ? <ActivityIndicator color="#fff" />
+                      : <Text style={wt.createBtnTxt}>{lang === 'tr' ? 'Kaydet' : 'Save'}</Text>
+                    }
+                  </LinearGradient>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </Modal>
       </View>
     );
   }
@@ -676,6 +745,10 @@ const wt = StyleSheet.create({
   addExBtn:       { borderRadius: 14, overflow: 'hidden', marginTop: 16 },
   addExGrad:      { height: 52, alignItems: 'center', justifyContent: 'center' },
   addExTxt:       { color: '#fff', fontWeight: '900', fontSize: 15 },
+  editBadge:      { width: 26, height: 26, borderRadius: 8, backgroundColor: 'rgba(220,38,38,0.12)', borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)', alignItems: 'center', justifyContent: 'center' },
+  editModal:      { backgroundColor: C.s1, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 36, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)' },
+  editFieldLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  editFieldInput: { backgroundColor: C.s2, borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(220,38,38,0.3)', width: '100%', height: 52, fontSize: 22, fontWeight: '900', color: C.text },
   // Picker
   pickerSearch:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.s1, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, height: 48, margin: 16, marginBottom: 8 },
   pickerInput:    { flex: 1, color: C.text, fontSize: 14 },
