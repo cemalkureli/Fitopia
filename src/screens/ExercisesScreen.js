@@ -120,20 +120,17 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
       .from('exercise_rating_summary')
       .select('avg_rating, vote_count')
       .eq('exercise_id', exerciseId)
-      .single();
-    if (s) {
-      const avg   = Number(s.avg_rating) || 0;
-      const votes = s.vote_count || 0;
-      setLiveAvg(avg);
-      setLiveVotes(votes);
-      // Parent'taki selected'ı da güncelle — modal kapanınca eski değer dönmesin
-      onUpdateSelected?.(avg, votes);
-    }
+      .maybeSingle();
+    const avg   = s ? (Number(s.avg_rating) || 0) : 0;
+    const votes = s ? (s.vote_count || 0) : 0;
+    setLiveAvg(avg);
+    setLiveVotes(votes);
+    onUpdateSelected?.(avg, votes);
   };
 
   useEffect(() => {
     if (!visible || !item) return;
-    setUserRating(0); setSubmitted(false); setActiveMuscle(null);
+    setUserRating(0); setSubmitted(false); setActiveMuscle(null); setLiveAvg(0); setLiveVotes(0);
     refreshSummary(item.id);
     supabase.auth.getUser().then(({ data }) => {
       if (!data?.user) return;
