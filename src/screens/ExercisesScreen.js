@@ -478,16 +478,19 @@ function WorkoutsTab({ lang }) {
   const [tmplForm, setTmplForm] = useState({ title: '', description: '', level: 'intermediate', goals: [], days: 3 });
   const [editEx,       setEditEx]       = useState(null);
   const [setsData,     setSetsData]     = useState([]);
-  const [editRir,      setEditRir]      = useState('1');
-  const [editIntensity,setEditIntensity]= useState(null); // null | 'failure' | 'superset' | 'finisher'
+  // Unified selection: null | 'rir0'|'rir1'|'rir2'|'rir3'|'rir4' | 'failure'|'superset'|'finisher'
+  const [editMode,     setEditMode]     = useState(null);
   const [editSaving,   setEditSaving]   = useState(false);
 
   const openEdit = (ex) => {
     setEditEx(ex);
     const sd = ex.sets_data?.length ? ex.sets_data : Array.from({ length: ex.sets || 3 }, () => ({ weight: String(ex.weight || ''), reps: String(ex.reps || 10) }));
     setSetsData(sd.map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
-    setEditRir(String(ex.rir ?? 1));
-    setEditIntensity(ex.intensity ?? null);
+    // Restore saved mode: check intensity first, then rir
+    const savedMode = ex.intensity
+      ? ex.intensity
+      : (ex.rir != null && ex.rir !== '' ? `rir${ex.rir}` : null);
+    setEditMode(savedMode);
     setView('exerciseDetail');
   };
 
@@ -500,13 +503,15 @@ function WorkoutsTab({ lang }) {
     setEditSaving(true);
     try {
       const cleanSets = setsData.map(s => ({ weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps) || 0 }));
+      const isRir = editMode?.startsWith('rir');
+      const rirVal = isRir ? parseInt(editMode.replace('rir','')) : null;
       await supabase.from('workout_exercises').update({
         sets:      cleanSets.length,
         reps:      cleanSets[0]?.reps || 10,
         weight:    cleanSets[0]?.weight || 0,
-        rir:       parseFloat(editRir) || 1,
+        rir:       rirVal,
         sets_data: cleanSets,
-        intensity: editIntensity,
+        intensity: isRir ? null : (editMode ?? null),
       }).eq('id', editEx.id);
       await loadWorkoutExercises(active.id);
       setEditEx(null);
@@ -691,38 +696,49 @@ function WorkoutsTab({ lang }) {
               <Text style={ed.addSetTxt}>{lang === 'tr' ? 'Set Ekle' : 'Add Set'}</Text>
             </TouchableOpacity>
 
-            {/* RIR */}
-            <View style={ed.rirRow}>
-              <Text style={ed.rirLabel}>RIR</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {['0','1','2','3','4'].map(v => (
-                  <TouchableOpacity key={v} style={[ed.rirBtn, editRir === v && ed.rirBtnActive]} onPress={() => setEditRir(v)}>
-                    <Text style={[ed.rirBtnTxt, editRir === v && { color: '#fff', fontWeight: '800' }]}>{v}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+            {/* Unified mode selector — mutually exclusive */}
+            <View style={{ marginTop: 16 }}>
+              <Text style={ed.rirLabel}>{lang === 'tr' ? 'Yoğunluk / RIR' : 'Intensity / RIR'}</Text>
 
-            {/* Intensity type */}
-            <View style={ed.intensityRow}>
-              {[
-                { key: 'failure',  label: 'Failure',  icon: 'flash' },
-                { key: 'superset', label: 'Superset', icon: 'repeat' },
-                { key: 'finisher', label: 'Finisher', icon: 'flag' },
-              ].map(({ key, label, icon }) => {
-                const active = editIntensity === key;
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={[ed.intensityBtn, active && ed.intensityBtnActive]}
-                    onPress={() => setEditIntensity(active ? null : key)}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons name={`${icon}${active ? '' : '-outline'}`} size={16} color={active ? '#fff' : C.muted} />
-                    <Text style={[ed.intensityTxt, active && { color: '#fff', fontWeight: '800' }]}>{label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {/* RIR row */}
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 8 }}>
+                <Text style={[ed.rirLabel, { width: 36, lineHeight: 36 }]}>RIR</Text>
+                {['0','1','2','3','4'].map(v => {
+                  const key = `rir${v}`;
+                  const active = editMode === key;
+                  return (
+                    <TouchableOpacity
+                      key={v}
+                      style={[ed.rirBtn, active && ed.rirBtnActive]}
+                      onPress={() => setEditMode(active ? null : key)}
+                    >
+                      <Text style={[ed.rirBtnTxt, active && { color: '#fff', fontWeight: '800' }]}>{v}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Intensity buttons */}
+              <View style={ed.intensityRow}>
+                {[
+                  { key: 'failure',  label: 'Failure',  icon: 'flash' },
+                  { key: 'superset', label: 'Superset', icon: 'repeat' },
+                  { key: 'finisher', label: 'Finisher', icon: 'flag' },
+                ].map(({ key, label, icon }) => {
+                  const active = editMode === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[ed.intensityBtn, active && ed.intensityBtnActive]}
+                      onPress={() => setEditMode(active ? null : key)}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name={`${icon}${active ? '' : '-outline'}`} size={16} color={active ? '#fff' : C.muted} />
+                      <Text style={[ed.intensityTxt, active && { color: '#fff', fontWeight: '800' }]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
             {/* Terim açıklamaları */}

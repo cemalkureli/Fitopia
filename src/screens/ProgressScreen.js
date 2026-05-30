@@ -112,13 +112,12 @@ function ExerciseCard({ name, sessions, onLog, index, lang, onReload, onDelete }
             <TouchableOpacity style={s.addBtn} onPress={() => onLog(name)}>
               <Ionicons name="add" size={18} color={C.lime} />
             </TouchableOpacity>
-            {/* Delete entire exercise */}
-            <TouchableOpacity
-              onPress={() => onDelete?.(name)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="trash-outline" size={16} color={C.red} />
-            </TouchableOpacity>
+            {/* Delete — only in Logged tab */}
+            {onDelete && (
+              <TouchableOpacity onPress={() => onDelete(name)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="trash-outline" size={16} color={C.red} />
+              </TouchableOpacity>
+            )}
             <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={C.dim} />
           </View>
         </TouchableOpacity>
@@ -728,7 +727,7 @@ export default function ProgressScreen() {
               filteredProg.map((ex, i) => (
                 <ExerciseCard key={ex} name={ex} sessions={workoutLogs[ex] || []} onLog={openLog} index={i} lang={lang}
                   onReload={() => getAllWorkoutLogs().then(setWorkoutLogs)}
-                  onDelete={(n) => setConfirmDel(n)} />
+                  onDelete={filterProg === 'logged' ? (n) => setConfirmDel(n) : undefined} />
               ))
             )}
           </ScrollView>
