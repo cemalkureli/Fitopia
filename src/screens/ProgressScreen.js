@@ -1,20 +1,36 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Modal, Dimensions, TextInput, KeyboardAvoidingView, Platform,
+  Modal, TextInput, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Animated,
 } from 'react-native';
-import Animated, { FadeInDown, FadeIn, FadeInRight } from 'react-native-reanimated';
+import AnimatedRN, { FadeInDown, FadeIn, ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../utils/theme';
-import { saveWorkoutSession, getAllWorkoutLogs } from '../utils/storage';
+import { saveWorkoutSession, getAllWorkoutLogs, getFavorites, MONTHS_SHORT as _MONTHS } from '../utils/storage';
 import { useLang } from '../context/LanguageContext';
-import { t, MONTHS_SHORT } from '../utils/i18n';
-import { getFavorites } from '../utils/storage';
+import { useUnits, fmtWeight } from '../context/UnitsContext';
+import { t, MONTHS_SHORT, DAYS_SHORT } from '../utils/i18n';
+import { supabase } from '../lib/supabase';
 
-const { width } = Dimensions.get('window');
+// ─── Measurement types ────────────────────────────────────────────────────────
+const MEASURE_TYPES = [
+  { key: 'bodyFat',    labelKey: 'mBodyFat',    unit: '%',    infoKey: 'mInfoBodyFat' },
+  { key: 'ffmi',       labelKey: 'mFFMI',       unit: 'kg/m²', infoKey: 'mInfoFFMI' },
+  { key: 'bodyWeight', labelKey: 'mBodyWeight', unitType: 'weight' },
+  { key: 'neck',       labelKey: 'mNeck',       unitType: 'length' },
+  { key: 'shoulder',   labelKey: 'mShoulder',   unitType: 'length' },
+  { key: 'chest',      labelKey: 'mChest',      unitType: 'length' },
+  { key: 'arm',        labelKey: 'mArm',        unitType: 'length' },
+  { key: 'waist',      labelKey: 'mWaist',      unitType: 'length' },
+  { key: 'hip',        labelKey: 'mHip',        unitType: 'length' },
+  { key: 'leg',        labelKey: 'mLeg',        unitType: 'length' },
+  { key: 'calf',       labelKey: 'mCalf',       unitType: 'length' },
+];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso, lang) {
   const months = MONTHS_SHORT[lang] ?? MONTHS_SHORT.tr;
   const d = new Date(iso), now = new Date();
@@ -28,26 +44,26 @@ function fmtDate(iso, lang) {
 function fmtSets(sets) {
   if (!sets?.length) return '';
   const kgs = [...new Set(sets.map(s => s.kg))];
-  const kg  = kgs.length === 1 ? `${kgs[0]}kg` : `${sets[0].kg}-${sets[sets.length-1].kg}kg`;
+  const kg  = kgs.length === 1 ? `${kgs[0]}kg` : `${sets[0].kg}-${sets[sets.length - 1].kg}kg`;
   return `${sets.length}×${sets[0].reps} @${kg}`;
 }
 
 function calcBestSet(sessions) {
   let best = null;
-  sessions.forEach(s => {
-    s.sets?.forEach(set => {
-      const vol = (set.reps || 0) * (set.kg || 0);
-      if (!best || vol > best.vol) best = { ...set, vol, date: s.date };
-    });
-  });
+  sessions.forEach(s => s.sets?.forEach(set => {
+    const vol = (set.reps || 0) * (set.kg || 0);
+    if (!best || vol > best.vol) best = { ...set, vol, date: s.date };
+  }));
   return best;
 }
 
+// ─── Mini bar chart ───────────────────────────────────────────────────────────
 function MiniChart({ sessions }) {
   if (sessions.length < 2) return null;
-  const last7 = sessions.slice(0, 7).reverse();
-  const vols  = last7.map(s => s.sets?.reduce((a, x) => a + (x.reps || 0) * (x.kg || 0), 0) || 0);
-  const max   = Math.max(...vols, 1);
+  const vols = sessions.slice(0, 7).reverse().map(s =>
+    s.sets?.reduce((a, x) => a + (x.reps || 0) * (x.kg || 0), 0) || 0
+  );
+  const max = Math.max(...vols, 1);
   return (
     <View style={mc.wrap}>
       {vols.map((v, i) => (
@@ -58,29 +74,25 @@ function MiniChart({ sessions }) {
     </View>
   );
 }
-
 const mc = StyleSheet.create({
   wrap:    { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 40, marginTop: 8 },
   barWrap: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   bar:     { width: '100%', backgroundColor: C.teal, borderRadius: 3, minHeight: 4 },
 });
 
+// ─── Exercise card (Progressive tab) ─────────────────────────────────────────
 function ExerciseCard({ name, sessions, onLog, index, lang }) {
   const [expanded, setExpanded] = useState(false);
-  const last  = sessions[0];
-  const best  = calcBestSet(sessions);
+  const last = sessions[0];
+  const best = calcBestSet(sessions);
   const trend = sessions.length >= 2 && sessions[0].sets && sessions[1].sets
     ? (sessions[0].sets[0]?.kg || 0) >= (sessions[1].sets[0]?.kg || 0) ? 'up' : 'down'
     : null;
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 40).duration(380)}>
+    <AnimatedRN.View entering={FadeInDown.delay(index * 40).duration(350)}>
       <View style={[s.exCard, expanded && { borderColor: C.lime + '44' }]}>
-        <TouchableOpacity
-          style={s.exCardHeader}
-          onPress={() => setExpanded(v => !v)}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity style={s.exCardHeader} onPress={() => setExpanded(v => !v)} activeOpacity={0.8}>
           <View style={{ flex: 1 }}>
             <View style={s.exNameRow}>
               <Text style={s.exName} numberOfLines={1}>{name}</Text>
@@ -99,21 +111,17 @@ function ExerciseCard({ name, sessions, onLog, index, lang }) {
             <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={C.dim} />
           </View>
         </TouchableOpacity>
-
         {sessions.length >= 2 && <MiniChart sessions={sessions} />}
-
         {expanded && (
           <View style={s.historyWrap}>
             {best && (
               <View style={s.prRow}>
                 <Ionicons name="trophy-outline" size={13} color={C.orange} />
-                <Text style={s.prText}>
-                  PR: {best.reps}t × {best.kg}kg — {fmtDate(best.date, lang)}
-                </Text>
+                <Text style={s.prText}>PR: {best.reps}t × {best.kg}kg — {fmtDate(best.date, lang)}</Text>
               </View>
             )}
             {sessions.slice(0, 10).map((session, j) => (
-              <Animated.View key={j} entering={FadeInRight.delay(j * 40).duration(280)} style={s.sessionRow}>
+              <View key={j} style={s.sessionRow}>
                 <Text style={s.sessionDate}>{fmtDate(session.date, lang)}</Text>
                 <View style={s.chipRow}>
                   {session.sets?.map((set, k) => (
@@ -122,22 +130,371 @@ function ExerciseCard({ name, sessions, onLog, index, lang }) {
                     </View>
                   ))}
                 </View>
-              </Animated.View>
+              </View>
             ))}
           </View>
         )}
       </View>
-    </Animated.View>
+    </AnimatedRN.View>
   );
 }
 
+// ─── Measurement accordion row ────────────────────────────────────────────────
+function MeasureRow({ item, latest, lang, weightUnit, lengthUnit, onSave, index }) {
+  const [open,     setOpen]     = useState(false);
+  const [editing,  setEditing]  = useState(false);
+  const [val,      setVal]      = useState('');
+  const [saving,   setSaving]   = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const inputRef = useRef(null);
+
+  const unit = item.unit ?? (item.unitType === 'weight' ? weightUnit : lengthUnit);
+
+  const openInput = () => { setEditing(true); setVal(''); setTimeout(() => inputRef.current?.focus(), 100); };
+  const cancel    = () => { setEditing(false); setVal(''); };
+
+  const save = async () => {
+    const num = parseFloat(val);
+    if (!num || isNaN(num)) return;
+    setSaving(true);
+    try {
+      await onSave(item.key, num, unit);
+      setEditing(false); setVal('');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const latestVal = latest?.[item.key];
+
+  return (
+    <AnimatedRN.View entering={FadeInDown.delay(index * 40).duration(300)}>
+      {/* Header row */}
+      <TouchableOpacity
+        style={[mr.row, open && { borderBottomWidth: 0 }]}
+        onPress={() => { setOpen(v => !v); if (open) { setEditing(false); setVal(''); } }}
+        activeOpacity={0.7}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+          <Text style={[mr.label, open && { color: '#dc2626' }]}>{t(item.labelKey, lang)}</Text>
+          {item.infoKey && (
+            <TouchableOpacity onPress={() => setInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+              <Ionicons name="information-circle-outline" size={18} color={C.dim} />
+            </TouchableOpacity>
+          )}
+          {latestVal != null && !open && (
+            <Text style={mr.latestBadge}>{latestVal} {unit}</Text>
+          )}
+        </View>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={open ? '#dc2626' : C.muted} />
+      </TouchableOpacity>
+
+      {/* Expanded content */}
+      {open && (
+        <AnimatedRN.View entering={FadeIn.duration(200)} style={mr.expandWrap}>
+          {!editing ? (
+            <TouchableOpacity style={mr.addBtn} onPress={openInput}>
+              <Ionicons name="add" size={20} color={C.text} />
+              <Text style={mr.addTxt}>{t('mAddMeasurement', lang)}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={mr.inputRow}>
+              <TouchableOpacity onPress={cancel} style={mr.inputIcon} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={20} color={C.muted} />
+              </TouchableOpacity>
+              <TextInput
+                ref={inputRef}
+                style={mr.input}
+                value={val}
+                onChangeText={setVal}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={C.dim}
+                returnKeyType="done"
+                onSubmitEditing={save}
+              />
+              <Text style={mr.inputUnit}>{unit}</Text>
+              <TouchableOpacity onPress={save} style={mr.inputIcon} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={saving}>
+                {saving
+                  ? <ActivityIndicator size="small" color="#dc2626" />
+                  : <Ionicons name="checkmark" size={20} color="#dc2626" />
+                }
+              </TouchableOpacity>
+            </View>
+          )}
+        </AnimatedRN.View>
+      )}
+
+      {/* Info modal */}
+      {item.infoKey && (
+        <Modal visible={infoOpen} transparent animationType="fade" onRequestClose={() => setInfoOpen(false)}>
+          <TouchableOpacity style={mr.infoOverlay} activeOpacity={1} onPress={() => setInfoOpen(false)}>
+            <AnimatedRN.View entering={ZoomIn.duration(200)} style={mr.infoBox}>
+              <Text style={mr.infoTitle}>{t(item.labelKey, lang)}</Text>
+              <Text style={mr.infoBody}>{t(item.infoKey, lang)}</Text>
+              <TouchableOpacity style={mr.infoClose} onPress={() => setInfoOpen(false)}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{t('confirm', lang)}</Text>
+              </TouchableOpacity>
+            </AnimatedRN.View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+    </AnimatedRN.View>
+  );
+}
+
+const mr = StyleSheet.create({
+  row:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 20, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: C.border },
+  label:      { color: C.text, fontSize: 16, fontWeight: '700' },
+  latestBadge:{ color: C.teal, fontSize: 12, fontWeight: '600' },
+  expandWrap: { backgroundColor: C.s1, borderBottomWidth: 1, borderBottomColor: C.border },
+  addBtn:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, paddingHorizontal: 24 },
+  addTxt:     { color: C.text, fontSize: 15, fontWeight: '600' },
+  inputRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  inputIcon:  { padding: 4 },
+  input:      { flex: 1, fontSize: 20, fontWeight: '700', color: C.text, borderBottomWidth: 2, borderBottomColor: '#dc2626', paddingBottom: 4, textAlign: 'center' },
+  inputUnit:  { color: C.muted, fontSize: 14, fontWeight: '600' },
+  infoOverlay:{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  infoBox:    { backgroundColor: C.s1, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)', maxWidth: 340, width: '100%' },
+  infoTitle:  { color: '#dc2626', fontSize: 18, fontWeight: '900', marginBottom: 12 },
+  infoBody:   { color: C.muted, fontSize: 14, lineHeight: 22, marginBottom: 20 },
+  infoClose:  { backgroundColor: '#dc2626', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+});
+
+// ─── General Status tab ───────────────────────────────────────────────────────
+function GeneralTab({ workoutLogs, lang, weightUnit }) {
+  const totalSessions = Object.values(workoutLogs).reduce((a, b) => a + b.length, 0);
+  const totalSets     = Object.values(workoutLogs).reduce((a, b) => a + b.reduce((c, s) => c + (s.sets?.length ?? 0), 0), 0);
+  const exCount       = Object.keys(workoutLogs).length;
+  const days          = DAYS_SHORT[lang] ?? DAYS_SHORT.tr;
+
+  // Weekly activity (last 7 days)
+  const today = new Date();
+  const week  = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - 6 + i);
+    return d;
+  });
+  const logDates = new Set();
+  Object.values(workoutLogs).forEach(sessions =>
+    sessions.forEach(s => logDates.add(new Date(s.date).toDateString()))
+  );
+
+  // Weekly sessions count
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 7);
+  const weekSessions = Object.values(workoutLogs).reduce((a, sessions) =>
+    a + sessions.filter(s => new Date(s.date) >= weekStart).length, 0
+  );
+
+  // Best exercises (top 3 by volume)
+  const bests = Object.entries(workoutLogs)
+    .map(([name, sessions]) => ({ name, best: calcBestSet(sessions) }))
+    .filter(x => x.best)
+    .sort((a, b) => b.best.vol - a.best.vol)
+    .slice(0, 3);
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+      {/* Stats summary */}
+      <AnimatedRN.View entering={FadeInDown.duration(320)} style={g.summaryCard}>
+        <LinearGradient colors={['rgba(232,244,74,0.08)', 'transparent']} style={StyleSheet.absoluteFill} />
+        <View style={g.statsRow}>
+          <View style={g.stat}>
+            <Text style={g.statVal}>{totalSessions}</Text>
+            <Text style={g.statLbl}>{t('totalSessionsP', lang)}</Text>
+          </View>
+          <View style={g.statDiv} />
+          <View style={g.stat}>
+            <Text style={g.statVal}>{totalSets}</Text>
+            <Text style={g.statLbl}>{t('totalSetsP', lang)}</Text>
+          </View>
+          <View style={g.statDiv} />
+          <View style={g.stat}>
+            <Text style={g.statVal}>{exCount}</Text>
+            <Text style={g.statLbl}>{t('exerciseCount', lang)}</Text>
+          </View>
+        </View>
+      </AnimatedRN.View>
+
+      {/* Weekly activity */}
+      <AnimatedRN.View entering={FadeInDown.delay(80).duration(320)} style={g.card}>
+        <Text style={g.cardTitle}>{t('weekActivity', lang)}</Text>
+        <View style={g.weekRow}>
+          {week.map((d, i) => {
+            const active  = logDates.has(d.toDateString());
+            const isToday = d.toDateString() === today.toDateString();
+            return (
+              <View key={i} style={g.dayCol}>
+                <View style={[
+                  g.dayDot,
+                  active  && { backgroundColor: C.lime },
+                  isToday && !active && { borderColor: C.lime, borderWidth: 1.5 },
+                ]} />
+                <Text style={[g.dayLbl, isToday && { color: C.lime }]}>{days[d.getDay()]}</Text>
+              </View>
+            );
+          })}
+        </View>
+        <Text style={g.weekSub}>
+          {weekSessions > 0
+            ? `${lang === 'tr' ? 'Bu hafta' : 'This week'}: ${weekSessions} ${t('sessions', lang).toLowerCase()}`
+            : t('noLogsYet', lang)
+          }
+        </Text>
+      </AnimatedRN.View>
+
+      {/* Best performances */}
+      {bests.length > 0 && (
+        <AnimatedRN.View entering={FadeInDown.delay(160).duration(320)} style={g.card}>
+          <Text style={g.cardTitle}>{t('bestSet', lang)}</Text>
+          {bests.map(({ name, best }, i) => (
+            <View key={i} style={[g.bestRow, i === bests.length - 1 && { borderBottomWidth: 0 }]}>
+              <View style={g.bestDot} />
+              <Text style={g.bestName} numberOfLines={1}>{name}</Text>
+              <Text style={g.bestVal}>{best.reps}t × {fmtWeight(best.kg, weightUnit)}</Text>
+            </View>
+          ))}
+        </AnimatedRN.View>
+      )}
+
+      {/* Progressive overload info card */}
+      <AnimatedRN.View entering={FadeInDown.delay(220).duration(320)} style={g.infoCard}>
+        <Ionicons name="trending-up-outline" size={16} color={C.lime} style={{ marginBottom: 6 }} />
+        <Text style={g.infoTitle}>{t('progressOverload', lang)}</Text>
+        <Text style={g.infoDesc}>{t('progressDesc', lang)}</Text>
+      </AnimatedRN.View>
+    </ScrollView>
+  );
+}
+
+const g = StyleSheet.create({
+  summaryCard: { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)', marginBottom: 12, overflow: 'hidden' },
+  statsRow:    { flexDirection: 'row' },
+  stat:        { flex: 1, alignItems: 'center' },
+  statVal:     { color: C.text, fontSize: 24, fontWeight: '900' },
+  statLbl:     { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 2, textAlign: 'center' },
+  statDiv:     { width: 1, backgroundColor: C.border },
+  card:        { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 12 },
+  cardTitle:   { color: C.text, fontSize: 13, fontWeight: '800', marginBottom: 14 },
+  weekRow:     { flexDirection: 'row', justifyContent: 'space-between' },
+  dayCol:      { alignItems: 'center', gap: 6 },
+  dayDot:      { width: 28, height: 28, borderRadius: 8, backgroundColor: C.s3 },
+  dayLbl:      { color: C.dim, fontSize: 10, fontWeight: '600' },
+  weekSub:     { color: C.dim, fontSize: 11, marginTop: 10, textAlign: 'center' },
+  bestRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
+  bestDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: C.orange },
+  bestName:    { flex: 1, color: C.text, fontSize: 13, fontWeight: '600' },
+  bestVal:     { color: C.orange, fontSize: 12, fontWeight: '700' },
+  infoCard:    { backgroundColor: 'rgba(232,244,74,0.06)', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)' },
+  infoTitle:   { color: C.lime, fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  infoDesc:    { color: C.muted, fontSize: 12, lineHeight: 18 },
+});
+
+// ─── Measurement tab ──────────────────────────────────────────────────────────
+function MeasurementTab({ lang, weightUnit, lengthUnit }) {
+  const [measurements, setMeasurements] = useState([]); // all records
+  const [loading, setLoading] = useState(true);
+  const [userId,  setUserId]  = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data?.user) return;
+      setUserId(data.user.id);
+      fetchMeasurements(data.user.id);
+    });
+  }, []);
+
+  const fetchMeasurements = async (uid) => {
+    const { data } = await supabase
+      .from('body_measurements')
+      .select('*')
+      .eq('user_id', uid)
+      .order('measured_at', { ascending: false });
+    setMeasurements(data || []);
+    setLoading(false);
+  };
+
+  const handleSave = async (type, value, unit) => {
+    if (!userId) return;
+    await supabase.from('body_measurements').insert({ user_id: userId, type, value, unit });
+    await fetchMeasurements(userId);
+  };
+
+  // Latest per type
+  const latest = {};
+  measurements.forEach(m => { if (!latest[m.type]) latest[m.type] = m.value; });
+
+  if (loading) return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <ActivityIndicator color={C.lime} />
+    </View>
+  );
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+        <View style={mt.list}>
+          {MEASURE_TYPES.map((item, i) => (
+            <MeasureRow
+              key={item.key}
+              item={item}
+              latest={latest}
+              lang={lang}
+              weightUnit={weightUnit}
+              lengthUnit={lengthUnit}
+              onSave={handleSave}
+              index={i}
+            />
+          ))}
+        </View>
+
+        {/* History */}
+        {measurements.length > 0 && (
+          <AnimatedRN.View entering={FadeInDown.delay(440).duration(320)} style={mt.histWrap}>
+            <Text style={mt.histTitle}>{t('mHistory', lang)}</Text>
+            {measurements.slice(0, 20).map((m, i) => {
+              const typeItem = MEASURE_TYPES.find(x => x.key === m.type);
+              return (
+                <View key={m.id} style={[mt.histRow, i === measurements.slice(0, 20).length - 1 && { borderBottomWidth: 0 }]}>
+                  <View style={mt.histDot} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={mt.histType}>{typeItem ? t(typeItem.labelKey, lang) : m.type}</Text>
+                    <Text style={mt.histDate}>{fmtDate(m.measured_at, lang)}</Text>
+                  </View>
+                  <Text style={mt.histVal}>{m.value} <Text style={mt.histUnit}>{m.unit}</Text></Text>
+                </View>
+              );
+            })}
+          </AnimatedRN.View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const mt = StyleSheet.create({
+  list:     { backgroundColor: C.bg },
+  histWrap: { margin: 16, backgroundColor: C.s1, borderRadius: 18, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+  histTitle:{ color: C.text, fontSize: 13, fontWeight: '800', padding: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  histRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  histDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' },
+  histType: { color: C.text, fontSize: 13, fontWeight: '600' },
+  histDate: { color: C.dim, fontSize: 10, marginTop: 2 },
+  histVal:  { color: '#dc2626', fontSize: 15, fontWeight: '800' },
+  histUnit: { color: C.muted, fontSize: 11, fontWeight: '400' },
+});
+
+// ─── Main ProgressScreen ──────────────────────────────────────────────────────
 export default function ProgressScreen() {
-  const { lang } = useLang();
-  const [workoutLogs, setWorkoutLogs] = useState({});
-  const [favorites,   setFavorites]   = useState([]);
-  const [logModal,    setLogModal]    = useState(null);
-  const [logSets,     setLogSets]     = useState([{ reps: '', kg: '' }, { reps: '', kg: '' }, { reps: '', kg: '' }]);
-  const [filter,      setFilter]      = useState('all');
+  const { lang }                       = useLang();
+  const { weightUnit, lengthUnit }     = useUnits();
+  const [workoutLogs, setWorkoutLogs]  = useState({});
+  const [favorites,   setFavorites]    = useState([]);
+  const [logModal,    setLogModal]     = useState(null);
+  const [logSets,     setLogSets]      = useState([{ reps: '', kg: '' }, { reps: '', kg: '' }, { reps: '', kg: '' }]);
+  const [filterProg,  setFilterProg]   = useState('all'); // 'all' = favorites, 'logged'
+  const [activeTab,   setActiveTab]    = useState(0);     // 0=General, 1=Progressive, 2=Measurement
 
   useFocusEffect(useCallback(() => {
     getAllWorkoutLogs().then(setWorkoutLogs);
@@ -155,9 +512,7 @@ export default function ProgressScreen() {
   };
 
   const saveLog = async () => {
-    const valid = logSets
-      .filter(s => s.reps || s.kg)
-      .map(s => ({ reps: parseInt(s.reps) || 0, kg: parseFloat(s.kg) || 0 }));
+    const valid = logSets.filter(s => s.reps || s.kg).map(s => ({ reps: parseInt(s.reps) || 0, kg: parseFloat(s.kg) || 0 }));
     if (valid.length > 0) {
       await saveWorkoutSession(logModal.name, valid);
       setWorkoutLogs(await getAllWorkoutLogs());
@@ -165,137 +520,107 @@ export default function ProgressScreen() {
     setLogModal(null);
   };
 
-  const updateSet = (i, field, val) =>
-    setLogSets(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
+  const updateSet = (i, field, val) => setLogSets(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
 
-  // all = favorites list, logged = exercises with actual logs
   const loggedExercises = Object.keys(workoutLogs).filter(ex => (workoutLogs[ex] || []).length > 0);
-  const filtered = filter === 'logged' ? loggedExercises : favorites;
+  const filteredProg    = filterProg === 'logged' ? loggedExercises : favorites;
 
-  const totalSessions = Object.values(workoutLogs).reduce((a, b) => a + b.length, 0);
-  const totalSets     = Object.values(workoutLogs).reduce((a, b) => a + b.reduce((c, s) => c + (s.sets?.length ?? 0), 0), 0);
-
-  const FILTERS = [
-    { key: 'all',    label: t('favorites', lang) },
-    { key: 'logged', label: t('logged', lang) },
+  const TABS = [
+    { label: t('tabGeneral', lang),     icon: 'stats-chart-outline' },
+    { label: t('tabProgressive', lang), icon: 'trending-up-outline' },
+    { label: t('tabMeasurement', lang), icon: 'body-outline' },
   ];
 
   return (
     <View style={s.fill}>
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        {/* Özet kart */}
-        <Animated.View entering={FadeInDown.duration(350)} style={s.summaryCard}>
-          <Ionicons name="trending-up-outline" size={16} color={C.lime} style={{ marginBottom: 6 }} />
-          <Text style={s.summaryTitle}>{t('progressOverload', lang)}</Text>
-          <Text style={s.summaryText}>{t('progressDesc', lang)}</Text>
-          <View style={s.summaryStats}>
-            <View style={s.summaryStat}>
-              <Text style={s.summaryStatVal}>{totalSessions}</Text>
-              <Text style={s.summaryStatLabel}>{t('totalSessionsP', lang)}</Text>
-            </View>
-            <View style={[s.summaryStat, s.summaryStatMid]}>
-              <Text style={s.summaryStatVal}>{totalSets}</Text>
-              <Text style={s.summaryStatLabel}>{t('totalSetsP', lang)}</Text>
-            </View>
-            <View style={s.summaryStat}>
-              <Text style={s.summaryStatVal}>{EXERCISE_LIST.filter(ex => (workoutLogs[ex] || []).length > 0).length}</Text>
-              <Text style={s.summaryStatLabel}>{t('exerciseCount', lang)}</Text>
-            </View>
-          </View>
-        </Animated.View>
+      {/* Tab bar */}
+      <View style={s.tabBar}>
+        {TABS.map((tab, i) => (
+          <TouchableOpacity
+            key={i}
+            style={[s.tabBtn, activeTab === i && s.tabBtnActive]}
+            onPress={() => setActiveTab(i)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name={tab.icon} size={14} color={activeTab === i ? '#0a0c0f' : C.muted} />
+            <Text style={[s.tabTxt, activeTab === i && s.tabTxtActive]}>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-        {/* Filtre */}
-        <Animated.View entering={FadeInDown.delay(80).duration(350)} style={s.filterRow}>
-          {FILTERS.map(f => (
-            <TouchableOpacity
-              key={f.key}
-              style={[s.filterBtn, filter === f.key && s.filterBtnActive]}
-              onPress={() => setFilter(f.key)}
-            >
-              <Text style={[s.filterText, filter === f.key && s.filterTextActive]}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </Animated.View>
+      {/* Tab 0 — Genel Durum */}
+      {activeTab === 0 && (
+        <GeneralTab workoutLogs={workoutLogs} lang={lang} weightUnit={weightUnit} />
+      )}
 
-        {/* Egzersiz kartları */}
-        {filtered.length === 0 ? (
-          <Animated.View entering={FadeInDown.duration(350)} style={s.emptyWrap}>
-            <Ionicons name={filter === 'all' ? 'heart-outline' : 'bar-chart-outline'} size={40} color={C.dim} />
-            <Text style={s.emptyTxt}>{t(filter === 'all' ? 'noFavorites' : 'noData', lang)}</Text>
-          </Animated.View>
-        ) : (
-          filtered.map((ex, i) => (
-            <ExerciseCard
-              key={ex}
-              name={ex}
-              sessions={workoutLogs[ex] || []}
-              onLog={openLog}
-              index={i}
-              lang={lang}
-            />
-          ))
-        )}
-      </ScrollView>
+      {/* Tab 1 — Progressive Overload */}
+      {activeTab === 1 && (
+        <View style={s.fill}>
+          <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+            {/* Filter */}
+            <AnimatedRN.View entering={FadeInDown.delay(60).duration(280)} style={s.filterRow}>
+              {[
+                { key: 'all',    label: t('favorites', lang) },
+                { key: 'logged', label: t('logged', lang) },
+              ].map(f => (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[s.filterBtn, filterProg === f.key && s.filterBtnActive]}
+                  onPress={() => setFilterProg(f.key)}
+                >
+                  <Text style={[s.filterText, filterProg === f.key && s.filterTextActive]}>{f.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </AnimatedRN.View>
 
-      {/* Kayıt Modalı */}
+            {filteredProg.length === 0 ? (
+              <AnimatedRN.View entering={FadeInDown.duration(320)} style={s.emptyWrap}>
+                <Ionicons name={filterProg === 'all' ? 'heart-outline' : 'bar-chart-outline'} size={40} color={C.dim} />
+                <Text style={s.emptyTxt}>{t(filterProg === 'all' ? 'noFavorites' : 'noData', lang)}</Text>
+              </AnimatedRN.View>
+            ) : (
+              filteredProg.map((ex, i) => (
+                <ExerciseCard key={ex} name={ex} sessions={workoutLogs[ex] || []} onLog={openLog} index={i} lang={lang} />
+              ))
+            )}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Tab 2 — Measurement */}
+      {activeTab === 2 && (
+        <MeasurementTab lang={lang} weightUnit={weightUnit} lengthUnit={lengthUnit} />
+      )}
+
+      {/* Log Modal */}
       {logModal && (
         <Modal visible transparent animationType="slide" onRequestClose={() => setLogModal(null)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setLogModal(null)}>
               <TouchableOpacity activeOpacity={1} style={s.logModalBox} onPress={() => {}}>
                 <Text style={s.logModalTitle}>{logModal.name}</Text>
-
                 {logModal.lastSession && (
                   <View style={s.prevSessionBox}>
                     <Text style={s.prevLabel}>{t('prevSession', lang)}</Text>
-                    <Text style={s.prevVal}>
-                      {fmtDate(logModal.lastSession.date, lang)} — {fmtSets(logModal.lastSession.sets)}
-                    </Text>
+                    <Text style={s.prevVal}>{fmtDate(logModal.lastSession.date, lang)} — {fmtSets(logModal.lastSession.sets)}</Text>
                   </View>
                 )}
-
                 <View style={s.logHeader}>
                   <Text style={[s.logHeaderText, { width: 36 }]}>{t('set', lang)}</Text>
                   <Text style={[s.logHeaderText, { flex: 1 }]}>{t('reps', lang)}</Text>
                   <Text style={[s.logHeaderText, { flex: 1 }]}>{t('weightKg', lang)}</Text>
                 </View>
-
                 {logSets.map((set, i) => (
                   <View key={i} style={s.logRow}>
-                    <View style={s.setNumBox}>
-                      <Text style={s.setNumText}>{i + 1}</Text>
-                    </View>
-                    <TextInput
-                      style={s.logInput}
-                      value={set.reps}
-                      onChangeText={v => updateSet(i, 'reps', v)}
-                      keyboardType="numeric"
-                      placeholder="—"
-                      placeholderTextColor={C.dim}
-                      maxLength={3}
-                    />
-                    <TextInput
-                      style={s.logInput}
-                      value={set.kg}
-                      onChangeText={v => updateSet(i, 'kg', v)}
-                      keyboardType="decimal-pad"
-                      placeholder="—"
-                      placeholderTextColor={C.dim}
-                      maxLength={6}
-                    />
+                    <View style={s.setNumBox}><Text style={s.setNumText}>{i + 1}</Text></View>
+                    <TextInput style={s.logInput} value={set.reps} onChangeText={v => updateSet(i, 'reps', v)} keyboardType="numeric" placeholder="—" placeholderTextColor={C.dim} maxLength={3} />
+                    <TextInput style={s.logInput} value={set.kg} onChangeText={v => updateSet(i, 'kg', v)} keyboardType="decimal-pad" placeholder="—" placeholderTextColor={C.dim} maxLength={6} />
                   </View>
                 ))}
-
-                <TouchableOpacity style={s.addSetBtn}
-                  onPress={() => setLogSets(p => [...p, { reps: '', kg: '' }])}>
+                <TouchableOpacity style={s.addSetBtn} onPress={() => setLogSets(p => [...p, { reps: '', kg: '' }])}>
                   <Ionicons name="add-circle-outline" size={16} color={C.teal} />
-                  <Text style={{ color: C.teal, fontSize: 13, fontWeight: '700', marginLeft: 4 }}>
-                    {t('addSet', lang)}
-                  </Text>
+                  <Text style={{ color: C.teal, fontSize: 13, fontWeight: '700', marginLeft: 4 }}>{t('addSet', lang)}</Text>
                 </TouchableOpacity>
-
                 <View style={s.logActions}>
                   <TouchableOpacity style={s.cancelBtn} onPress={() => setLogModal(null)}>
                     <Text style={{ color: C.muted, fontWeight: '700' }}>{t('cancel', lang)}</Text>
@@ -319,54 +644,53 @@ const s = StyleSheet.create({
   fill:    { flex: 1, backgroundColor: C.bg },
   content: { padding: 16, paddingBottom: 32 },
 
-  summaryCard:      { backgroundColor: C.s1, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)', marginBottom: 14 },
-  summaryTitle:     { color: C.lime,  fontSize: 14, fontWeight: '800', marginBottom: 4 },
-  summaryText:      { color: C.muted, fontSize: 12, lineHeight: 18, marginBottom: 12 },
-  summaryStats:     { flexDirection: 'row' },
-  summaryStat:      { flex: 1, alignItems: 'center' },
-  summaryStatMid:   { borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.border },
-  summaryStatVal:   { color: C.text,  fontSize: 22, fontWeight: '900' },
-  summaryStatLabel: { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 2 },
+  // Tab bar
+  tabBar:       { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+  tabBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s1 },
+  tabBtnActive: { backgroundColor: C.lime, borderColor: C.lime },
+  tabTxt:       { color: C.muted, fontSize: 11, fontWeight: '700' },
+  tabTxtActive: { color: '#0a0c0f', fontWeight: '800' },
 
+  // Progressive tab
   filterRow:       { flexDirection: 'row', gap: 8, marginBottom: 14 },
   filterBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.s1 },
   filterBtnActive: { backgroundColor: C.lime + '18', borderColor: C.lime },
   filterText:      { color: C.muted, fontSize: 13, fontWeight: '600' },
   filterTextActive:{ color: C.lime, fontWeight: '700' },
+  emptyWrap:       { alignItems: 'center', paddingVertical: 48, gap: 12 },
+  emptyTxt:        { color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
+  // Exercise card
   exCard:       { backgroundColor: C.s1, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 14, marginBottom: 8 },
   exCardHeader: { flexDirection: 'row', alignItems: 'center' },
   exNameRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  exName:       { color: C.text,  fontSize: 13, fontWeight: '700', flex: 1 },
-  exLast:       { color: C.teal,  fontSize: 11 },
-  exNoData:     { color: C.dim,   fontSize: 11, fontStyle: 'italic' },
+  exName:       { color: C.text, fontSize: 13, fontWeight: '700', flex: 1 },
+  exLast:       { color: C.teal, fontSize: 11 },
+  exNoData:     { color: C.dim, fontSize: 11, fontStyle: 'italic' },
   exActions:    { flexDirection: 'row', gap: 10, alignItems: 'center' },
   addBtn:       { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(232,244,74,0.12)', borderWidth: 1, borderColor: C.lime, alignItems: 'center', justifyContent: 'center' },
+  prRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
+  prText:       { color: C.orange, fontSize: 11, fontWeight: '700' },
+  historyWrap:  { borderTopWidth: 1, borderTopColor: C.border, marginTop: 8, paddingTop: 8 },
+  sessionRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
+  sessionDate:  { color: C.dim, fontSize: 10, width: 66, paddingTop: 3 },
+  chipRow:      { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  setChip:      { backgroundColor: C.s2, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: C.border },
+  setChipText:  { color: C.text, fontSize: 11 },
 
-  prRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
-  prText: { color: C.orange, fontSize: 11, fontWeight: '700' },
-
-  historyWrap: { borderTopWidth: 1, borderTopColor: C.border, marginTop: 8, paddingTop: 8 },
-  sessionRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
-  sessionDate: { color: C.dim,  fontSize: 10, width: 66, paddingTop: 3 },
-  chipRow:     { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  setChip:     { backgroundColor: C.s2, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: C.border },
-  setChipText: { color: C.text, fontSize: 11 },
-
+  // Log modal
   overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   logModalBox:   { backgroundColor: C.s1, borderRadius: 24, padding: 20, borderWidth: 1, borderColor: C.border, width: '100%', maxWidth: 400 },
   logModalTitle: { color: C.text, fontSize: 16, fontWeight: '900', marginBottom: 14, textAlign: 'center' },
   prevSessionBox:{ backgroundColor: 'rgba(232,244,74,0.06)', borderRadius: 12, padding: 10, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(232,244,74,0.2)' },
   prevLabel:     { color: C.muted, fontSize: 10, fontWeight: '700', marginBottom: 2 },
-  prevVal:       { color: C.lime,  fontSize: 12, fontWeight: '700' },
+  prevVal:       { color: C.lime, fontSize: 12, fontWeight: '700' },
   logHeader:     { flexDirection: 'row', gap: 8, marginBottom: 8 },
   logHeaderText: { color: C.muted, fontSize: 11, fontWeight: '700', textAlign: 'center' },
   logRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   setNumBox:     { width: 36, height: 36, borderRadius: 18, backgroundColor: C.s2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border },
   setNumText:    { color: C.lime, fontWeight: '800', fontSize: 12 },
   logInput:      { flex: 1, height: 36, backgroundColor: C.s2, borderRadius: 10, borderWidth: 1, borderColor: C.border, color: C.text, textAlign: 'center', fontSize: 14, fontWeight: '700' },
-  emptyWrap:     { alignItems: 'center', paddingVertical: 48, gap: 12 },
-  emptyTxt:      { color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
   addSetBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   logActions:    { flexDirection: 'row', gap: 10, marginTop: 12 },
   cancelBtn:     { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
