@@ -62,19 +62,29 @@ export default function TurntableMascot({
   autoSpin = true,
   style,
 }) {
-  const frames = gender === 'female' ? FEMALE_FRAMES : MALE_FRAMES;
+  // Select correct frame array based on gender — never mix male/female
+  const frames    = gender === 'female' ? FEMALE_FRAMES : MALE_FRAMES;
   const hasFrames = frames.some(f => f !== null);
 
-  const [frameIdx,  setFrameIdx]  = useState(0); // 0-7
+  const [frameIdx,  setFrameIdx]  = useState(0);
   const [nextIdx,   setNextIdx]   = useState(1);
   const [isDragging,setIsDragging]= useState(false);
 
-  const opacity     = useRef(new Animated.Value(1)).current;  // current frame
-  const crossOpacity= useRef(new Animated.Value(0)).current;  // next frame (crossfade)
+  const opacity     = useRef(new Animated.Value(1)).current;
+  const crossOpacity= useRef(new Animated.Value(0)).current;
   const dragOffset  = useRef(0);
   const autoTimer   = useRef(null);
   const currentIdx  = useRef(0);
   const spinning    = useRef(false);
+
+  // Reset to frame 0 when gender changes so male/female never show wrong frames
+  useEffect(() => {
+    currentIdx.current = 0;
+    setFrameIdx(0);
+    setNextIdx(1);
+    crossOpacity.setValue(0);
+    opacity.setValue(1);
+  }, [gender]);
 
   // Clamp index to 0-7
   const clamp = (i) => ((i % FRAME_COUNT) + FRAME_COUNT) % FRAME_COUNT;
