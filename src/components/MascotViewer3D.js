@@ -1,26 +1,17 @@
-/**
- * MascotViewer3D
- * Renders a GLB 3D model using expo-gl + three.js
- * Supports drag-to-rotate
- */
-import React, { useRef, useEffect } from 'react';
-import { View, PanResponder, StyleSheet } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator, PanResponder, StyleSheet } from 'react-native';
 import { GLView } from 'expo-gl';
 import { Asset } from 'expo-asset';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { C } from '../utils/theme';
 
-// GLB assets — static requires
 const WOMAN_GLB = require('../../assets/mascot_female/woman.glb');
 
-export default function MascotViewer3D({
-  width  = 280,
-  height = 420,
-  style,
-}) {
-  const glRef     = useRef(null);
-  const sceneRef  = useRef(null);
-  const cameraRef = useRef(null);
+export default function MascotViewer3D({ width = 280, height = 420, style }) {
+  const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
+  const [errMsg, setErrMsg] = useState('');
+
   const rendRef   = useRef(null);
   const modelRef  = useRef(null);
   const rafRef    = useRef(null);
@@ -28,126 +19,123 @@ export default function MascotViewer3D({
   const lastX     = useRef(0);
   const isDrag    = useRef(false);
 
-  // ── PanResponder for drag-to-rotate ──────────────────────────────────────────
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: (_, gs) => {
-        isDrag.current = true;
-        lastX.current  = gs.x0;
-      },
-      onPanResponderMove: (_, gs) => {
-        const dx = gs.moveX - lastX.current;
-        rotY.current += dx * 0.012;
-        lastX.current = gs.moveX;
-        if (modelRef.current) modelRef.current.rotation.y = rotY.current;
-      },
-      onPanResponderRelease: () => { isDrag.current = false; },
-    })
-  ).current;
+  const pan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder:  () => true,
+    onPanResponderGrant: (_, gs) => { isDrag.current = true;  lastX.current = gs.x0; },
+    onPanResponderMove: (_, gs) => {
+      rotY.current += (gs.moveX - lastX.current) * 0.012;
+      lastX.current = gs.moveX;
+      if (modelRef.current) modelRef.current.rotation.y = rotY.current;
+    },
+    onPanResponderRelease: () => { isDrag.current = false; },
+  })).current;
 
-  // ── Three.js setup ────────────────────────────────────────────────────────────
   const onContextCreate = async (gl) => {
-    glRef.current = gl;
-    const W = gl.drawingBufferWidth;
-    const H = gl.drawingBufferHeight;
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ context: gl, antialias: true, alpha: true });
-    renderer.setSize(W, H);
-    renderer.setPixelRatio(1);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = false;
-    rendRef.current = renderer;
-
-    // Scene (transparent bg — blends with app dark background)
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-
-    // Camera
-    const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
-    camera.position.set(0, 0, 2.8);
-    cameraRef.current = camera;
-
-    // Lighting — studio setup
-    const ambient = new THREE.AmbientLight(0xffffff, 1.4);
-    scene.add(ambient);
-
-    const key = new THREE.DirectionalLight(0xffffff, 2.0);
-    key.position.set(2, 4, 3);
-    scene.add(key);
-
-    const fill = new THREE.DirectionalLight(0xe0f0ff, 0.8);
-    fill.position.set(-3, 1, 2);
-    scene.add(fill);
-
-    const rim = new THREE.DirectionalLight(0xffd0a0, 0.6);
-    rim.position.set(0, -2, -3);
-    scene.add(rim);
-
-    // Load GLB
     try {
+      const W = gl.drawingBufferWidth;
+      const H = gl.drawingBufferHeight;
+
+      // Renderer
+      const renderer = new THREE.WebGLRenderer({ context: gl, antialias: true, alpha: true });
+      renderer.setSize(W, H);
+      renderer.setPixelRatio(1);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      rendRef.current = renderer;
+
+      // Scene
+      const scene = new THREE.Scene();
+
+      // Camera
+      const camera = new THREE.PerspectiveCamera(45, W / H, 0.01, 1000);
+      camera.position.set(0, 0, 3);
+
+      // Lights
+      scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+      const key = new THREE.DirectionalLight(0xffffff, 2.2);
+      key.position.set(2, 4, 3); scene.add(key);
+      const fill = new THREE.DirectionalLight(0xb0d0ff, 0.9);
+      fill.position.set(-3, 0, 2); scene.add(fill);
+      const rim = new THREE.DirectionalLight(0xffc080, 0.5);
+      rim.position.set(0, -3, -3); scene.add(rim);
+
+      // Load GLB
       const asset = Asset.fromModule(WOMAN_GLB);
       await asset.downloadAsync();
-      const uri = asset.localUri || asset.uri;
+      const uri = asset.localUri ?? asset.uri;
+      console.log('[3D] Loading GLB from:', uri);
 
-      // Fetch the GLB as ArrayBuffer and pass to GLTFLoader
-      const response = await fetch(uri);
-      const buffer   = await response.arrayBuffer();
+      // Fetch as ArrayBuffer
+      const res = await fetch(uri);
+      if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+      const buf = await res.arrayBuffer();
+      console.log('[3D] GLB buffer size:', buf.byteLength);
 
-      const loader = new GLTFLoader();
-      loader.parse(buffer, '', (gltf) => {
-        const model = gltf.scene;
-
-        // Auto-center and scale
-        const box    = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size   = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale  = 1.8 / maxDim;
-
-        model.position.sub(center.multiplyScalar(scale));
-        model.scale.setScalar(scale);
-        model.position.y -= 0.1; // slight downward shift
-
-        scene.add(model);
-        modelRef.current = model;
-      }, (err) => {
-        console.warn('GLB parse error:', err);
+      await new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+        loader.parse(buf, '', (gltf) => {
+          const model = gltf.scene;
+          // Center + scale
+          const box  = new THREE.Box3().setFromObject(model);
+          const ctr  = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const sc   = 2.0 / Math.max(size.x, size.y, size.z);
+          model.scale.setScalar(sc);
+          model.position.copy(ctr.multiplyScalar(-sc));
+          model.position.y -= 0.15;
+          scene.add(model);
+          modelRef.current = model;
+          console.log('[3D] Model loaded, scale:', sc, 'size:', size);
+          resolve();
+        }, (err) => { reject(err); });
       });
-    } catch (e) {
-      console.warn('GLB load error:', e);
-    }
 
-    // Render loop
-    const animate = () => {
-      rafRef.current = requestAnimationFrame(animate);
-      // Slow auto-rotation when not dragging
-      if (!isDrag.current && modelRef.current) {
-        modelRef.current.rotation.y += 0.004;
-        rotY.current = modelRef.current.rotation.y;
-      }
-      renderer.render(scene, camera);
-      gl.endFrameEXP();
-    };
-    animate();
+      setStatus('ok');
+
+      // Render loop
+      const animate = () => {
+        rafRef.current = requestAnimationFrame(animate);
+        if (!isDrag.current && modelRef.current) {
+          modelRef.current.rotation.y += 0.005;
+          rotY.current = modelRef.current.rotation.y;
+        }
+        renderer.render(scene, camera);
+        gl.endFrameEXP();
+      };
+      animate();
+
+    } catch (e) {
+      console.error('[3D] Error:', e);
+      setStatus('error');
+      setErrMsg(String(e?.message ?? e));
+    }
   };
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (rendRef.current) rendRef.current.dispose();
-    };
+  useEffect(() => () => {
+    if (rafRef.current)  cancelAnimationFrame(rafRef.current);
+    if (rendRef.current) rendRef.current.dispose();
   }, []);
 
   return (
-    <View style={[{ width, height }, style]} {...pan.panHandlers}>
-      <GLView
-        style={{ width, height }}
-        onContextCreate={onContextCreate}
-      />
+    <View style={[{ width, height, alignItems: 'center', justifyContent: 'center' }, style]}
+      {...(status === 'ok' ? pan.panHandlers : {})}>
+      <GLView style={{ width, height, position: 'absolute' }} onContextCreate={onContextCreate} />
+      {status === 'loading' && (
+        <View style={styles.overlay}>
+          <ActivityIndicator color={C.lime} size="large" />
+          <Text style={styles.txt}>3D model yükleniyor...</Text>
+        </View>
+      )}
+      {status === 'error' && (
+        <View style={styles.overlay}>
+          <Text style={[styles.txt, { color: C.red }]}>⚠ {errMsg}</Text>
+        </View>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  overlay: { position: 'absolute', alignItems: 'center', gap: 8, padding: 16 },
+  txt:     { color: C.muted, fontSize: 12, textAlign: 'center' },
+});
