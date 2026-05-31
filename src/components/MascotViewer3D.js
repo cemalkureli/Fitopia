@@ -2,9 +2,31 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, PanResponder, StyleSheet } from 'react-native';
 import { GLView } from 'expo-gl';
 import { Asset } from 'expo-asset';
+import { C } from '../utils/theme';
+
+// ─── Polyfill document for Three.js in React Native ──────────────────────────
+if (typeof global.document === 'undefined') {
+  global.document = {
+    createElementNS: (_ns, tag) => {
+      const el = { style: {}, addEventListener: () => {}, removeEventListener: () => {} };
+      if (tag === 'canvas') el.getContext = () => null;
+      return el;
+    },
+    createElement: (tag) => {
+      const el = { style: {}, addEventListener: () => {}, removeEventListener: () => {} };
+      if (tag === 'canvas') el.getContext = () => null;
+      return el;
+    },
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+}
+if (typeof global.window === 'undefined') {
+  global.window = global;
+}
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { C } from '../utils/theme';
 
 const WOMAN_GLB = require('../../assets/mascot_female/woman.glb');
 
