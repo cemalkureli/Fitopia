@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   TextInput, Modal, Dimensions, Image, ActivityIndicator,
@@ -15,6 +16,7 @@ import { t, CATEGORY_LABELS, MUSCLE_LABELS } from '../utils/i18n';
 import { getFavorites, toggleFavorite } from '../utils/storage';
 import { TRAINING_PLANS, PLAN_FILTERS } from '../data/trainingPlans';
 import { setActiveProgram, getMyPlans, saveMyPlan, deleteMyPlan, getActiveProgram, clearActiveProgram } from '../utils/storage';
+import { useMuscleFilter } from '../context/MuscleFilterContext';
 import { useToast, ConfirmModal } from '../components/Toast';
 import { cacheGet, cacheSet, TTL } from '../utils/cache';
 import { Image as ExpoImage } from 'expo-image';
@@ -1505,7 +1507,8 @@ const TAB_BAR_H = StyleSheet.create({
 
 // ─── ExercisesScreen (exercises-only tab) ─────────────────────────────────────
 function ExercisesLibrary({ lang }) {
-  // All existing state and logic moved here
+  const { muscleFilter, clearMuscleFilter } = useMuscleFilter();
+
   const [exercises, setExercises] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [loadMore,  setLoadMore]  = useState(false);
@@ -1517,6 +1520,14 @@ function ExercisesLibrary({ lang }) {
   const [favorites, setFavorites] = useState([]);
   const offsetRef   = useRef(0);
   const searchTimer = useRef(null);
+
+  // Apply muscle filter from mascot tap (one-time, then clear)
+  useFocusEffect(useCallback(() => {
+    if (muscleFilter?.cat) {
+      setCat(muscleFilter.cat);
+      clearMuscleFilter();
+    }
+  }, [muscleFilter]));
 
   useEffect(() => { getFavorites().then(setFavorites); }, []);
 

@@ -12,9 +12,7 @@ import { C } from '../utils/theme';
 import { saveWorkoutSession, getAllWorkoutLogs, getFavorites, deleteWorkoutSession, deleteAllExerciseSessions, getActiveProgram } from '../utils/storage';
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
-import FitnessMascot from '../components/FitnessMascot';
-import TurntableMascot from '../components/TurntableMascot';
-import MascotViewer3D from '../components/MascotViewer3D';
+import MascotFlipCard from '../components/MascotFlipCard';
 import { useToast, ConfirmModal } from '../components/Toast';
 import { t, MONTHS_SHORT, DAYS_SHORT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
@@ -443,9 +441,9 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           style={StyleSheet.absoluteFill}
         />
 
-        {/* 3D GLB mascot */}
+        {/* Mascot flip card (tap or use button to flip front/back) */}
         <View style={g.mascotWrap}>
-          <MascotViewer3D width={280} height={440} />
+          <MascotFlipCard gender={gender} width={260} height={420} />
         </View>
 
         {/* Measurement values — animated laser lines */}
@@ -522,7 +520,7 @@ const g = StyleSheet.create({
   statDiv:      { width: 1, backgroundColor: C.border },
 
   // Mascot section
-  mascotSection:{ backgroundColor: C.s1, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', marginBottom: 12, paddingBottom: 8 },
+  mascotSection:{ backgroundColor: 'transparent', marginBottom: 4, paddingBottom: 0 },
   mascotWrap:   { alignItems: 'center', paddingTop: 0, paddingBottom: 0 },
   measureList:  { paddingVertical: 4 },
   noMeasure:    { color: C.dim, fontSize: 12, textAlign: 'center', paddingVertical: 12, paddingHorizontal: 20 },

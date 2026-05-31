@@ -13,6 +13,7 @@ import { C } from './src/utils/theme';
 import { supabase } from './src/lib/supabase';
 import { LanguageProvider, useLang } from './src/context/LanguageContext';
 import { UnitsProvider } from './src/context/UnitsContext';
+import { MuscleFilterProvider } from './src/context/MuscleFilterContext';
 import { t } from './src/utils/i18n';
 
 import LoginScreen    from './src/screens/auth/LoginScreen';
@@ -192,7 +193,8 @@ export default function App() {
   return (
     <LanguageProvider>
       <UnitsProvider>
-        <SafeAreaProvider>
+        <MuscleFilterProvider>
+          <SafeAreaProvider>
         <StatusBar barStyle="light-content" backgroundColor={C.bg} />
 
         {session === undefined ? (
@@ -220,7 +222,8 @@ export default function App() {
             )}
           </SafeAreaView>
         )}
-        </SafeAreaProvider>
+          </SafeAreaProvider>
+        </MuscleFilterProvider>
       </UnitsProvider>
     </LanguageProvider>
   );

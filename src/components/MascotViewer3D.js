@@ -29,8 +29,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const WOMAN_GLB = require('../../assets/mascot_female/woman.glb');
+const MAN_GLB   = require('../../assets/mascot_male/man.glb');
 
-export default function MascotViewer3D({ width = 280, height = 420, style }) {
+export default function MascotViewer3D({ gender = 'female', width = 280, height = 420, style }) {
   const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
   const [errMsg, setErrMsg] = useState('');
 
@@ -69,9 +70,9 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
       // Scene
       const scene = new THREE.Scene();
 
-      // Camera — closer, looking at model center
-      const camera = new THREE.PerspectiveCamera(40, W / H, 0.01, 1000);
-      camera.position.set(0, 0.1, 2.2);
+      // Camera — show full body with room to spare
+      const camera = new THREE.PerspectiveCamera(38, W / H, 0.01, 1000);
+      camera.position.set(0, 0, 3.2);
 
       // Lights
       scene.add(new THREE.AmbientLight(0xffffff, 1.6));
@@ -82,8 +83,8 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
       const rim = new THREE.DirectionalLight(0xffc080, 0.5);
       rim.position.set(0, -3, -3); scene.add(rim);
 
-      // Load GLB
-      const asset = Asset.fromModule(WOMAN_GLB);
+      // Load correct GLB based on gender
+      const asset = Asset.fromModule(gender === 'male' ? MAN_GLB : WOMAN_GLB);
       await asset.downloadAsync();
       const uri = asset.localUri ?? asset.uri;
       console.log('[3D] Loading GLB from:', uri);
@@ -131,7 +132,7 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
           const ctr  = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3());
           const maxDim = Math.max(size.x, size.y, size.z);
-          const sc = 1.8 / maxDim;
+          const sc = 1.4 / maxDim; // smaller scale so full body fits
 
           model.scale.setScalar(sc);
           model.position.set(-ctr.x * sc, -ctr.y * sc, -ctr.z * sc);
@@ -167,15 +168,20 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
     }
   };
 
-  useEffect(() => () => {
-    if (rafRef.current)  cancelAnimationFrame(rafRef.current);
-    if (rendRef.current) rendRef.current.dispose();
-  }, []);
+  // Cleanup on gender change AND unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current)  { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (rendRef.current) { rendRef.current.dispose(); rendRef.current = null; }
+      modelRef.current = null;
+      setStatus('loading');
+    };
+  }, [gender]);
 
   return (
     <View style={[{ width, height, alignItems: 'center', justifyContent: 'center' }, style]}
       {...(status === 'ok' ? pan.panHandlers : {})}>
-      <GLView style={{ width, height, position: 'absolute' }} onContextCreate={onContextCreate} />
+      <GLView key={gender} style={{ width, height, position: 'absolute' }} onContextCreate={onContextCreate} />
       {status === 'loading' && (
         <View style={styles.overlay}>
           <ActivityIndicator color={C.lime} size="large" />
