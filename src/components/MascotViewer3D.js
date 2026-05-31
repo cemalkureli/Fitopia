@@ -97,22 +97,13 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
       await new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
         loader.parse(buf, '', (gltf) => {
-          console.log('[3D] scenes:', gltf.scenes?.length, 'children:', gltf.scene?.children?.length);
+          console.log('[3D] scenes:', gltf.scenes?.length, 'scene children:', gltf.scene?.children?.length);
 
-          // Use ONLY the first scene/model (GLB has 2, user wants first/front one)
-          let model;
-          if (gltf.scenes && gltf.scenes.length > 0) {
-            model = gltf.scenes[0];  // first scene only
-          } else {
-            model = gltf.scene;
-          }
-
-          // If first scene has children, use only first child
-          if (model.children && model.children.length > 1) {
-            const firstChild = model.children[0].clone();
-            model = new THREE.Group();
-            model.add(firstChild);
-          }
+          // Extract ONLY the first top-level child (one model out of two)
+          const root = gltf.scene;
+          const firstChild = root.children[0];
+          const model = new THREE.Group();
+          model.add(firstChild.clone ? firstChild.clone() : firstChild);
 
           // Center + scale to fit view
           const box  = new THREE.Box3().setFromObject(model);
