@@ -445,7 +445,7 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
 
         {/* 3D GLB mascot */}
         <View style={g.mascotWrap}>
-          <MascotViewer3D width={340} height={540} />
+          <MascotViewer3D width={280} height={440} />
         </View>
 
         {/* Measurement values — animated laser lines */}

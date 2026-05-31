@@ -58,19 +58,20 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
       const W = gl.drawingBufferWidth;
       const H = gl.drawingBufferHeight;
 
-      // Renderer
+      // Renderer — fully transparent background
       const renderer = new THREE.WebGLRenderer({ context: gl, antialias: true, alpha: true });
       renderer.setSize(W, H);
       renderer.setPixelRatio(1);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.setClearColor(0x000000, 0); // transparent
       rendRef.current = renderer;
 
       // Scene
       const scene = new THREE.Scene();
 
-      // Camera
-      const camera = new THREE.PerspectiveCamera(45, W / H, 0.01, 1000);
-      camera.position.set(0, 0, 3);
+      // Camera — closer, looking at model center
+      const camera = new THREE.PerspectiveCamera(40, W / H, 0.01, 1000);
+      camera.position.set(0, 0.1, 2.2);
 
       // Lights
       scene.add(new THREE.AmbientLight(0xffffff, 1.6));
@@ -121,11 +122,10 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
           const sc = 1.8 / maxDim;
 
           model.scale.setScalar(sc);
-          model.position.set(
-            -ctr.x * sc,
-            -ctr.y * sc - 0.1,
-            -ctr.z * sc
-          );
+          model.position.set(-ctr.x * sc, -ctr.y * sc, -ctr.z * sc);
+
+          // Rotate to face front (try 0 first, if still sideways use Math.PI)
+          model.rotation.y = Math.PI;
 
           scene.add(model);
           modelRef.current = model;
