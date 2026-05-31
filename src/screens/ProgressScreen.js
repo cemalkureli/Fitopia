@@ -445,7 +445,7 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
 
         {/* 3D GLB mascot */}
         <View style={g.mascotWrap}>
-          <MascotViewer3D width={240} height={420} />
+          <MascotViewer3D width={340} height={540} />
         </View>
 
         {/* Measurement values — animated laser lines */}
@@ -522,8 +522,8 @@ const g = StyleSheet.create({
   statDiv:      { width: 1, backgroundColor: C.border },
 
   // Mascot section
-  mascotSection:{ backgroundColor: C.s1, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', marginBottom: 12, overflow: 'hidden', paddingBottom: 16 },
-  mascotWrap:   { alignItems: 'center', paddingTop: 20, paddingBottom: 4 },
+  mascotSection:{ backgroundColor: C.s1, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)', marginBottom: 12, paddingBottom: 8 },
+  mascotWrap:   { alignItems: 'center', paddingTop: 0, paddingBottom: 0 },
   measureList:  { paddingVertical: 4 },
   noMeasure:    { color: C.dim, fontSize: 12, textAlign: 'center', paddingVertical: 12, paddingHorizontal: 20 },
 
