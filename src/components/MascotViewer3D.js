@@ -96,18 +96,40 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
       await new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
         loader.parse(buf, '', (gltf) => {
-          const model = gltf.scene;
-          // Center + scale
+          console.log('[3D] scenes:', gltf.scenes?.length, 'children:', gltf.scene?.children?.length);
+
+          // Use ONLY the first scene/model (GLB has 2, user wants first/front one)
+          let model;
+          if (gltf.scenes && gltf.scenes.length > 0) {
+            model = gltf.scenes[0];  // first scene only
+          } else {
+            model = gltf.scene;
+          }
+
+          // If first scene has children, use only first child
+          if (model.children && model.children.length > 1) {
+            const firstChild = model.children[0].clone();
+            model = new THREE.Group();
+            model.add(firstChild);
+          }
+
+          // Center + scale to fit view
           const box  = new THREE.Box3().setFromObject(model);
           const ctr  = box.getCenter(new THREE.Vector3());
           const size = box.getSize(new THREE.Vector3());
-          const sc   = 2.0 / Math.max(size.x, size.y, size.z);
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const sc = 1.8 / maxDim;
+
           model.scale.setScalar(sc);
-          model.position.copy(ctr.multiplyScalar(-sc));
-          model.position.y -= 0.15;
+          model.position.set(
+            -ctr.x * sc,
+            -ctr.y * sc - 0.1,
+            -ctr.z * sc
+          );
+
           scene.add(model);
           modelRef.current = model;
-          console.log('[3D] Model loaded, scale:', sc, 'size:', size);
+          console.log('[3D] Model added. size:', JSON.stringify(size), 'scale:', sc);
           resolve();
         }, (err) => { reject(err); });
       });
