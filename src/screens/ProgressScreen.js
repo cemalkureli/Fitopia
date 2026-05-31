@@ -14,6 +14,7 @@ import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
 import FitnessMascot from '../components/FitnessMascot';
 import TurntableMascot from '../components/TurntableMascot';
+import MascotViewer3D from '../components/MascotViewer3D';
 import { useToast, ConfirmModal } from '../components/Toast';
 import { t, MONTHS_SHORT, DAYS_SHORT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
@@ -442,9 +443,9 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           style={StyleSheet.absoluteFill}
         />
 
-        {/* 3D Turntable mascot (transparent PNG, drag to spin) */}
+        {/* 3D GLB mascot */}
         <View style={g.mascotWrap}>
-          <TurntableMascot gender={gender} width={220} height={400} autoSpin />
+          <MascotViewer3D width={240} height={420} />
         </View>
 
         {/* Measurement values — animated laser lines */}
