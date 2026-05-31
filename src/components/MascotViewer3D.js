@@ -97,13 +97,34 @@ export default function MascotViewer3D({ width = 280, height = 420, style }) {
       await new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
         loader.parse(buf, '', (gltf) => {
-          console.log('[3D] scenes:', gltf.scenes?.length, 'scene children:', gltf.scene?.children?.length);
+          const sceneRoot = gltf.scene;
+          const topChild = sceneRoot.children[0]; // the grouped container
+          console.log('[3D] topChild children:', topChild?.children?.length);
 
-          // Extract ONLY the first top-level child (one model out of two)
-          const root = gltf.scene;
-          const firstChild = root.children[0];
+          // Go one level deeper — take only the FIRST sub-child (first model)
           const model = new THREE.Group();
-          model.add(firstChild.clone ? firstChild.clone() : firstChild);
+          if (topChild?.children?.length > 1) {
+            // Two models inside — clone just the first one
+            const firstModel = topChild.children[0];
+            model.add(firstModel);
+            console.log('[3D] Using sub-child 0 of', topChild.children.length);
+          } else {
+            // Single model — use as-is
+            model.add(topChild || sceneRoot);
+          }
+
+          // Replace all textures/materials with plain metallic (Blob API not supported in RN)
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.material = new THREE.MeshStandardMaterial({
+                color: 0xd0ccc8,
+                metalness: 0.55,
+                roughness: 0.35,
+              });
+              child.castShadow = false;
+              child.receiveShadow = false;
+            }
+          });
 
           // Center + scale to fit view
           const box  = new THREE.Box3().setFromObject(model);
