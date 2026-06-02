@@ -2,7 +2,7 @@ const BASE = 'https://hipkprgvvdowtwvomiqc.supabase.co/storage/v1/object/public/
 
 export const videoUrl = (filename) => `${BASE}/${filename}.webm`;
 
-// Program'daki egzersizler
+// Program egzersizleri — ProgramScreen'deki fallback url haritası
 export const MEDIA_URLS = {
   'Plate Loaded Chest Press':        videoUrl('chest-press-machine'),
   'Smith Machine Low Incline Press': videoUrl('smith-machine-incline-bench-press'),
@@ -27,57 +27,4 @@ export const MEDIA_URLS = {
   'Reverse Wrist Curl':              videoUrl('reverse-barbell-wrist-curl'),
   'Romanian Deadlift':               videoUrl('romanian-deadlift'),
   'Cable Rear Delt Fly':             videoUrl('cable-reverse-fly'),
-};
-
-// Kütüphane egzersizleri
-export const EXERCISE_URLS = {
-  'Barbell Bench Press':             videoUrl('barbell-bench-press'),
-  'Dumbbell Bench Press':            videoUrl('dumbbell-bench-press'),
-  'Incline Dumbbell Bench Press':    videoUrl('incline-dumbbell-bench-press'),
-  'Pec Deck Fly Machine':            videoUrl('pec-deck-fly-machine'),
-  'Chest Press Machine':             videoUrl('chest-press-machine'),
-  'Dumbbell Fly':                    videoUrl('dumbbell-fly'),
-  'Push Up':                         videoUrl('push-up'),
-  'Close Grip Bench Press':          videoUrl('close-grip-bench-press'),
-  'Lat Pull Down':                   videoUrl('lat-pull-down'),
-  'Seated Cable Row':                videoUrl('seated-cable-row'),
-  'Pull Up':                         videoUrl('pull-up'),
-  'Dumbbell Row':                    videoUrl('dumbbell-row'),
-  'High Row Machine':                videoUrl('high-row-machine'),
-  'Romanian Deadlift':               videoUrl('romanian-deadlift'),
-  'Conventional Deadlift':           videoUrl('conventional-deadlift'),
-  'Cable Straight Arm Pulldown':     videoUrl('cable-straight-arm-pulldown'),
-  'Shoulder Press Machine':          videoUrl('shoulder-press-machine'),
-  'Dumbbell Lateral Raise':          videoUrl('dumbbell-lateral-raise'),
-  'Dumbbell Shoulder Press':         videoUrl('dumbbell-shoulder-press'),
-  'Cable Lateral Raise':             videoUrl('cable-lateral-raise'),
-  'Face Pull':                       videoUrl('face-pull'),
-  'Cable Reverse Fly':               videoUrl('cable-reverse-fly'),
-  'Overhead Press':                  videoUrl('overhead-press'),
-  'Cable Curl':                      videoUrl('cable-curl'),
-  'Dumbbell Bicep Curl':             videoUrl('dumbbell-bicep-curl'),
-  'Incline Dumbbell Curl':           videoUrl('incline-dumbbell-curl'),
-  'Dumbbell Hammer Curl':            videoUrl('dumbbell-hammer-curl'),
-  'Cable Push Down':                 videoUrl('cable-push-down'),
-  'Cable Overhead Tricep Extension': videoUrl('cable-overhead-tricep-extension'),
-  'Skull Crusher':                   videoUrl('skull-crusher'),
-  'Dips':                            videoUrl('dips'),
-  'Back Squat':                      videoUrl('back-squat'),
-  'Leg Press':                       videoUrl('leg-press'),
-  'Smith Machine Squat':             videoUrl('smith-machine-squat'),
-  'Leg Extension':                   videoUrl('leg-extension'),
-  'Seated Leg Curl':                 videoUrl('seated-leg-curl'),
-  'Barbell Hip Thrust':              videoUrl('barbell-hip-thrust'),
-  'Bulgarian Split Squat':           videoUrl('barbell-bulgarian-split-squat'),
-  'Hack Squat Machine':              videoUrl('hack-squat-machine'),
-  'Seated Calf Raise':               videoUrl('seated-calf-raise'),
-  'Crunch':                          videoUrl('crunch'),
-  'Leg Raise':                       videoUrl('leg-raise'),
-  'Hanging Knee Raise':              videoUrl('hanging-knee-raise'),
-  'Plank':                           videoUrl('plank'),
-  'Reverse Crunch':                  videoUrl('reverse-crunch'),
-  'Running':                         videoUrl('running'),
-  'Jump Squat':                      videoUrl('jump-squat'),
-  'Burpee':                          videoUrl('burpee'),
-  'Mountain Climber':                videoUrl('mountain-climber'),
 };
