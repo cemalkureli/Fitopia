@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,11 +22,17 @@ export default function LoginScreen({ onSuccess, onGoRegister }) {
   const [error,    setError]    = useState('');
   const passRef = useRef(null);
 
+  useEffect(() => {
+    AsyncStorage.getItem('lastEmail').then(v => { if (v) setEmail(v); });
+  }, []);
+
   const handleLogin = async () => {
     if (!email.trim() || !password) { setError(t('emailRequired', lang)); return; }
     setError(''); setLoading(true);
     try {
-      await signIn({ email: email.trim().toLowerCase(), password });
+      const trimmed = email.trim().toLowerCase();
+      await signIn({ email: trimmed, password });
+      AsyncStorage.setItem('lastEmail', trimmed);
       onSuccess?.();
     } catch (e) {
       setError(e.message === 'Invalid login credentials' ? t('wrongCreds', lang) : e.message);

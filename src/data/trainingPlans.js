@@ -5,7 +5,8 @@ export const TRAINING_PLANS = [
   {
     id: 'guray-hypertrophy',
     title: 'Guray HyperTrophy',
-    description: 'Kişiselleştirilmiş hipertrofi programı. Push/Pull/Legs + ön kol bölünmesi, RIR bazlı yükleme. Haftada 5 aktif gün, 2 dinlenme günü.',
+    description:    'Kişiselleştirilmiş hipertrofi programı. Push/Pull/Legs + ön kol bölünmesi, RIR bazlı yükleme. Haftada 5 aktif gün, 2 dinlenme günü.',
+    description_en: 'Personalised hypertrophy program. Push/Pull/Legs + forearm split, RIR-based loading. 5 active days per week, 2 rest days.',
     level: 'intermediate',
     days: 5,
     goals: ['bodybuilding', 'hypertrophy'],
@@ -14,11 +15,11 @@ export const TRAINING_PLANS = [
     athleteCount: 1,
     isPaid: false,
     workouts: [
-      { name: 'Push A (Salı)', exercises: ['Plate Loaded Chest Press 2×5-6 RIR1', 'Smith Machine Low Incline Press 2×5-6 RIR1', 'Chest Fly Machine 1×6-8 Failure', 'Shoulder Press Machine 2×6-8 RIR1', 'Lateral Raise 3×8-10 Failure', 'Triceps Pushdown 2×6-8 Failure', 'Overhead Rope Extension 2×8-10 Failure', 'Cable Crunch 3×10'] },
-      { name: 'Pull A (Çarşamba)', exercises: ['Lat Pulldown 2×6-8 RIR1-Failure', 'Plate Loaded Wide Grip Row 3×6-8 RIR1-Failure', 'Cable Row 1×8-10 Failure', 'Incline Dumbbell Curl 2×6-8 Failure', 'Cable Curl 2×6-8 Failure', 'Hammer Curl + Reverse Barbell Curl 2×8-10 Süperset'] },
-      { name: 'Leg + Ön Kol (Perşembe)', exercises: ['Leg Press 2×6-8 RIR1-2', 'Smith Machine Squat 2×6-8 RIR1-2', 'Leg Extension 2×8-10 Failure', 'Seated Leg Curl 3×8-10 RIR1', 'Wrist Curl 3×12-15 Failure', 'Reverse Wrist Curl 3×12-15 Failure', 'Cable Crunch 3×12-15'] },
-      { name: 'Push B (Cumartesi)', exercises: ['Shoulder Press Machine 2×6-8 RIR1', 'Lateral Raise 3×8-10 Failure', 'Smith Machine Low Incline Press 2×5-6 RIR1', 'Chest Fly Machine 2×6-8 Failure', 'Cable Rear Delt Fly 2×8-10 Failure', 'Triceps Pushdown 2×6-8 Failure', 'Overhead Rope Extension 2×8-10 Failure'] },
-      { name: 'Pull + (Pazar)', exercises: ['Plate Loaded Wide Grip Row 3×6-8 RIR1-Failure', 'Lat Pulldown 3×6-8 RIR1-Failure', 'Romanian Deadlift 2×5-6 RIR1-2', 'Cable Curl 2×6-8 Failure', 'Hammer Curl + Reverse Curl 2×8-10 Süperset', 'Leg Extension 2×6-8 Failure', 'Seated Leg Curl 1×8-10 Failure'] },
+      { dayOfWeek: 2, name: 'Push A',          name_en: 'Push A',           exercises: ['Plate Loaded Chest Press 2×5-6 RIR1', 'Smith Machine Low Incline Press 2×5-6 RIR1', 'Chest Fly Machine 1×6-8 Failure', 'Shoulder Press Machine 2×6-8 RIR1', 'Lateral Raise 3×8-10 Failure', 'Triceps Pushdown 2×6-8 Failure', 'Overhead Rope Extension 2×8-10 Failure', 'Cable Crunch 3×10'] },
+      { dayOfWeek: 3, name: 'Pull A',           name_en: 'Pull A',           exercises: ['Lat Pulldown 2×6-8 RIR1-Failure', 'Plate Loaded Wide Grip Row 3×6-8 RIR1-Failure', 'Cable Row 1×8-10 Failure', 'Incline Dumbbell Curl 2×6-8 Failure', 'Cable Curl 2×6-8 Failure', 'Hammer Curl + Reverse Barbell Curl 2×8-10 Superset'] },
+      { dayOfWeek: 4, name: 'Bacak + Ön Kol',  name_en: 'Legs + Forearms',  exercises: ['Leg Press 2×6-8 RIR1-2', 'Smith Machine Squat 2×6-8 RIR1-2', 'Leg Extension 2×8-10 Failure', 'Seated Leg Curl 3×8-10 RIR1', 'Wrist Curl 3×12-15 Failure', 'Reverse Wrist Curl 3×12-15 Failure', 'Cable Crunch 3×12-15'] },
+      { dayOfWeek: 6, name: 'Push B',           name_en: 'Push B',           exercises: ['Shoulder Press Machine 2×6-8 RIR1', 'Lateral Raise 3×8-10 Failure', 'Smith Machine Low Incline Press 2×5-6 RIR1', 'Chest Fly Machine 2×6-8 Failure', 'Cable Rear Delt Fly 2×8-10 Failure', 'Triceps Pushdown 2×6-8 Failure', 'Overhead Rope Extension 2×8-10 Failure'] },
+      { dayOfWeek: 0, name: 'Pull +',           name_en: 'Pull +',           exercises: ['Plate Loaded Wide Grip Row 3×6-8 RIR1-Failure', 'Lat Pulldown 3×6-8 RIR1-Failure', 'Romanian Deadlift 2×5-6 RIR1-2', 'Cable Curl 2×6-8 Failure', 'Hammer Curl + Reverse Curl 2×8-10 Superset', 'Leg Extension 2×6-8 Failure', 'Seated Leg Curl 1×8-10 Failure'] },
     ],
   },
   {
@@ -33,9 +34,9 @@ export const TRAINING_PLANS = [
     athleteCount: 14320,
     isPaid: false,
     workouts: [
-      { name: 'Push A', exercises: ['Barbell Bench Press 4×6-8 RIR1', 'Incline Dumbbell Bench Press 3×8-10 RIR1', 'Shoulder Press Machine 3×8-10 RIR1', 'Lateral Raise 4×12-15 Failure', 'Cable Push Down 3×10-12 Failure', 'Overhead Rope Extension 3×10-12 Failure'] },
-      { name: 'Pull A', exercises: ['Lat Pull Down 4×6-8 RIR1', 'Seated Cable Row 3×8-10 RIR1', 'Incline Dumbbell Curl 3×8-10 Failure', 'Cable Curl 3×10-12 Failure', 'Face Pull 3×15-20 Failure'] },
-      { name: 'Legs A', exercises: ['Back Squat 4×5-6 RIR2', 'Leg Press 3×8-10 RIR1', 'Leg Extension 3×12-15 Failure', 'Seated Leg Curl 3×10-12 RIR1', 'Romanian Deadlift 3×8-10 RIR1', 'Standing Calf Raise 4×12-15'] },
+      { name: 'Push A', name_en: 'Push A', exercises: ['Barbell Bench Press 4×6-8 RIR1', 'Incline Dumbbell Bench Press 3×8-10 RIR1', 'Shoulder Press Machine 3×8-10 RIR1', 'Lateral Raise 4×12-15 Failure', 'Cable Push Down 3×10-12 Failure', 'Overhead Rope Extension 3×10-12 Failure'] },
+      { name: 'Pull A', name_en: 'Pull A', exercises: ['Lat Pull Down 4×6-8 RIR1', 'Seated Cable Row 3×8-10 RIR1', 'Incline Dumbbell Curl 3×8-10 Failure', 'Cable Curl 3×10-12 Failure', 'Face Pull 3×15-20 Failure'] },
+      { name: 'Legs A', name_en: 'Legs A', exercises: ['Back Squat 4×5-6 RIR2', 'Leg Press 3×8-10 RIR1', 'Leg Extension 3×12-15 Failure', 'Seated Leg Curl 3×10-12 RIR1', 'Romanian Deadlift 3×8-10 RIR1', 'Standing Calf Raise 4×12-15'] },
     ],
   },
   {
@@ -50,8 +51,8 @@ export const TRAINING_PLANS = [
     athleteCount: 9040,
     isPaid: false,
     workouts: [
-      { name: 'Workout A', exercises: ['Back Squat 5×5', 'Barbell Bench Press 5×5', 'Barbell Row 5×5'] },
-      { name: 'Workout B', exercises: ['Back Squat 5×5', 'Overhead Press 5×5', 'Conventional Deadlift 1×5'] },
+      { name: 'Workout A', name_en: 'Workout A', exercises: ['Back Squat 5×5', 'Barbell Bench Press 5×5', 'Barbell Row 5×5'] },
+      { name: 'Workout B', name_en: 'Workout B', exercises: ['Back Squat 5×5', 'Overhead Press 5×5', 'Conventional Deadlift 1×5'] },
     ],
   },
   {
@@ -66,9 +67,9 @@ export const TRAINING_PLANS = [
     athleteCount: 6755,
     isPaid: false,
     workouts: [
-      { name: 'Day 1', exercises: ['Push Up 3×10-15', 'Bodyweight Squat 3×15', 'Plank 3×30-60s', 'Crunch 3×15'] },
-      { name: 'Day 2', exercises: ['Dips 3×8-12', 'Lunge 3×12', 'Inverted Row 3×10', 'Side Plank 3×30s'] },
-      { name: 'Day 3', exercises: ['Push Up 4×12', 'Glute Bridge 4×15', 'Hanging Knee Raise 3×12', 'Mountain Climber 3×30s'] },
+      { name: 'Gün 1', name_en: 'Day 1', exercises: ['Push Up 3×10-15', 'Bodyweight Squat 3×15', 'Plank 3×30-60s', 'Crunch 3×15'] },
+      { name: 'Gün 2', name_en: 'Day 2', exercises: ['Dips 3×8-12', 'Lunge 3×12', 'Inverted Row 3×10', 'Side Plank 3×30s'] },
+      { name: 'Gün 3', name_en: 'Day 3', exercises: ['Push Up 4×12', 'Glute Bridge 4×15', 'Hanging Knee Raise 3×12', 'Mountain Climber 3×30s'] },
     ],
   },
   {
@@ -83,10 +84,10 @@ export const TRAINING_PLANS = [
     athleteCount: 5210,
     isPaid: true,
     workouts: [
-      { name: 'Upper Power', exercises: ['Barbell Bench Press 4×4-6', 'Barbell Row 4×4-6', 'Overhead Press 3×6-8', 'Ez Bar Curl 3×8-10'] },
-      { name: 'Lower Power', exercises: ['Back Squat 4×4-6', 'Romanian Deadlift 4×4-6', 'Leg Press 3×8-10', 'Seated Leg Curl 3×8-10'] },
-      { name: 'Upper Hypertrophy', exercises: ['Incline Dumbbell Bench Press 4×10-12', 'Lat Pull Down 4×10-12', 'Dumbbell Shoulder Press 3×12-15', 'Cable Curl 3×12-15', 'Cable Push Down 3×12-15'] },
-      { name: 'Lower Hypertrophy', exercises: ['Leg Press 4×10-12', 'Leg Extension 3×12-15', 'Seated Leg Curl 3×12-15', 'Hip Thrust 3×12-15', 'Standing Calf Raise 4×15-20'] },
+      { name: 'Üst Güç',       name_en: 'Upper Power',       exercises: ['Barbell Bench Press 4×4-6', 'Barbell Row 4×4-6', 'Overhead Press 3×6-8', 'Ez Bar Curl 3×8-10'] },
+      { name: 'Alt Güç',       name_en: 'Lower Power',       exercises: ['Back Squat 4×4-6', 'Romanian Deadlift 4×4-6', 'Leg Press 3×8-10', 'Seated Leg Curl 3×8-10'] },
+      { name: 'Üst Hipertrofi',name_en: 'Upper Hypertrophy', exercises: ['Incline Dumbbell Bench Press 4×10-12', 'Lat Pull Down 4×10-12', 'Dumbbell Shoulder Press 3×12-15', 'Cable Curl 3×12-15', 'Cable Push Down 3×12-15'] },
+      { name: 'Alt Hipertrofi', name_en: 'Lower Hypertrophy', exercises: ['Leg Press 4×10-12', 'Leg Extension 3×12-15', 'Seated Leg Curl 3×12-15', 'Hip Thrust 3×12-15', 'Standing Calf Raise 4×15-20'] },
     ],
   },
   {
@@ -101,11 +102,11 @@ export const TRAINING_PLANS = [
     athleteCount: 8100,
     isPaid: true,
     workouts: [
-      { name: 'Chest', exercises: ['Barbell Bench Press 4×6-8', 'Incline Dumbbell Bench Press 4×8-10', 'Pec Deck Fly Machine 3×12-15', 'Cable Push Down 3×12-15'] },
-      { name: 'Back', exercises: ['Conventional Deadlift 3×5', 'Lat Pull Down 4×8-10', 'Seated Cable Row 4×8-10', 'One Arm Dumbbell Row 3×10-12'] },
-      { name: 'Shoulders', exercises: ['Seated Barbell Shoulder Press 4×8-10', 'Lateral Raise 4×12-15', 'Face Pull 3×15-20', 'Barbell Shrug 4×10-12'] },
-      { name: 'Arms', exercises: ['Barbell Curl 4×8-10', 'Hammer Curl 3×10-12', 'Skull Crusher 4×8-10', 'Cable Push Down 3×12-15', 'Barbell Wrist Curl 3×15'] },
-      { name: 'Legs', exercises: ['Back Squat 4×6-8', 'Leg Press 3×10-12', 'Leg Extension 3×12-15', 'Seated Leg Curl 3×10-12', 'Romanian Deadlift 3×8-10', 'Seated Calf Raise 4×15'] },
+      { name: 'Göğüs',  name_en: 'Chest',     exercises: ['Barbell Bench Press 4×6-8', 'Incline Dumbbell Bench Press 4×8-10', 'Pec Deck Fly Machine 3×12-15', 'Cable Push Down 3×12-15'] },
+      { name: 'Sırt',   name_en: 'Back',      exercises: ['Conventional Deadlift 3×5', 'Lat Pull Down 4×8-10', 'Seated Cable Row 4×8-10', 'One Arm Dumbbell Row 3×10-12'] },
+      { name: 'Omuz',   name_en: 'Shoulders', exercises: ['Seated Barbell Shoulder Press 4×8-10', 'Lateral Raise 4×12-15', 'Face Pull 3×15-20', 'Barbell Shrug 4×10-12'] },
+      { name: 'Kollar', name_en: 'Arms',      exercises: ['Barbell Curl 4×8-10', 'Hammer Curl 3×10-12', 'Skull Crusher 4×8-10', 'Cable Push Down 3×12-15', 'Barbell Wrist Curl 3×15'] },
+      { name: 'Bacak',  name_en: 'Legs',      exercises: ['Back Squat 4×6-8', 'Leg Press 3×10-12', 'Leg Extension 3×12-15', 'Seated Leg Curl 3×10-12', 'Romanian Deadlift 3×8-10', 'Seated Calf Raise 4×15'] },
     ],
   },
   {
@@ -120,10 +121,10 @@ export const TRAINING_PLANS = [
     athleteCount: 11200,
     isPaid: false,
     workouts: [
-      { name: 'Lower A (Hip Dominant)', exercises: ['Romanian Deadlift 4×8-10', 'Hip Thrust 4×10-12', 'Cable Donkey Kick 3×15', 'Seated Leg Curl 3×12-15'] },
-      { name: 'Upper A', exercises: ['Lat Pull Down 3×10-12', 'Dumbbell Shoulder Press 3×12-15', 'Dumbbell Row 3×10-12', 'Cable Curl 3×12-15'] },
-      { name: 'Lower B (Quad Dominant)', exercises: ['Back Squat 4×6-8', 'Leg Press 3×10-12', 'Leg Extension 3×12-15', 'Glute Bridge 3×15-20'] },
-      { name: 'Upper B', exercises: ['Incline Dumbbell Bench Press 3×10-12', 'Seated Cable Row 3×10-12', 'Lateral Raise 3×15', 'Dumbbell Tricep Extension 3×12'] },
+      { name: 'Alt A (Kalça Ağırlıklı)', name_en: 'Lower A (Hip Dominant)',  exercises: ['Romanian Deadlift 4×8-10', 'Hip Thrust 4×10-12', 'Cable Donkey Kick 3×15', 'Seated Leg Curl 3×12-15'] },
+      { name: 'Üst A',                   name_en: 'Upper A',                  exercises: ['Lat Pull Down 3×10-12', 'Dumbbell Shoulder Press 3×12-15', 'Dumbbell Row 3×10-12', 'Cable Curl 3×12-15'] },
+      { name: 'Alt B (Kuad Ağırlıklı)',  name_en: 'Lower B (Quad Dominant)',  exercises: ['Back Squat 4×6-8', 'Leg Press 3×10-12', 'Leg Extension 3×12-15', 'Glute Bridge 3×15-20'] },
+      { name: 'Üst B',                   name_en: 'Upper B',                  exercises: ['Incline Dumbbell Bench Press 3×10-12', 'Seated Cable Row 3×10-12', 'Lateral Raise 3×15', 'Dumbbell Tricep Extension 3×12'] },
     ],
   },
 ];

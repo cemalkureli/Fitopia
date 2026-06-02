@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { C } from '../utils/theme';
 

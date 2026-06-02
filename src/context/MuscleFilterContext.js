@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 
 const MuscleFilterContext = createContext({
-  muscleFilter: null,        // { cat: 'Göğüs', label: 'Chest', muscle: 'Pectoralis Major' }
+  muscleFilter: null,        // { filterType:'cat'|'muscle', value, label, labelEn }
   setMuscleFilter: () => {},
   clearMuscleFilter: () => {},
 });

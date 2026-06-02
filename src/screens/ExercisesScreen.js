@@ -59,6 +59,27 @@ const CAT_ICON = {
   'Compound':'flash-outline',
 };
 
+// Unified filter chips: filterType='cat' → .eq('category',id), 'muscle' → .eq('primary_muscle',id)
+const FILTER_CHIPS = [
+  { id: '',                 filterType: 'all',    label_tr: 'Tümü',       label_en: 'All',        icon: 'apps-outline',            color: C.muted   },
+  { id: 'Göğüs',           filterType: 'cat',    label_tr: 'Göğüs',      label_en: 'Chest',      icon: 'body-outline',            color: '#ef4444' },
+  { id: 'Omuz',            filterType: 'cat',    label_tr: 'Omuz',       label_en: 'Shoulder',   icon: 'barbell-outline',         color: '#a855f7' },
+  { id: 'Biceps Brachii',  filterType: 'muscle', label_tr: 'Biseps',     label_en: 'Biceps',     icon: 'fitness-outline',         color: '#06b6d4' },
+  { id: 'Triceps Brachii', filterType: 'muscle', label_tr: 'Triceps',    label_en: 'Triceps',    icon: 'fitness-outline',         color: '#8b5cf6' },
+  { id: 'Kol',             filterType: 'cat',    label_tr: 'Önkol',      label_en: 'Forearms',   icon: 'fitness-outline',         color: '#818cf8' },
+  { id: 'Sırt',            filterType: 'cat',    label_tr: 'Sırt',       label_en: 'Back',       icon: 'accessibility-outline',   color: '#3b82f6' },
+  { id: 'Latissimus Dorsi',filterType: 'muscle', label_tr: 'Latissimus', label_en: 'Lats',       icon: 'accessibility-outline',   color: '#f43f5e' },
+  { id: 'Trapez',          filterType: 'muscle', label_tr: 'Trapez',     label_en: 'Traps',      icon: 'accessibility-outline',   color: '#e879f9' },
+  { id: 'Erector Spinae',  filterType: 'muscle', label_tr: 'Alt Sırt',   label_en: 'Lower Back', icon: 'accessibility-outline',   color: '#a855f7' },
+  { id: 'Core',            filterType: 'cat',    label_tr: 'Core',       label_en: 'Core',       icon: 'radio-button-on-outline', color: '#84cc16' },
+  { id: 'Quadriceps',      filterType: 'muscle', label_tr: 'Kuadriceps', label_en: 'Quads',      icon: 'walk-outline',            color: '#38bdf8' },
+  { id: 'Hamstring',       filterType: 'muscle', label_tr: 'Hamstring',  label_en: 'Hamstrings', icon: 'walk-outline',            color: '#0ea5e9' },
+  { id: 'Gluteus Maximus', filterType: 'muscle', label_tr: 'Gluteus',    label_en: 'Glutes',     icon: 'walk-outline',            color: '#fb923c' },
+  { id: 'Bacak',           filterType: 'cat',    label_tr: 'Baldır',     label_en: 'Calves',     icon: 'walk-outline',            color: '#7dd3fc' },
+  { id: 'Kardio',          filterType: 'cat',    label_tr: 'Kardio',     label_en: 'Cardio',     icon: 'heart-outline',           color: '#ef4444' },
+  { id: 'Compound',        filterType: 'cat',    label_tr: 'Bileşik',    label_en: 'Compound',   icon: 'flash-outline',           color: C.muted   },
+];
+
 const DIFF_META = [
   { key: 'all',   color: C.muted,  icon: 'options-outline'     },
   { key: 'diff1', color: C.green,  icon: 'leaf-outline'        },
@@ -224,18 +245,18 @@ function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lan
         <View style={det.sheet}>
           <View style={det.dragBar} />
 
-          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-            {/* Video */}
-            <View style={[det.videoWrap, { borderColor: color + '44' }]}>
-              {item.webm_url ? (
-                <ExerciseMedia source={item.webm_url} style={{ flex: 1 }} />
-              ) : (
-                <LinearGradient colors={[color+'22', color+'08']} style={{ flex:1, alignItems:'center', justifyContent:'center' }}>
-                  <Ionicons name="barbell-outline" size={56} color={color} />
-                </LinearGradient>
-              )}
-            </View>
+          {/* Video — ScrollView dışında, sabit kalır */}
+          <View style={[det.videoWrap, { borderColor: color + '44' }]}>
+            {item.webm_url ? (
+              <ExerciseMedia source={item.webm_url} style={{ flex: 1 }} />
+            ) : (
+              <LinearGradient colors={[color+'22', color+'08']} style={{ flex:1, alignItems:'center', justifyContent:'center' }}>
+                <Ionicons name="barbell-outline" size={56} color={color} />
+              </LinearGradient>
+            )}
+          </View>
 
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
             <View style={{ padding: 20 }}>
               {/* Başlık */}
               <Text style={det.name}>{item.name}</Text>
@@ -459,6 +480,76 @@ function WorkoutsTab({ lang }) {
     showToast(lang === 'tr' ? 'Antrenman silindi.' : 'Workout deleted.', 'error');
   };
 
+  const saveWorkoutEdit = async () => {
+    if (!editWorkoutForm.title.trim() || !active) return;
+    await supabase.from('custom_workouts').update({
+      title:       editWorkoutForm.title.trim(),
+      description: editWorkoutForm.description.trim(),
+    }).eq('id', active.id);
+    setActive(a => ({ ...a, title: editWorkoutForm.title.trim(), description: editWorkoutForm.description.trim() }));
+    setEditingWorkout(false);
+    await loadWorkouts(userId);
+    showToast(lang === 'tr' ? '✓ Güncellendi' : '✓ Updated', 'success');
+  };
+
+  const openCreateTemplate = () => {
+    setDaySchedule({});
+    setSelectedEx(null);
+    setTmplForm({ title: active?.title ?? '', description: active?.description ?? '', level: 'intermediate', goals: [], days: 0 });
+    setView('createTemplate');
+  };
+
+  const addExToDay = (dayIdx) => {
+    if (!selectedEx) return;
+    setDaySchedule(prev => ({ ...prev, [dayIdx]: [...(prev[dayIdx] ?? []), selectedEx] }));
+    setSelectedEx(null);
+  };
+
+  const removeExFromDay = (dayIdx, exIdx) => {
+    setDaySchedule(prev => ({ ...prev, [dayIdx]: (prev[dayIdx] ?? []).filter((_, i) => i !== exIdx) }));
+  };
+
+  const saveTemplate = async () => {
+    if (!tmplForm.title.trim()) return;
+    // Sadece egzersiz içeren günler
+    const ORDER = [1,2,3,4,5,6,0]; // Mon→Sun
+    const DAY_TR = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+    const DAY_EN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const activeDays = ORDER.filter(d => (daySchedule[d] ?? []).length > 0);
+    const autodays   = activeDays.length;
+
+    if (autodays === 0) {
+      showToast(lang === 'tr' ? 'En az 1 güne egzersiz ekle' : 'Add exercises to at least 1 day', 'error');
+      return;
+    }
+
+    const plan = {
+      id:           `my-${Date.now()}`,
+      title:        tmplForm.title.trim(),
+      description:  tmplForm.description.trim(),
+      level:        tmplForm.level,
+      days:         autodays,
+      goals:        tmplForm.goals,
+      targetMuscles: [],
+      environment:   [],
+      athleteCount:  1,
+      isPaid:        false,
+      isMine:        true,
+      workouts: activeDays.map(d => ({
+        name:       DAY_TR[d],
+        name_en:    DAY_EN[d],
+        dayOfWeek:  d,
+        exercises:  daySchedule[d],
+      })),
+      createdAt: new Date().toISOString(),
+    };
+    await saveMyPlan(plan);
+    setView('detail');
+    setDaySchedule({});
+    setSelectedEx(null);
+    showToast(lang === 'tr' ? '✓ Template kaydedildi!' : '✓ Template saved!', 'success');
+  };
+
   const loadPicker = async () => {
     setLoadingPicker(true);
     const { data } = await supabase.from('exercises').select('id, name, category, primary_muscle').order('name');
@@ -486,6 +577,10 @@ function WorkoutsTab({ lang }) {
   // ── Exercise detail sub-view ───────────────────────────────────────────────
   const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [tmplForm, setTmplForm] = useState({ title: '', description: '', level: 'intermediate', goals: [], days: 3 });
+  const [editingWorkout,   setEditingWorkout]   = useState(false);
+  const [editWorkoutForm,  setEditWorkoutForm]  = useState({ title: '', description: '' });
+  const [selectedEx,       setSelectedEx]       = useState(null);  // template builder
+  const [daySchedule,      setDaySchedule]      = useState({});    // { 0:[], 1:[], ..., 6:[] }
   const [editEx,       setEditEx]       = useState(null);
   const [setsData,     setSetsData]     = useState([]);
   // Unified selection: null | 'rir0'|'rir1'|'rir2'|'rir3'|'rir4' | 'failure'|'superset'|'finisher'
@@ -554,6 +649,139 @@ function WorkoutsTab({ lang }) {
       setEditSaving(false);
     }
   };
+
+  // ── Create Template screen ─────────────────────────────────────────────────
+  if (view === 'createTemplate') {
+    const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon → Sun
+    const DAY_TR    = { 0:'Pazar', 1:'Pazartesi', 2:'Salı', 3:'Çarşamba', 4:'Perşembe', 5:'Cuma', 6:'Cumartesi' };
+    const DAY_EN    = { 0:'Sunday', 1:'Monday', 2:'Tuesday', 3:'Wednesday', 4:'Thursday', 5:'Friday', 6:'Saturday' };
+    const DAY_LABEL = (d) => lang === 'tr' ? DAY_TR[d] : DAY_EN[d];
+    const activeDayCount = DAY_ORDER.filter(d => (daySchedule[d] ?? []).length > 0).length;
+
+    return (
+      <View style={wt.fill}>
+        {ToastNode}
+        <SubHdr
+          title={lang === 'tr' ? 'Template Oluştur' : 'Create Template'}
+          onBack={() => { setView('detail'); setSelectedEx(null); setDaySchedule({}); }}
+        />
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+
+            {/* Plan bilgileri */}
+            <TextInput
+              style={wt.createInput}
+              value={tmplForm.title}
+              onChangeText={v => setTmplForm(f => ({ ...f, title: v }))}
+              placeholder={lang === 'tr' ? 'Plan Adı *' : 'Plan Name *'}
+              placeholderTextColor={C.dim}
+            />
+            <TextInput
+              style={[wt.createInput, { height: 64, textAlignVertical: 'top', paddingTop: 10 }]}
+              value={tmplForm.description}
+              onChangeText={v => setTmplForm(f => ({ ...f, description: v }))}
+              placeholder={lang === 'tr' ? 'Açıklama' : 'Description'}
+              placeholderTextColor={C.dim}
+              multiline
+            />
+
+            {/* Exercise pool */}
+            <Text style={[wt.tmplSectionLabel, { marginTop: 4 }]}>
+              {lang === 'tr' ? 'Egzersizler — seç, sonra güne ekle' : 'Exercises — tap to select, then tap a day'}
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+              {wkExercises.length > 0 ? wkExercises.map((ex, i) => {
+                const isSel = selectedEx === ex.exercise_name;
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[wt.exChip, isSel && wt.exChipSelected]}
+                    onPress={() => setSelectedEx(isSel ? null : ex.exercise_name)}
+                    activeOpacity={0.75}
+                  >
+                    {isSel && <Ionicons name="checkmark-circle" size={13} color="#fff" style={{ marginRight: 4 }} />}
+                    <Text style={[wt.exChipTxt, isSel && { color: '#fff', fontWeight: '800' }]} numberOfLines={1}>
+                      {ex.exercise_name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }) : (
+                <Text style={{ color: C.dim, fontSize: 13 }}>
+                  {lang === 'tr' ? 'Antrenmanınıza egzersiz ekleyin' : 'Add exercises to this workout first'}
+                </Text>
+              )}
+            </ScrollView>
+            {selectedEx && (
+              <Text style={{ color: '#dc2626', fontSize: 12, marginBottom: 4 }}>
+                ✦ {lang === 'tr' ? `"${selectedEx}" seçildi — bir güne dokun` : `"${selectedEx}" selected — tap a day below`}
+              </Text>
+            )}
+
+            {/* 7 gün kutuları */}
+            <Text style={[wt.tmplSectionLabel, { marginTop: 8 }]}>
+              {lang === 'tr' ? 'Haftalık Program' : 'Weekly Schedule'}
+            </Text>
+            {DAY_ORDER.map(dayIdx => {
+              const exsInDay = daySchedule[dayIdx] ?? [];
+              const hasEx    = exsInDay.length > 0;
+              return (
+                <View key={dayIdx} style={wt.dayBox}>
+                  <View style={wt.dayHeader}>
+                    <Text style={wt.dayLabel}>{DAY_LABEL(dayIdx)}</Text>
+                    {hasEx && (
+                      <Text style={wt.dayCount}>{exsInDay.length} ex</Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={[wt.dayDropArea, selectedEx && wt.dayDropAreaActive]}
+                    onPress={() => addExToDay(dayIdx)}
+                    activeOpacity={selectedEx ? 0.7 : 1}
+                  >
+                    {exsInDay.map((exName, i) => (
+                      <View key={i} style={wt.dayExRow}>
+                        <Ionicons name="barbell-outline" size={13} color="#dc2626" />
+                        <Text style={wt.dayExName} numberOfLines={1}>{exName}</Text>
+                        <TouchableOpacity onPress={() => removeExFromDay(dayIdx, i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name="close-circle-outline" size={16} color={C.dim} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    {selectedEx ? (
+                      <Text style={wt.dayAddHint}>+ {selectedEx}</Text>
+                    ) : (
+                      !hasEx && <Text style={wt.dayEmpty}>{lang === 'tr' ? 'Dinlenme günü' : 'Rest day'}</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+
+            {/* Haftalık gün özet */}
+            <View style={wt.daysSummary}>
+              <Ionicons name="calendar-outline" size={16} color={activeDayCount > 0 ? C.lime : C.dim} />
+              <Text style={[wt.daysSummaryTxt, { color: activeDayCount > 0 ? C.lime : C.dim }]}>
+                {lang === 'tr'
+                  ? `Haftalık ${activeDayCount} antrenman günü`
+                  : `${activeDayCount} training day${activeDayCount !== 1 ? 's' : ''} per week`}
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* Kaydet butonu */}
+          <View style={{ padding: 16, paddingBottom: 24 }}>
+            <TouchableOpacity onPress={saveTemplate} disabled={!tmplForm.title.trim() || activeDayCount === 0}>
+              <LinearGradient
+                colors={tmplForm.title.trim() && activeDayCount > 0 ? ['#dc2626','#7f1d1d'] : [C.s2, C.s2]}
+                style={wt.createBtnGrad}
+              >
+                <Text style={wt.createBtnTxt}>{lang === 'tr' ? 'Template Kaydet' : 'Save Template'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    );
+  }
 
   // ── Picker screen ──────────────────────────────────────────────────────────
   if (view === 'picker') {
@@ -799,7 +1027,7 @@ function WorkoutsTab({ lang }) {
           title={active.title}
           onBack={() => { setView('main'); setActive(null); }}
           right={[
-            <TouchableOpacity key="edit" onPress={() => {}} style={{ padding: 6 }}>
+            <TouchableOpacity key="edit" onPress={() => { setEditWorkoutForm({ title: active.title, description: active.description || '' }); setEditingWorkout(true); }} style={{ padding: 6 }}>
               <Ionicons name="pencil-outline" size={20} color={C.muted} />
             </TouchableOpacity>,
             <TouchableOpacity key="del" onPress={deleteWorkout} style={{ padding: 6 }}>
@@ -848,7 +1076,7 @@ function WorkoutsTab({ lang }) {
           {/* Create Template from this workout */}
           <TouchableOpacity
             style={wt.activeProgramBtn}
-            onPress={() => setCreatingTemplate(true)}
+            onPress={openCreateTemplate}
           >
             <Ionicons name="bookmark-outline" size={16} color={C.lime} />
             <Text style={wt.activeProgramTxt}>
@@ -857,7 +1085,39 @@ function WorkoutsTab({ lang }) {
           </TouchableOpacity>
         </ScrollView>
 
-      {/* Create Template Modal */}
+      {/* Edit Workout Modal */}
+      <Modal visible={editingWorkout} transparent animationType="slide" onRequestClose={() => setEditingWorkout(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <TouchableOpacity style={wt.modalOverlay} activeOpacity={1} onPress={() => setEditingWorkout(false)}>
+            <TouchableOpacity activeOpacity={1} style={wt.createModal} onPress={() => {}}>
+              <View style={wt.createHandle} />
+              <Text style={wt.createTitle}>{lang === 'tr' ? 'Antrenmanı Düzenle' : 'Edit Workout'}</Text>
+              <TextInput
+                style={wt.createInput}
+                value={editWorkoutForm.title}
+                onChangeText={v => setEditWorkoutForm(f => ({ ...f, title: v }))}
+                placeholder={lang === 'tr' ? 'Antrenman Adı' : 'Workout Title'}
+                placeholderTextColor={C.dim}
+              />
+              <TextInput
+                style={[wt.createInput, { height: 80, textAlignVertical: 'top', paddingTop: 12 }]}
+                value={editWorkoutForm.description}
+                onChangeText={v => setEditWorkoutForm(f => ({ ...f, description: v }))}
+                placeholder={lang === 'tr' ? 'Açıklama (isteğe bağlı)' : 'Description (optional)'}
+                placeholderTextColor={C.dim}
+                multiline
+              />
+              <TouchableOpacity style={[wt.createBtn, { marginTop: 8 }]} onPress={saveWorkoutEdit} disabled={!editWorkoutForm.title.trim()}>
+                <LinearGradient colors={['#dc2626','#7f1d1d']} style={wt.createBtnGrad}>
+                  <Text style={wt.createBtnTxt}>{lang === 'tr' ? 'Kaydet' : 'Save'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Create Template Modal (legacy — replaced by createTemplate view) */}
       <Modal visible={creatingTemplate} transparent animationType="slide" onRequestClose={() => setCreatingTemplate(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <TouchableOpacity style={wt.modalOverlay} activeOpacity={1} onPress={() => setCreatingTemplate(false)}>
@@ -1225,7 +1485,9 @@ function TemplatesTab({ lang }) {
             description: plan.description,
             // Full plan: multiple workouts; single workout: wrapped in array
             workouts:    plan.workouts.map(w => ({
-              name:      w.name,
+              name:       w.name,
+              name_en:    w.name_en,
+              dayOfWeek:  w.dayOfWeek,
               exercises: (w.exercises || []).map(ex => (typeof ex === 'string' ? { name: ex } : ex)),
             })),
           });
@@ -1311,7 +1573,7 @@ function TemplatesTab({ lang }) {
             <Text style={ft.detailSection}>{lang === 'tr' ? 'Antrenmanlar' : 'Workouts'}</Text>
             {(selected.workouts || []).map((w, i) => (
               <Animated.View key={i} entering={FadeInDown.delay(i * 50).duration(280)} style={ft.workoutItem}>
-                <Text style={ft.workoutItemTitle}>{w.name}</Text>
+                <Text style={ft.workoutItemTitle}>{lang === 'en' && w.name_en ? w.name_en : w.name}</Text>
                 {(w.exercises || []).map((ex, j) => (
                   <Text key={j} style={ft.workoutExercise}>• {typeof ex === 'string' ? ex : ex.name}</Text>
                 ))}
@@ -1374,7 +1636,7 @@ function TemplatesTab({ lang }) {
                       <Text style={ft.workoutsBadgeTxt}>{plan.days} {lang === 'tr' ? 'gün' : 'days'}</Text>
                     </View>
                   </View>
-                  {plan.description ? <Text style={ft.planDesc} numberOfLines={2}>{plan.description}</Text> : null}
+                  {plan.description ? <Text style={ft.planDesc} numberOfLines={2}>{lang === 'en' && plan.description_en ? plan.description_en : plan.description}</Text> : null}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
                     <Ionicons name="person-outline" size={12} color={C.dim} />
                     <Text style={ft.planAthletes}>{lang === 'tr' ? 'Kişisel plan' : 'Personal plan'}</Text>
@@ -1424,7 +1686,7 @@ function TemplatesTab({ lang }) {
                       <Text style={ft.workoutsBadgeTxt}>{plan.workouts.length} {lang === 'tr' ? 'antrenman' : 'workouts'}</Text>
                     </View>
                   </View>
-                  <Text style={ft.planDesc} numberOfLines={2}>{plan.description}</Text>
+                  <Text style={ft.planDesc} numberOfLines={2}>{lang === 'en' && plan.description_en ? plan.description_en : plan.description}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
                     <Ionicons name="people-outline" size={12} color={C.dim} />
                     <Text style={ft.planAthletes}>{plan.athleteCount.toLocaleString()} {lang === 'tr' ? 'sporcu' : 'athletes'}</Text>
@@ -1494,6 +1756,25 @@ const ft = StyleSheet.create({
   workoutItem:   { backgroundColor: C.s1, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
   workoutItemTitle: { color: '#dc2626', fontSize: 14, fontWeight: '800', marginBottom: 8 },
   workoutExercise:  { color: C.muted, fontSize: 12, lineHeight: 20 },
+
+  // ── Create Template builder ────────────────────────────────────────────────
+  exChip:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.s2, borderRadius: 20, borderWidth: 1, borderColor: C.border, maxWidth: 200 },
+  exChipSelected:{ backgroundColor: '#dc2626', borderColor: '#dc2626' },
+  exChipTxt:     { color: C.text, fontSize: 12, fontWeight: '600' },
+
+  dayBox:        { backgroundColor: C.s1, borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+  dayHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
+  dayLabel:      { color: C.text, fontSize: 13, fontWeight: '800' },
+  dayCount:      { color: '#dc2626', fontSize: 11, fontWeight: '700' },
+  dayDropArea:   { padding: 12, minHeight: 44 },
+  dayDropAreaActive: { backgroundColor: 'rgba(220,38,38,0.06)' },
+  dayExRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  dayExName:     { flex: 1, color: C.text, fontSize: 12, fontWeight: '600' },
+  dayAddHint:    { color: '#dc2626', fontSize: 12, fontStyle: 'italic', marginTop: 4 },
+  dayEmpty:      { color: C.dim, fontSize: 12 },
+
+  daysSummary:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, padding: 12, backgroundColor: C.s1, borderRadius: 12, borderWidth: 1, borderColor: C.border },
+  daysSummaryTxt:{ fontSize: 13, fontWeight: '700' },
 });
 
 // ─── Tab bar shared style ─────────────────────────────────────────────────────
@@ -1515,16 +1796,23 @@ function ExercisesLibrary({ lang }) {
   const [hasMore,   setHasMore]   = useState(true);
   const [search,    setSearch]    = useState('');
   const [cat,       setCat]       = useState('');
+  const [muscle,    setMuscle]    = useState(''); // primary_muscle filter
   const [diff,      setDiff]      = useState(0);
   const [selected,  setSelected]  = useState(null);
   const [favorites, setFavorites] = useState([]);
   const offsetRef   = useRef(0);
   const searchTimer = useRef(null);
 
-  // Apply muscle filter from mascot tap (one-time, then clear)
+  // Apply filter from mascot zone tap (one-time, then clear)
   useFocusEffect(useCallback(() => {
-    if (muscleFilter?.cat) {
-      setCat(muscleFilter.cat);
+    if (muscleFilter) {
+      if (muscleFilter.filterType === 'muscle') {
+        setMuscle(muscleFilter.value);
+        setCat('');
+      } else {
+        setCat(muscleFilter.value ?? muscleFilter.cat ?? '');
+        setMuscle('');
+      }
       clearMuscleFilter();
     }
   }, [muscleFilter]));
@@ -1541,7 +1829,7 @@ function ExercisesLibrary({ lang }) {
     if (!reset) { setLoadMore(true); }
 
     // Cache key includes all filter params
-    const cacheKey = `exercises_${cat}_${diff}_${search.trim()}_${offset}`;
+    const cacheKey = `exercises_${cat}_${muscle}_${diff}_${search.trim()}_${offset}`;
 
     // Try cache first on reset (instant show)
     if (reset) {
@@ -1560,6 +1848,7 @@ function ExercisesLibrary({ lang }) {
       .select('id,slug,name,name_tr,category,primary_muscle,secondary_muscles,difficulty,effectiveness,muscle_activations,instructions,instructions_en,webm_url,thumb_url')
       .range(offset, offset + PAGE - 1).order('name');
     if (cat)           q = q.eq('category', cat);
+    if (muscle)        q = q.eq('primary_muscle', muscle);
     if (diff > 0)      q = q.eq('difficulty', diff);
     if (search.trim()) q = q.ilike('name', `%${search.trim()}%`);
 
@@ -1599,34 +1888,44 @@ function ExercisesLibrary({ lang }) {
     }
     setHasMore(unique.length === PAGE);
     setLoading(false); setLoadMore(false);
-  }, [cat, diff, search]);
+  }, [cat, muscle, diff, search]);
 
   useEffect(() => {
     setLoading(true); offsetRef.current = 0;
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => fetchExercises(true), search ? 400 : 0);
     return () => clearTimeout(searchTimer.current);
-  }, [cat, diff, search]);
+  }, [cat, muscle, diff, search]);
 
   const renderItem = useCallback(({ item }) => (
     <ExerciseRow item={item} onPress={setSelected} lang={lang} isFav={favorites.includes(item.name)} onToggleFav={handleToggleFav} />
   ), [lang, favorites, handleToggleFav]);
 
-  const renderCat = useCallback(({ item: c }) => {
-    const label = c === '' ? t('all', lang) : (CATEGORY_LABELS[lang]?.[c] ?? c);
-    const color = CAT_COLOR[c] ?? C.lime;
-    const icon  = CAT_ICON[c] ?? 'apps-outline';
-    const active = cat === c;
+  const renderChip = useCallback(({ item: chip }) => {
+    const label = lang === 'tr' ? chip.label_tr : chip.label_en;
+    const isActive = chip.filterType === 'all'
+      ? (cat === '' && muscle === '')
+      : chip.filterType === 'cat'
+      ? cat === chip.id
+      : muscle === chip.id;
+    const onPress = () => {
+      if (chip.filterType === 'all') { setCat(''); setMuscle(''); }
+      else if (chip.filterType === 'cat') { setCat(isActive ? '' : chip.id); setMuscle(''); }
+      else { setMuscle(isActive ? '' : chip.id); setCat(''); }
+    };
     return (
-      <TouchableOpacity style={[s.catBtn, active && { backgroundColor: color, borderColor: color }]} onPress={() => setCat(active ? '' : c)} activeOpacity={0.75}>
-        <Ionicons name={icon} size={14} color={active ? '#0a0c0f' : color} />
-        <Text style={[s.catTxt, active && { color: '#0a0c0f', fontWeight: '800' }]}>{label}</Text>
+      <TouchableOpacity
+        style={[s.catBtn, isActive && { backgroundColor: chip.color, borderColor: chip.color }]}
+        onPress={onPress}
+        activeOpacity={0.75}
+      >
+        <Ionicons name={chip.icon} size={14} color={isActive ? '#0a0c0f' : chip.color} />
+        <Text style={[s.catTxt, isActive && { color: '#0a0c0f', fontWeight: '800' }]}>{label}</Text>
       </TouchableOpacity>
     );
-  }, [cat, lang]);
+  }, [cat, muscle, lang]);
 
   const renderFooter = useCallback(() => loadMore ? <ActivityIndicator color={C.teal} style={{ margin: 16 }} /> : null, [loadMore]);
-  const CATS = ['', ...CAT_KEYS];
 
   return (
     <View style={s.fill}>
@@ -1635,7 +1934,7 @@ function ExercisesLibrary({ lang }) {
         <TextInput style={s.searchInput} placeholder={t('searchPlaceholder', lang)} placeholderTextColor={C.dim} value={search} onChangeText={setSearch} />
         {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color={C.dim} /></TouchableOpacity>}
       </View>
-      <FlatList data={CATS} keyExtractor={c => c || '__all__'} renderItem={renderCat} horizontal showsHorizontalScrollIndicator={false} style={s.catList} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }} />
+      <FlatList data={FILTER_CHIPS} keyExtractor={chip => chip.id + chip.filterType} renderItem={renderChip} horizontal showsHorizontalScrollIndicator={false} style={s.catList} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.diffScroll} contentContainerStyle={s.diffContent}>
         {DIFF_META.map((dm, d) => {
           const active = diff === d;

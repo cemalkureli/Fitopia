@@ -1,56 +1,17 @@
 import 'react-native-url-polyfill/auto';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 
-const SUPABASE_URL      = Constants.expoConfig?.extra?.supabaseUrl      ?? '';
-const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.supabaseAnonKey  ?? '';
+const SUPABASE_URL      = process.env.EXPO_PUBLIC_SUPABASE_URL      ?? Constants.expoConfig?.extra?.supabaseUrl      ?? '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? Constants.expoConfig?.extra?.supabaseAnonKey  ?? '';
 
-// SecureStore max 2048 byte — JWT token daha uzun olabileceği için parçalara böl
-const CHUNK = 1800;
-
-const SecureStorage = {
-  async getItem(key) {
-    try {
-      const n = await SecureStore.getItemAsync(`${key}__n`);
-      if (n === null) return SecureStore.getItemAsync(key);
-      const parts = await Promise.all(
-        Array.from({ length: parseInt(n) }, (_, i) => SecureStore.getItemAsync(`${key}__${i}`))
-      );
-      return parts.every(p => p !== null) ? parts.join('') : null;
-    } catch { return null; }
-  },
-  async setItem(key, value) {
-    try {
-      if (value.length <= CHUNK) {
-        await SecureStore.setItemAsync(key, value);
-        return;
-      }
-      const chunks = [];
-      for (let i = 0; i < value.length; i += CHUNK) chunks.push(value.slice(i, i + CHUNK));
-      await SecureStore.setItemAsync(`${key}__n`, String(chunks.length));
-      await Promise.all(chunks.map((c, i) => SecureStore.setItemAsync(`${key}__${i}`, c)));
-    } catch {}
-  },
-  async removeItem(key) {
-    try {
-      const n = await SecureStore.getItemAsync(`${key}__n`);
-      if (n !== null) {
-        await Promise.all(
-          Array.from({ length: parseInt(n) }, (_, i) => SecureStore.deleteItemAsync(`${key}__${i}`))
-        );
-        await SecureStore.deleteItemAsync(`${key}__n`);
-      }
-      await SecureStore.deleteItemAsync(key);
-    } catch {}
-  },
-};
-
+// AsyncStorage: boyut sınırı yok, cross-platform güvenilir, oturum kalıcı
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage:          SecureStorage,
-    autoRefreshToken: true,
-    persistSession:   true,
+    storage:            AsyncStorage,
+    autoRefreshToken:   true,
+    persistSession:     true,   // uygulama kapansa da oturum açık kalır
     detectSessionInUrl: false,
   },
 });

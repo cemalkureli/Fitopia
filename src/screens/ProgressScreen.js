@@ -7,7 +7,7 @@ import {
 import AnimatedRN, { FadeInDown, FadeInLeft, FadeIn, ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { C } from '../utils/theme';
 import { saveWorkoutSession, getAllWorkoutLogs, getFavorites, deleteWorkoutSession, deleteAllExerciseSessions, getActiveProgram } from '../utils/storage';
 import { useLang } from '../context/LanguageContext';
@@ -346,7 +346,8 @@ const lz = StyleSheet.create({
 
 // ─── General Status tab ───────────────────────────────────────────────────────
 function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
-  const [gender,       setGender]       = useState('male');
+  const navigation                      = useNavigation();
+  const [gender,       setGender]       = useState(null); // null = not loaded yet / not set
   const [latestMeasure, setLatestMeasure] = useState({});
 
   useFocusEffect(useCallback(() => {
@@ -354,17 +355,11 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
       if (!data?.user) return;
       const uid = data.user.id;
 
-      // Gender (cached 10 min)
-      const gKey = `profile_gender_${uid}`;
-      const gc = await cacheGet(gKey);
-      if (gc && !gc.stale) {
-        if (gc.data) setGender(gc.data);
-      } else {
-        supabase.from('profiles').select('gender').eq('id', uid).single()
-          .then(async ({ data: p }) => {
-            if (p?.gender) { setGender(p.gender); await cacheSet(gKey, p.gender, TTL.PROFILE); }
-          });
-      }
+      // Gender — always fresh, no cache (single lightweight query)
+      supabase.from('profiles').select('gender').eq('id', uid).single()
+        .then(({ data: p }) => {
+          setGender(p?.gender || null);
+        });
 
       // Measurements (cached 2 min)
       const mKey = `measurements_${uid}`;
@@ -441,9 +436,33 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Mascot flip card (tap or use button to flip front/back) */}
+        {/* Mascot — shows only when gender is set */}
         <View style={g.mascotWrap}>
-          <MascotFlipCard gender={gender} width={260} height={420} />
+          {gender ? (
+            <MascotFlipCard key={gender} gender={gender} />
+          ) : (
+            <AnimatedRN.View entering={FadeIn.duration(400)} style={g.noGenderCard}>
+              <Ionicons name="person-circle-outline" size={48} color={C.dim} />
+              <Text style={g.noGenderTitle}>
+                {lang === 'tr' ? 'Cinsiyet Seçilmedi' : 'Gender Not Set'}
+              </Text>
+              <Text style={g.noGenderSub}>
+                {lang === 'tr'
+                  ? 'Modelin yüklenmesi için cinsiyetini seçmelisin.'
+                  : 'Select your gender to load your model.'}
+              </Text>
+              <TouchableOpacity
+                style={g.noGenderBtn}
+                onPress={() => navigation.navigate('Profil')}
+                activeOpacity={0.8}
+              >
+                <Text style={g.noGenderBtnTxt}>
+                  {lang === 'tr' ? 'Profile Git' : 'Go to Profile'}
+                </Text>
+                <Ionicons name="arrow-forward" size={14} color={C.bg} />
+              </TouchableOpacity>
+            </AnimatedRN.View>
+          )}
         </View>
 
         {/* Measurement values — animated laser lines */}
@@ -472,27 +491,6 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
         )}
       </AnimatedRN.View>
 
-      {/* ── Weekly activity ── */}
-      <AnimatedRN.View entering={FadeInDown.delay(200).duration(300)} style={g.card}>
-        <Text style={g.cardTitle}>{t('weekActivity', lang)}</Text>
-        <View style={g.weekRow}>
-          {week.map((d, i) => {
-            const active  = logDates.has(d.toDateString());
-            const isToday = d.toDateString() === today.toDateString();
-            return (
-              <View key={i} style={g.dayCol}>
-                <View style={[g.dayDot, active && { backgroundColor: C.lime }, isToday && !active && { borderColor: C.lime, borderWidth: 1.5 }]} />
-                <Text style={[g.dayLbl, isToday && { color: C.lime }]}>{days[d.getDay()]}</Text>
-              </View>
-            );
-          })}
-        </View>
-        <Text style={g.weekSub}>
-          {weekSessions > 0
-            ? `${lang === 'tr' ? 'Bu hafta' : 'This week'}: ${weekSessions} ${t('sessions', lang).toLowerCase()}`
-            : t('noLogsYet', lang)}
-        </Text>
-      </AnimatedRN.View>
 
       {/* ── Best sets ── */}
       {bests.length > 0 && (
@@ -520,8 +518,22 @@ const g = StyleSheet.create({
   statDiv:      { width: 1, backgroundColor: C.border },
 
   // Mascot section
-  mascotSection:{ backgroundColor: 'transparent', marginBottom: 4, paddingBottom: 0 },
-  mascotWrap:   { alignItems: 'center', paddingTop: 0, paddingBottom: 0 },
+  mascotSection:   { backgroundColor: 'transparent', marginBottom: 0, paddingBottom: 0 },
+  mascotWrap:      { alignItems: 'center', paddingTop: 0, paddingBottom: 0, width: '100%' },
+  noGenderCard:    {
+    alignItems: 'center', gap: 10, paddingVertical: 32, paddingHorizontal: 24,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 20,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 8, width: 260,
+  },
+  noGenderTitle:   { color: C.text, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  noGenderSub:     { color: C.muted, fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  noGenderBtn:     {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: C.lime, borderRadius: 12,
+    paddingHorizontal: 20, paddingVertical: 10, marginTop: 4,
+  },
+  noGenderBtnTxt:  { color: C.bg, fontSize: 13, fontWeight: '800' },
   measureList:  { paddingVertical: 4 },
   noMeasure:    { color: C.dim, fontSize: 12, textAlign: 'center', paddingVertical: 12, paddingHorizontal: 20 },
 

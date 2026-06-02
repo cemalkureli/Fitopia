@@ -1,221 +1,212 @@
-/**
- * MascotFlipCard
- * - Front/back flip with animation
- * - Interactive muscle zone hotspots (glow on hover/tap)
- * - Tap muscle → filter exercises screen by that muscle group
- */
 import React, { useRef, useState } from 'react';
-import {
-  View, Image, TouchableOpacity, Animated,
-  StyleSheet, PanResponder, Text,
-} from 'react-native';
+import { View, Image, TouchableOpacity, Pressable, StyleSheet, Text, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { C } from '../utils/theme';
 import { useMuscleFilter } from '../context/MuscleFilterContext';
 import { useLang } from '../context/LanguageContext';
-import { t } from '../utils/i18n';
+import { ZONE_TABLES } from '../data/zoneData';
 
-// ── Images (user places these files) ─────────────────────────────────────────
-let IMGS = { male_front: null, male_back: null, female_front: null, female_back: null };
-try { IMGS.male_front   = require('../../assets/mascot_male/front.png');   } catch {}
-try { IMGS.male_back    = require('../../assets/mascot_male/back.png');    } catch {}
-try { IMGS.female_front = require('../../assets/mascot_female/front.png'); } catch {}
-try { IMGS.female_back  = require('../../assets/mascot_female/back.png');  } catch {}
+// ── Model görselleri ──────────────────────────────────────────────────────────
+let IMGS = { MF: null, MB: null, FF: null, FB: null };
+try { IMGS.MF = require('../../assets/mascot_male/front.png');   } catch {}
+try { IMGS.MB = require('../../assets/mascot_male/back.png');    } catch {}
+try { IMGS.FF = require('../../assets/mascot_female/front.png'); } catch {}
+try { IMGS.FB = require('../../assets/mascot_female/back.png');  } catch {}
 
-// ── Muscle zones (% of image width/height) ────────────────────────────────────
-// Each zone: { id, label, cat (DB category), top%, left%, w%, h%, side: 'front'|'back' }
-const ZONES_FRONT = [
-  { id: 'chest',    label: 'Göğüs',   labelEn: 'Chest',     cat: 'Göğüs', top: 22, left: 25, w: 50, h: 14 },
-  { id: 'shoulder', label: 'Omuz',    labelEn: 'Shoulder',  cat: 'Omuz',  top: 18, left: 10, w: 18, h: 10 },
-  { id: 'shoulder2',label: 'Omuz',    labelEn: 'Shoulder',  cat: 'Omuz',  top: 18, left: 72, w: 18, h: 10 },
-  { id: 'bicep_l',  label: 'Kol',     labelEn: 'Arms',      cat: 'Kol',   top: 30, left:  8, w: 14, h: 18 },
-  { id: 'bicep_r',  label: 'Kol',     labelEn: 'Arms',      cat: 'Kol',   top: 30, left: 78, w: 14, h: 18 },
-  { id: 'forearm_l',label: 'Kol',     labelEn: 'Arms',      cat: 'Kol',   top: 47, left:  5, w: 12, h: 14 },
-  { id: 'forearm_r',label: 'Kol',     labelEn: 'Arms',      cat: 'Kol',   top: 47, left: 83, w: 12, h: 14 },
-  { id: 'abs',      label: 'Core',    labelEn: 'Abs',       cat: 'Core',  top: 35, left: 28, w: 44, h: 18 },
-  { id: 'quad_l',   label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 54, left: 18, w: 24, h: 20 },
-  { id: 'quad_r',   label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 54, left: 58, w: 24, h: 20 },
-  { id: 'calf_l',   label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 76, left: 20, w: 18, h: 14 },
-  { id: 'calf_r',   label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 76, left: 62, w: 18, h: 14 },
-];
+// ── Zone overlay PNG'leri (script tarafından üretildi) ────────────────────────
+const OV = {};
+try { OV.MF_chest     = require('../../assets/zones/MF_chest.png');     } catch {}
+try { OV.MF_shoulder  = require('../../assets/zones/MF_shoulder.png');  } catch {}
+try { OV.MF_bicep     = require('../../assets/zones/MF_bicep.png');     } catch {}
+try { OV.MF_abs       = require('../../assets/zones/MF_abs.png');       } catch {}
+try { OV.MF_forearm   = require('../../assets/zones/MF_forearm.png');   } catch {}
+try { OV.MF_quad      = require('../../assets/zones/MF_quad.png');      } catch {}
+try { OV.MF_calf      = require('../../assets/zones/MF_calf.png');      } catch {}
 
-const ZONES_BACK = [
-  { id: 'trap',     label: 'Sırt',    labelEn: 'Back',      cat: 'Sırt',  top: 18, left: 28, w: 44, h: 12 },
-  { id: 'lat_l',    label: 'Sırt',    labelEn: 'Back',      cat: 'Sırt',  top: 28, left: 14, w: 22, h: 22 },
-  { id: 'lat_r',    label: 'Sırt',    labelEn: 'Back',      cat: 'Sırt',  top: 28, left: 64, w: 22, h: 22 },
-  { id: 'lspine',   label: 'Sırt',    labelEn: 'Back',      cat: 'Sırt',  top: 35, left: 36, w: 28, h: 14 },
-  { id: 'tri_l',    label: 'Kol',     labelEn: 'Arms',      cat: 'Kol',   top: 30, left:  8, w: 13, h: 16 },
-  { id: 'tri_r',    label: 'Kol',     labelEn: 'Arms',      cat: 'Kol',   top: 30, left: 79, w: 13, h: 16 },
-  { id: 'glute_l',  label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 50, left: 22, w: 24, h: 14 },
-  { id: 'glute_r',  label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 50, left: 54, w: 24, h: 14 },
-  { id: 'ham_l',    label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 60, left: 20, w: 20, h: 18 },
-  { id: 'ham_r',    label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 60, left: 60, w: 20, h: 18 },
-  { id: 'calf_bl',  label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 76, left: 22, w: 16, h: 13 },
-  { id: 'calf_br',  label: 'Bacak',   labelEn: 'Legs',      cat: 'Bacak', top: 76, left: 62, w: 16, h: 13 },
-];
+try { OV.MB_trap      = require('../../assets/zones/MB_trap.png');      } catch {}
+try { OV.MB_shoulder  = require('../../assets/zones/MB_shoulder.png');  } catch {}
+try { OV.MB_tricep    = require('../../assets/zones/MB_tricep.png');    } catch {}
+try { OV.MB_lat       = require('../../assets/zones/MB_lat.png');       } catch {}
+try { OV.MB_mid_back  = require('../../assets/zones/MB_mid_back.png');  } catch {}
+try { OV.MB_low_back  = require('../../assets/zones/MB_low_back.png');  } catch {}
+try { OV.MB_glute     = require('../../assets/zones/MB_glute.png');     } catch {}
+try { OV.MB_hamstring = require('../../assets/zones/MB_hamstring.png'); } catch {}
+try { OV.MB_calf      = require('../../assets/zones/MB_calf.png');      } catch {}
 
-// Unique selectable muscles for tooltip (by cat)
-const CAT_COLORS = {
-  'Göğüs': '#ef4444', 'Omuz': '#f97316', 'Kol': '#a78bfa',
-  'Core': '#4ade80', 'Bacak': '#38bdf8', 'Sırt': '#fb7185',
+try { OV.FF_chest     = require('../../assets/zones/FF_chest.png');     } catch {}
+try { OV.FF_bicep     = require('../../assets/zones/FF_bicep.png');     } catch {}
+try { OV.FF_abs       = require('../../assets/zones/FF_abs.png');       } catch {}
+try { OV.FF_forearm   = require('../../assets/zones/FF_forearm.png');   } catch {}
+try { OV.FF_quad      = require('../../assets/zones/FF_quad.png');      } catch {}
+try { OV.FF_calf      = require('../../assets/zones/FF_calf.png');      } catch {}
+
+try { OV.FB_trap      = require('../../assets/zones/FB_trap.png');      } catch {}
+try { OV.FB_lat       = require('../../assets/zones/FB_lat.png');       } catch {}
+try { OV.FB_mid_back  = require('../../assets/zones/FB_mid_back.png');  } catch {}
+try { OV.FB_tricep    = require('../../assets/zones/FB_tricep.png');    } catch {}
+try { OV.FB_low_back  = require('../../assets/zones/FB_low_back.png');  } catch {}
+try { OV.FB_forearm   = require('../../assets/zones/FB_forearm.png');   } catch {}
+try { OV.FB_glute     = require('../../assets/zones/FB_glute.png');     } catch {}
+try { OV.FB_hamstring = require('../../assets/zones/FB_hamstring.png'); } catch {}
+try { OV.FB_calf      = require('../../assets/zones/FB_calf.png');      } catch {}
+
+// ── Zone → filtre & etiket ────────────────────────────────────────────────────
+const ZONE_INFO = {
+  chest:     { label: 'Göğüs',      labelEn: 'Chest',       filterType: 'cat',    value: 'Göğüs'            },
+  shoulder:  { label: 'Omuz',       labelEn: 'Shoulder',    filterType: 'cat',    value: 'Omuz'             },
+  bicep:     { label: 'Biseps',     labelEn: 'Biceps',      filterType: 'muscle', value: 'Biceps Brachii'   },
+  tricep:    { label: 'Triceps',    labelEn: 'Triceps',     filterType: 'muscle', value: 'Triceps Brachii'  },
+  forearm:   { label: 'Önkol',      labelEn: 'Forearm',     filterType: 'cat',    value: 'Kol'              },
+  abs:       { label: 'Karın',      labelEn: 'Abs',         filterType: 'muscle', value: 'Rectus Abdominis' },
+  quad:      { label: 'Kuadriceps', labelEn: 'Quads',       filterType: 'muscle', value: 'Quadriceps'       },
+  calf:      { label: 'Baldır',     labelEn: 'Calves',      filterType: 'cat',    value: 'Bacak'            },
+  trap:      { label: 'Trapez',     labelEn: 'Traps',       filterType: 'muscle', value: 'Trapez'           },
+  lat:       { label: 'Latissimus', labelEn: 'Lats',        filterType: 'muscle', value: 'Latissimus Dorsi' },
+  mid_back:  { label: 'Sırt',       labelEn: 'Mid Back',    filterType: 'muscle', value: 'Romboidler'       },
+  low_back:  { label: 'Alt Sırt',   labelEn: 'Lower Back',  filterType: 'muscle', value: 'Erector Spinae'   },
+  glute:     { label: 'Gluteus',    labelEn: 'Glutes',      filterType: 'muscle', value: 'Gluteus Maximus'  },
+  hamstring: { label: 'Hamstring',  labelEn: 'Hamstrings',  filterType: 'muscle', value: 'Hamstring'        },
 };
 
-// ── Animated zone overlay ─────────────────────────────────────────────────────
-function MuscleZone({ zone, imgW, imgH, onPress, isActive }) {
-  const glow = useRef(new Animated.Value(0)).current;
-  const col  = CAT_COLORS[zone.cat] ?? '#dc2626';
+const ZONE_COLOR = {
+  chest: '#ef4444', shoulder: '#f97316', bicep: '#06b6d4', tricep: '#8b5cf6',
+  forearm: '#818cf8', abs: '#4ade80', quad: '#38bdf8', calf: '#7dd3fc',
+  trap: '#e879f9', lat: '#f43f5e', mid_back: '#fb7185', low_back: '#a855f7',
+  glute: '#fb923c', hamstring: '#0ea5e9',
+};
 
-  React.useEffect(() => {
-    if (isActive) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glow, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.timing(glow, { toValue: 0.4, duration: 400, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      Animated.timing(glow, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-    }
-  }, [isActive]);
+// Overlay PNG'lerin üretildiği referans boyutlar (scripts/process_assets.js ile eşleşmeli)
+const OV_W    = 390;
+const OV_H    = 650;
+const TABLE_W = 78;   // OV_W / CELL
+const CELL    = 5;
 
-  const top  = (zone.top  / 100) * imgH;
-  const left = (zone.left / 100) * imgW;
-  const w    = (zone.w    / 100) * imgW;
-  const h    = (zone.h    / 100) * imgH;
+// ── Bileşen ───────────────────────────────────────────────────────────────────
+const SCREEN = Dimensions.get('window');
 
-  return (
-    <TouchableOpacity
-      style={[ss.zone, { top, left, width: w, height: h }]}
-      onPress={() => onPress(zone)}
-      activeOpacity={0.7}
-    >
-      <Animated.View style={[
-        ss.zoneGlow,
-        {
-          backgroundColor: col,
-          opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.45] }),
-          borderColor: col,
-          borderWidth: isActive ? 1.5 : 0,
-        }
-      ]} />
-    </TouchableOpacity>
-  );
-}
+export default function MascotFlipCard({ gender = 'female', width = SCREEN.width, height = Math.round(SCREEN.width * (OV_H / OV_W)), style }) {
+  const { lang }            = useLang();
+  const { setMuscleFilter } = useMuscleFilter();
+  const navigation          = useNavigation();
 
-// ── Main component ────────────────────────────────────────────────────────────
-export default function MascotFlipCard({ gender = 'female', width = 260, height = 420, style }) {
-  const { lang }                          = useLang();
-  const { setMuscleFilter }               = useMuscleFilter();
-  const navigation                        = useNavigation();
-  const [showFront, setShowFront]         = useState(true);
-  const [activeZone, setActiveZone]       = useState(null);
-  const [tooltip, setTooltip]             = useState(null); // { label, labelEn, cat }
-  const flipAnim                          = useRef(new Animated.Value(0)).current;
-  const isFlipping                        = useRef(false);
-  const tooltipTimer                      = useRef(null);
+  const [showFront, setShowFront] = useState(true);
+  const [activeZone, setActiveZone] = useState(null);
+  const [tooltip, setTooltip]       = useState(null);
+  const timer = useRef(null);
 
-  const zones = showFront ? ZONES_FRONT : ZONES_BACK;
+  const key = `${gender === 'male' ? 'M' : 'F'}${showFront ? 'F' : 'B'}`;
+  const src  = IMGS[key];
+  const overlay = activeZone ? OV[`${key}_${activeZone}`] : null;
 
   const flip = () => {
-    if (isFlipping.current) return;
-    isFlipping.current = true;
-    setActiveZone(null); setTooltip(null);
-    Animated.sequence([
-      Animated.timing(flipAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.timing(flipAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
-    ]).start(() => { isFlipping.current = false; });
-    setTimeout(() => setShowFront(p => !p), 180);
+    clearTimeout(timer.current);
+    setActiveZone(null);
+    setTooltip(null);
+    setShowFront(p => !p);
   };
 
-  const handleZoneTap = (zone) => {
-    // Highlight zone
-    setActiveZone(zone.id);
-    // Show tooltip
-    setTooltip({ label: zone.label, labelEn: zone.labelEn, cat: zone.cat });
-    clearTimeout(tooltipTimer.current);
-    // After 600ms, navigate to exercises with filter
-    tooltipTimer.current = setTimeout(() => {
-      setMuscleFilter({ cat: zone.cat, label: zone.label, labelEn: zone.labelEn });
-      setActiveZone(null); setTooltip(null);
+  const onTouch = (e) => {
+    const { locationX: lx, locationY: ly } = e.nativeEvent;
+    // Touch koordinatlarını overlay referans boyutuna scale et
+    const scaledX = lx / width  * OV_W;
+    const scaledY = ly / height * OV_H;
+    const tx = Math.max(0, Math.min(TABLE_W - 1, Math.floor(scaledX / CELL)));
+    const ty = Math.max(0, Math.min(129,          Math.floor(scaledY / CELL)));
+    const zoneId = ZONE_TABLES[key]?.[ty * TABLE_W + tx] ?? null;
+
+    clearTimeout(timer.current);
+
+    if (!zoneId) {
+      setActiveZone(null);
+      setTooltip(null);
+      return;
+    }
+
+    const info = ZONE_INFO[zoneId];
+    if (!info) return;
+
+    setActiveZone(zoneId);
+    setTooltip(info);
+
+    timer.current = setTimeout(() => {
+      setMuscleFilter({
+        filterType: info.filterType,
+        value:      info.value,
+        label:      info.label,
+        labelEn:    info.labelEn,
+      });
+      setActiveZone(null);
+      setTooltip(null);
       navigation.navigate('Egzersizler');
-    }, 600);
+    }, 700);
   };
 
-  const scaleX = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const frontSrc = gender === 'male' ? IMGS.male_front   : IMGS.female_front;
-  const backSrc  = gender === 'male' ? IMGS.male_back    : IMGS.female_back;
-  const src      = showFront ? frontSrc : backSrc;
-
-  // Image area dimensions for zone calculations
-  const imgW = width;
-  const imgH = height;
+  const accentColor = activeZone ? (ZONE_COLOR[activeZone] ?? '#dc2626') : '#dc2626';
 
   return (
     <View style={[ss.wrap, { width, height }, style]}>
-      {/* Flip image */}
-      <TouchableOpacity activeOpacity={0.95} onPress={() => { setActiveZone(null); setTooltip(null); }} style={{ flex: 1 }}>
-        <Animated.View style={[ss.imgWrap, { transform: [{ scaleX }] }]}>
-          {src ? (
-            <Image source={src} style={[ss.img, { width: imgW, height: imgH }]} resizeMode="contain" />
-          ) : (
-            <View style={[ss.placeholder, { width: imgW, height: imgH }]} />
-          )}
 
-          {/* Muscle zone hotspots */}
-          {zones.map(zone => (
-            <MuscleZone
-              key={zone.id}
-              zone={zone}
-              imgW={imgW}
-              imgH={imgH}
-              isActive={activeZone === zone.id}
-              onPress={handleZoneTap}
-            />
-          ))}
-        </Animated.View>
-      </TouchableOpacity>
+      {/* Model görseli */}
+      {src && (
+        <Image
+          source={src}
+          style={{ position: 'absolute', top: 0, left: 0, width, height }}
+          resizeMode="contain"
+        />
+      )}
+
+      {/* Aktif zone overlay — piksel mükemmel */}
+      {overlay && (
+        <Image
+          source={overlay}
+          style={{ position: 'absolute', top: 0, left: 0, width, height }}
+          resizeMode="stretch"
+        />
+      )}
+
+      {/* Dokunma katmanı — Pressable scroll'dan ayırt eder */}
+      <Pressable
+        style={{ position: 'absolute', top: 0, left: 0, width, height }}
+        onPress={onTouch}
+      />
 
       {/* Tooltip */}
       {tooltip && (
-        <Animated.View style={[ss.tooltip, { borderColor: CAT_COLORS[tooltip.cat] }]}>
-          <View style={[ss.tooltipDot, { backgroundColor: CAT_COLORS[tooltip.cat] }]} />
-          <Text style={[ss.tooltipTxt, { color: CAT_COLORS[tooltip.cat] }]}>
+        <View style={[ss.tooltip, { borderColor: accentColor }]} pointerEvents="none">
+          <View style={[ss.dot, { backgroundColor: accentColor }]} />
+          <Text style={[ss.ttxt, { color: accentColor }]}>
             {lang === 'tr' ? tooltip.label : tooltip.labelEn}
           </Text>
-          <Ionicons name="arrow-forward" size={12} color={CAT_COLORS[tooltip.cat]} />
-        </Animated.View>
+          <Ionicons name="arrow-forward" size={12} color={accentColor} />
+        </View>
       )}
 
-      {/* Rotate button */}
-      <View style={ss.rotateBtn}>
-        <TouchableOpacity onPress={flip} style={ss.rotateTouchable} activeOpacity={0.75}>
-          <Ionicons name="sync-outline" size={22} color={showFront ? C.teal : C.orange} />
-          <Text style={[ss.rotateLbl, { color: showFront ? C.teal : C.orange }]}>
-            {showFront ? (lang === 'tr' ? 'Arka' : 'Back') : (lang === 'tr' ? 'Ön' : 'Front')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Çevirme butonu */}
+      <TouchableOpacity style={ss.flipBtn} onPress={flip} activeOpacity={0.75}>
+        <Ionicons name="sync-outline" size={18} color={showFront ? C.teal : C.orange} />
+        <Text style={[ss.flipLbl, { color: showFront ? C.teal : C.orange }]}>
+          {showFront ? (lang === 'tr' ? 'Arka' : 'Back') : (lang === 'tr' ? 'Ön' : 'Front')}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const ss = StyleSheet.create({
-  wrap:          { flexDirection: 'row', alignItems: 'center', position: 'relative' },
-  imgWrap:       { flex: 1, position: 'relative' },
-  img:           {},
-  placeholder:   { backgroundColor: C.s2, borderRadius: 16 },
-  zone:          { position: 'absolute', borderRadius: 8, overflow: 'hidden' },
-  zoneGlow:      { ...StyleSheet.absoluteFillObject, borderRadius: 8 },
-  tooltip:       {
-    position: 'absolute', bottom: 12, alignSelf: 'center',
+  wrap:    { overflow: 'hidden', position: 'relative' },
+  tooltip: {
+    position: 'absolute', bottom: 14, alignSelf: 'center',
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(2,6,23,0.92)', borderRadius: 20,
     borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7,
   },
-  tooltipDot:    { width: 8, height: 8, borderRadius: 4 },
-  tooltipTxt:    { fontSize: 13, fontWeight: '700' },
-  rotateBtn:     { width: 44, alignItems: 'center', justifyContent: 'center' },
-  rotateTouchable:{ alignItems: 'center', gap: 4, padding: 8 },
-  rotateLbl:     { fontSize: 9, fontWeight: '700' },
+  dot:     { width: 8, height: 8, borderRadius: 4 },
+  ttxt:    { fontSize: 13, fontWeight: '700', color: '#fff' },
+  flipBtn: {
+    position: 'absolute', top: 8, right: 8,
+    alignItems: 'center', gap: 3, padding: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8,
+  },
+  flipLbl: { fontSize: 9, fontWeight: '700' },
 });
