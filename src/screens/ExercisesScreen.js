@@ -477,7 +477,7 @@ function WorkoutsTab({ lang }) {
     setConfirmDeleteWorkout(false);
     setView('main'); setActive(null);
     await loadWorkouts(userId);
-    showToast(lang === 'tr' ? 'Antrenman silindi.' : 'Workout deleted.', 'error');
+    showToast(t('workoutDeleted', lang), 'error');
   };
 
   const saveWorkoutEdit = async () => {
@@ -489,7 +489,7 @@ function WorkoutsTab({ lang }) {
     setActive(a => ({ ...a, title: editWorkoutForm.title.trim(), description: editWorkoutForm.description.trim() }));
     setEditingWorkout(false);
     await loadWorkouts(userId);
-    showToast(lang === 'tr' ? '✓ Güncellendi' : '✓ Updated', 'success');
+    showToast(t('updated', lang), 'success');
   };
 
   const openCreateTemplate = () => {
@@ -519,7 +519,7 @@ function WorkoutsTab({ lang }) {
     const autodays   = activeDays.length;
 
     if (autodays === 0) {
-      showToast(lang === 'tr' ? 'En az 1 güne egzersiz ekle' : 'Add exercises to at least 1 day', 'error');
+      showToast(t('addExToAtLeast1Day', lang), 'error');
       return;
     }
 
@@ -547,7 +547,7 @@ function WorkoutsTab({ lang }) {
     setView('detail');
     setDaySchedule({});
     setSelectedEx(null);
-    showToast(lang === 'tr' ? '✓ Template kaydedildi!' : '✓ Template saved!', 'success');
+    showToast(t('templateSaved', lang), 'success');
   };
 
   const loadPicker = async () => {
@@ -662,7 +662,7 @@ function WorkoutsTab({ lang }) {
       <View style={wt.fill}>
         {ToastNode}
         <SubHdr
-          title={lang === 'tr' ? 'Template Oluştur' : 'Create Template'}
+          title={t('createTemplate', lang)}
           onBack={() => { setView('detail'); setSelectedEx(null); setDaySchedule({}); }}
         />
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -673,21 +673,21 @@ function WorkoutsTab({ lang }) {
               style={wt.createInput}
               value={tmplForm.title}
               onChangeText={v => setTmplForm(f => ({ ...f, title: v }))}
-              placeholder={lang === 'tr' ? 'Plan Adı *' : 'Plan Name *'}
+              placeholder={t('planNameRequired', lang)}
               placeholderTextColor={C.dim}
             />
             <TextInput
               style={[wt.createInput, { height: 64, textAlignVertical: 'top', paddingTop: 10 }]}
               value={tmplForm.description}
               onChangeText={v => setTmplForm(f => ({ ...f, description: v }))}
-              placeholder={lang === 'tr' ? 'Açıklama' : 'Description'}
+              placeholder={t('description', lang)}
               placeholderTextColor={C.dim}
               multiline
             />
 
             {/* Exercise pool */}
             <Text style={[wt.tmplSectionLabel, { marginTop: 4 }]}>
-              {lang === 'tr' ? 'Egzersizler — seç, sonra güne ekle' : 'Exercises — tap to select, then tap a day'}
+              {t('exercisesSelectHint', lang)}
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
               {wkExercises.length > 0 ? wkExercises.map((ex, i) => {
@@ -707,7 +707,7 @@ function WorkoutsTab({ lang }) {
                 );
               }) : (
                 <Text style={{ color: C.dim, fontSize: 13 }}>
-                  {lang === 'tr' ? 'Antrenmanınıza egzersiz ekleyin' : 'Add exercises to this workout first'}
+                  {t('addExercisesFirst', lang)}
                 </Text>
               )}
             </ScrollView>
@@ -719,7 +719,7 @@ function WorkoutsTab({ lang }) {
 
             {/* 7 gün kutuları */}
             <Text style={[wt.tmplSectionLabel, { marginTop: 8 }]}>
-              {lang === 'tr' ? 'Haftalık Program' : 'Weekly Schedule'}
+              {t('weeklySchedule', lang)}
             </Text>
             {DAY_ORDER.map(dayIdx => {
               const exsInDay = daySchedule[dayIdx] ?? [];
@@ -749,7 +749,7 @@ function WorkoutsTab({ lang }) {
                     {selectedEx ? (
                       <Text style={wt.dayAddHint}>+ {selectedEx}</Text>
                     ) : (
-                      !hasEx && <Text style={wt.dayEmpty}>{lang === 'tr' ? 'Dinlenme günü' : 'Rest day'}</Text>
+                      !hasEx && <Text style={wt.dayEmpty}>{t('restDay', lang)}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -774,7 +774,7 @@ function WorkoutsTab({ lang }) {
                 colors={tmplForm.title.trim() && activeDayCount > 0 ? ['#dc2626','#7f1d1d'] : [C.s2, C.s2]}
                 style={wt.createBtnGrad}
               >
-                <Text style={wt.createBtnTxt}>{lang === 'tr' ? 'Template Kaydet' : 'Save Template'}</Text>
+                <Text style={wt.createBtnTxt}>{t('saveTemplate', lang)}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -800,7 +800,7 @@ function WorkoutsTab({ lang }) {
     return (
       <View style={[wt.fill, { backgroundColor: C.bg }]}>
         <SubHdr
-          title={lang === 'tr' ? 'Egzersiz Ekle' : 'Add Exercises'}
+          title={t('addExercises', lang)}
           onBack={() => { setView('detail'); setPickerSel(new Set()); }}
         />
         {/* Search */}
@@ -844,8 +844,8 @@ function WorkoutsTab({ lang }) {
             <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ed.pickerAddGrad}>
               <Text style={ed.pickerAddTxt}>
                 {pickerSel.size > 0
-                  ? `${lang === 'tr' ? 'Egzersiz Ekle' : 'Add Exercises'} (${pickerSel.size})`
-                  : (lang === 'tr' ? 'Egzersiz Seç' : 'Select Exercises')
+                  ? `${t('addExercises', lang)} (${pickerSel.size})`
+                  : t('selectExercises', lang)
                 }
               </Text>
             </LinearGradient>
@@ -866,7 +866,7 @@ function WorkoutsTab({ lang }) {
           onBack={() => { setEditEx(null); setView('detail'); }}
           right={[
             <TouchableOpacity key="save" onPress={saveEdit} disabled={editSaving} style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#dc2626', borderRadius: 10 }}>
-              {editSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{lang === 'tr' ? 'Kaydet' : 'Save'}</Text>}
+              {editSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{t('save', lang)}</Text>}
             </TouchableOpacity>,
           ]}
         />
@@ -878,7 +878,7 @@ function WorkoutsTab({ lang }) {
             <View style={ed.summaryRow}>
               <View style={ed.summaryItem}>
                 <Text style={ed.summaryVal}>{setsData.length}</Text>
-                <Text style={ed.summaryLbl}>{lang === 'tr' ? 'Set' : 'Sets'}</Text>
+                <Text style={ed.summaryLbl}>{t('sets', lang)}</Text>
               </View>
               <View style={ed.summaryDiv} />
               <View style={ed.summaryItem}>
@@ -888,7 +888,7 @@ function WorkoutsTab({ lang }) {
               <View style={ed.summaryDiv} />
               <View style={ed.summaryItem}>
                 <Text style={ed.summaryVal}>{totalVol > 0 ? `${totalVol}` : '—'}</Text>
-                <Text style={ed.summaryLbl}>{lang === 'tr' ? 'Hacim' : 'Volume'}</Text>
+                <Text style={ed.summaryLbl}>{t('volume', lang)}</Text>
               </View>
               <View style={ed.summaryDiv} />
               <View style={ed.summaryItem}>
@@ -898,16 +898,16 @@ function WorkoutsTab({ lang }) {
                     : '—'
                   }
                 </Text>
-                <Text style={ed.summaryLbl}>{lang === 'tr' ? 'Mod' : 'Mode'}</Text>
+                <Text style={ed.summaryLbl}>{t('mode', lang)}</Text>
               </View>
             </View>
 
 
             {/* Column headers */}
             <View style={ed.tableHeader}>
-              <Text style={[ed.thTxt, { width: 36 }]}>{lang === 'tr' ? 'Set' : 'Set'}</Text>
-              <Text style={[ed.thTxt, { flex: 1 }]}>{lang === 'tr' ? 'Ağırlık (kg)' : 'Weight (kg)'}</Text>
-              <Text style={[ed.thTxt, { flex: 1 }]}>{lang === 'tr' ? 'Tekrar' : 'Reps'}</Text>
+              <Text style={[ed.thTxt, { width: 36 }]}>Set</Text>
+              <Text style={[ed.thTxt, { flex: 1 }]}>{t('weightKg', lang)}</Text>
+              <Text style={[ed.thTxt, { flex: 1 }]}>{t('reps', lang)}</Text>
               <View style={{ width: 32 }} />
             </View>
 
@@ -942,12 +942,12 @@ function WorkoutsTab({ lang }) {
             {/* Add set */}
             <TouchableOpacity style={ed.addSetRow} onPress={addSet}>
               <Ionicons name="add-circle" size={20} color="#dc2626" />
-              <Text style={ed.addSetTxt}>{lang === 'tr' ? 'Set Ekle' : 'Add Set'}</Text>
+              <Text style={ed.addSetTxt}>{t('addSet', lang)}</Text>
             </TouchableOpacity>
 
             {/* Unified mode selector — mutually exclusive */}
             <View style={{ marginTop: 16 }}>
-              <Text style={ed.modeSectionLabel}>{lang === 'tr' ? 'Yoğunluk / RIR' : 'Intensity / RIR'}</Text>
+              <Text style={ed.modeSectionLabel}>{t('intensityRIR', lang)}</Text>
 
               {/* RIR row */}
               <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 8, alignItems: 'center' }}>
@@ -992,7 +992,7 @@ function WorkoutsTab({ lang }) {
 
             {/* Terim açıklamaları */}
             <View style={ed.termSection}>
-              <Text style={ed.termSectionTitle}>{lang === 'tr' ? 'Terimler' : 'Terminology'}</Text>
+              <Text style={ed.termSectionTitle}>{t('terminology', lang)}</Text>
               {Object.entries(TERIMLER[lang] ?? TERIMLER.tr).map(([term, desc]) => (
                 <View key={term} style={ed.termItem}>
                   <View style={ed.termHeader}>
@@ -1015,9 +1015,9 @@ function WorkoutsTab({ lang }) {
       <View style={[wt.fill, { backgroundColor: C.bg, position: 'relative' }]}>
         <ConfirmModal
           visible={confirmDeleteWorkout}
-          title={lang === 'tr' ? 'Antrenmanı Sil' : 'Delete Workout'}
+          title={t('deleteWorkout', lang)}
           message={lang === 'tr' ? `"${active.title}" ve tüm egzersizleri silinecek.` : `"${active.title}" and all its exercises will be deleted.`}
-          confirmLabel={lang === 'tr' ? 'Sil' : 'Delete'}
+          confirmLabel={t('delete', lang)}
           confirmColor="#dc2626"
           lang={lang}
           onCancel={() => setConfirmDeleteWorkout(false)}
@@ -1040,7 +1040,7 @@ function WorkoutsTab({ lang }) {
 
           {wkExercises.length > 0 && (
             <>
-              <Text style={wt.detailSectionTitle}>{lang === 'tr' ? 'Egzersizler' : 'Exercises'}</Text>
+              <Text style={wt.detailSectionTitle}>{t('exercisesLabel', lang)}</Text>
               {wkExercises.map((ex, i) => (
                 <Animated.View key={ex.id} entering={FadeInLeft.delay(i * 40).duration(260)}>
                   <TouchableOpacity style={wt.exCard} onPress={() => openEdit(ex)} activeOpacity={0.75}>
@@ -1050,8 +1050,8 @@ function WorkoutsTab({ lang }) {
                     <View style={{ flex: 1 }}>
                       <Text style={wt.exCardName}>{ex.exercise_name}</Text>
                       <View style={wt.exCardMeta}>
-                        <View style={wt.exMetaItem}><Ionicons name="copy-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.sets} {lang === 'tr' ? 'set' : 'sets'}</Text></View>
-                        <View style={wt.exMetaItem}><Ionicons name="repeat-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.reps} {lang === 'tr' ? 'tekrar' : 'reps'}</Text></View>
+                        <View style={wt.exMetaItem}><Ionicons name="copy-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.sets} {t('sets', lang)}</Text></View>
+                        <View style={wt.exMetaItem}><Ionicons name="repeat-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.reps} {t('repsShort', lang)}</Text></View>
                         <View style={wt.exMetaItem}><Ionicons name="speedometer-outline" size={11} color={C.dim} /><Text style={wt.exMetaTxt}>{ex.rir} RIR</Text></View>
                       </View>
                     </View>
@@ -1069,7 +1069,7 @@ function WorkoutsTab({ lang }) {
 
           <TouchableOpacity style={wt.addExBtn} onPress={openPicker}>
             <LinearGradient colors={['#dc2626', '#7f1d1d']} style={wt.addExGrad}>
-              <Text style={wt.addExTxt}>{lang === 'tr' ? 'Egzersiz Ekle' : 'Add Exercises'}</Text>
+              <Text style={wt.addExTxt}>{t('addExercises', lang)}</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -1080,7 +1080,7 @@ function WorkoutsTab({ lang }) {
           >
             <Ionicons name="bookmark-outline" size={16} color={C.lime} />
             <Text style={wt.activeProgramTxt}>
-              {lang === 'tr' ? 'Template Oluştur' : 'Create Template'}
+              {t('createTemplate', lang)}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -1091,25 +1091,25 @@ function WorkoutsTab({ lang }) {
           <TouchableOpacity style={wt.modalOverlay} activeOpacity={1} onPress={() => setEditingWorkout(false)}>
             <TouchableOpacity activeOpacity={1} style={wt.createModal} onPress={() => {}}>
               <View style={wt.createHandle} />
-              <Text style={wt.createTitle}>{lang === 'tr' ? 'Antrenmanı Düzenle' : 'Edit Workout'}</Text>
+              <Text style={wt.createTitle}>{t('editWorkout', lang)}</Text>
               <TextInput
                 style={wt.createInput}
                 value={editWorkoutForm.title}
                 onChangeText={v => setEditWorkoutForm(f => ({ ...f, title: v }))}
-                placeholder={lang === 'tr' ? 'Antrenman Adı' : 'Workout Title'}
+                placeholder={t('workoutTitle', lang)}
                 placeholderTextColor={C.dim}
               />
               <TextInput
                 style={[wt.createInput, { height: 80, textAlignVertical: 'top', paddingTop: 12 }]}
                 value={editWorkoutForm.description}
                 onChangeText={v => setEditWorkoutForm(f => ({ ...f, description: v }))}
-                placeholder={lang === 'tr' ? 'Açıklama (isteğe bağlı)' : 'Description (optional)'}
+                placeholder={t('descriptionOptional', lang)}
                 placeholderTextColor={C.dim}
                 multiline
               />
               <TouchableOpacity style={[wt.createBtn, { marginTop: 8 }]} onPress={saveWorkoutEdit} disabled={!editWorkoutForm.title.trim()}>
                 <LinearGradient colors={['#dc2626','#7f1d1d']} style={wt.createBtnGrad}>
-                  <Text style={wt.createBtnTxt}>{lang === 'tr' ? 'Kaydet' : 'Save'}</Text>
+                  <Text style={wt.createBtnTxt}>{t('save', lang)}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </TouchableOpacity>
@@ -1123,16 +1123,16 @@ function WorkoutsTab({ lang }) {
           <TouchableOpacity style={wt.modalOverlay} activeOpacity={1} onPress={() => setCreatingTemplate(false)}>
             <TouchableOpacity activeOpacity={1} style={[wt.createModal, { maxHeight: '90%' }]} onPress={() => {}}>
               <View style={wt.createHandle} />
-              <Text style={wt.createTitle}>{lang === 'tr' ? 'Template Oluştur' : 'Create Template'}</Text>
+              <Text style={wt.createTitle}>{t('createTemplate', lang)}</Text>
               <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Title */}
                 <TextInput style={wt.createInput} value={tmplForm.title} onChangeText={v => setTmplForm(f => ({...f, title: v}))}
-                  placeholder={lang === 'tr' ? 'Plan Adı' : 'Plan Name'} placeholderTextColor={C.dim} />
+                  placeholder={t('planName', lang)} placeholderTextColor={C.dim} />
                 <TextInput style={wt.createInput} value={tmplForm.description} onChangeText={v => setTmplForm(f => ({...f, description: v}))}
-                  placeholder={lang === 'tr' ? 'Açıklama' : 'Description'} placeholderTextColor={C.dim} />
+                  placeholder={t('description', lang)} placeholderTextColor={C.dim} />
 
                 {/* Days per week */}
-                <Text style={wt.tmplSectionLabel}>{lang === 'tr' ? 'Haftalık Gün' : 'Days per Week'}</Text>
+                <Text style={wt.tmplSectionLabel}>{t('daysPerWeek', lang)}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                   {[1,2,3,4,5,6].map(d => (
                     <TouchableOpacity key={d} style={[wt.tmplChip, tmplForm.days === d && wt.tmplChipActive]} onPress={() => setTmplForm(f => ({...f, days: d}))}>
@@ -1142,7 +1142,7 @@ function WorkoutsTab({ lang }) {
                 </View>
 
                 {/* Level */}
-                <Text style={wt.tmplSectionLabel}>{lang === 'tr' ? 'Seviye' : 'Level'}</Text>
+                <Text style={wt.tmplSectionLabel}>{t('level', lang)}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {['beginner','intermediate','advanced'].map(lv => {
                     const label = lang === 'tr' ? {beginner:'Başlangıç',intermediate:'Orta',advanced:'İleri'}[lv] : {beginner:'Beginner',intermediate:'Intermediate',advanced:'Advanced'}[lv];
@@ -1155,7 +1155,7 @@ function WorkoutsTab({ lang }) {
                 </View>
 
                 {/* Goals (multi-select) */}
-                <Text style={wt.tmplSectionLabel}>{lang === 'tr' ? 'Hedefler' : 'Goals'}</Text>
+                <Text style={wt.tmplSectionLabel}>{t('goals', lang)}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {[{k:'strength',tr:'Güç',en:'Strength'},{k:'bodybuilding',tr:'Kas',en:'Bodybuilding'},{k:'fat_loss',tr:'Yağ Yak',en:'Fat Loss'},{k:'powerlifting',tr:'Powerlifting',en:'Powerlifting'},{k:'athleticism',tr:'Atletizm',en:'Athleticism'}].map(g => {
                     const active = tmplForm.goals.includes(g.k);
@@ -1190,12 +1190,12 @@ function WorkoutsTab({ lang }) {
                   await saveMyPlan(plan);
                   setCreatingTemplate(false);
                   setTmplForm({ title: '', description: '', level: 'intermediate', goals: [], days: 3 });
-                  showToast(lang === 'tr' ? '✓ Template başarıyla eklendi!' : '✓ Template saved successfully!', 'success');
+                  showToast(t('templateSaved', lang), 'success');
                 }}
                 disabled={!tmplForm.title.trim()}
               >
                 <LinearGradient colors={['#dc2626','#7f1d1d']} style={wt.createBtnGrad}>
-                  <Text style={wt.createBtnTxt}>{lang === 'tr' ? 'Kaydet' : 'Save'}</Text>
+                  <Text style={wt.createBtnTxt}>{t('save', lang)}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </TouchableOpacity>
@@ -1213,7 +1213,7 @@ function WorkoutsTab({ lang }) {
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         {/* All Workouts accordion */}
         <TouchableOpacity style={wt.accordion} onPress={() => setAllOpen(v => !v)}>
-          <Text style={wt.accordionTitle}>{lang === 'tr' ? 'Tüm Antrenmanlar' : 'All Workouts'}</Text>
+          <Text style={wt.accordionTitle}>{t('allWorkouts', lang)}</Text>
           <Ionicons name={allOpen ? 'chevron-up' : 'chevron-down'} size={18} color='#dc2626' />
         </TouchableOpacity>
 
@@ -1221,7 +1221,7 @@ function WorkoutsTab({ lang }) {
           <>
             <TouchableOpacity style={wt.addWorkout} onPress={() => setCreating(true)}>
               <Ionicons name="add" size={20} color='#dc2626' />
-              <Text style={wt.addWorkoutTxt}>{lang === 'tr' ? 'Antrenman Ekle' : 'Add Workout'}</Text>
+              <Text style={wt.addWorkoutTxt}>{t('addWorkout', lang)}</Text>
             </TouchableOpacity>
             <View style={wt.separator} />
 
@@ -1253,12 +1253,12 @@ function WorkoutsTab({ lang }) {
           <TouchableOpacity style={wt.modalOverlay} activeOpacity={1} onPress={() => setCreating(false)}>
             <TouchableOpacity activeOpacity={1} style={wt.createModal} onPress={() => {}}>
               <View style={wt.createHandle} />
-              <Text style={wt.createTitle}>{lang === 'tr' ? 'Yeni Antrenman' : 'New Workout'}</Text>
-              <TextInput style={wt.createInput} value={form.title} onChangeText={v => setForm(f => ({ ...f, title: v }))} placeholder={lang === 'tr' ? 'Başlık' : 'Title'} placeholderTextColor={C.dim} />
-              <TextInput style={wt.createInput} value={form.description} onChangeText={v => setForm(f => ({ ...f, description: v }))} placeholder={lang === 'tr' ? 'Açıklama' : 'Description'} placeholderTextColor={C.dim} />
+              <Text style={wt.createTitle}>{t('newWorkout', lang)}</Text>
+              <TextInput style={wt.createInput} value={form.title} onChangeText={v => setForm(f => ({ ...f, title: v }))} placeholder={t('title', lang)} placeholderTextColor={C.dim} />
+              <TextInput style={wt.createInput} value={form.description} onChangeText={v => setForm(f => ({ ...f, description: v }))} placeholder={t('description', lang)} placeholderTextColor={C.dim} />
               <TouchableOpacity style={wt.createBtn} onPress={createWorkout} disabled={saving || !form.title.trim()}>
                 <LinearGradient colors={['#dc2626', '#7f1d1d']} style={wt.createBtnGrad}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={wt.createBtnTxt}>{lang === 'tr' ? 'Oluştur' : 'Create'}</Text>}
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={wt.createBtnTxt}>{t('create', lang)}</Text>}
                 </LinearGradient>
               </TouchableOpacity>
             </TouchableOpacity>
@@ -1406,6 +1406,21 @@ function TemplatesTab({ lang }) {
   const levelLabel = (lv) => lang === 'tr' ? LEVEL_LABELS_TR[lv] : LEVEL_LABELS_EN[lv];
   const goalLabel  = (g)  => lang === 'tr' ? GOAL_LABELS_TR[g] : GOAL_LABELS_EN[g];
 
+  // Workout'un dayOfWeek'ini güncelle; my plan ise AsyncStorage'a kaydet
+  const updateWorkoutDay = async (workoutIndex, newDay) => {
+    const updated = {
+      ...selected,
+      workouts: selected.workouts.map((w, i) =>
+        i === workoutIndex ? { ...w, dayOfWeek: newDay === w.dayOfWeek ? undefined : newDay } : w
+      ),
+    };
+    setSelected(updated);
+    if (updated.isMine) {
+      const plans = await getMyPlans();
+      await saveMyPlan({ ...plans.find(p => p.id === updated.id), ...updated });
+    }
+  };
+
   const filtered = TRAINING_PLANS.filter(p => {
     if (showPaid === 'free' && p.isPaid) return false;
     if (showPaid === 'paid' && !p.isPaid) return false;
@@ -1430,13 +1445,13 @@ function TemplatesTab({ lang }) {
       {/* Confirm: Replace existing active program */}
       <ConfirmModal
         visible={!!confirmReplace}
-        title={lang === 'tr' ? 'Aktif Program Mevcut' : 'Active Program Exists'}
+        title={t('activeProgramExists', lang)}
         message={confirmReplace
           ? (lang === 'tr'
               ? `"${confirmReplace.existing.title}" zaten aktif program olarak ayarlı.\n\nYeni programla değiştirmek istiyor musunuz?`
               : `"${confirmReplace.existing.title}" is already your active program.\n\nDo you want to replace it?`)
           : ''}
-        confirmLabel={lang === 'tr' ? 'Değiştir' : 'Replace'}
+        confirmLabel={t('replace', lang)}
         confirmColor={C.orange}
         lang={lang}
         onCancel={() => setConfirmReplace(null)}
@@ -1450,9 +1465,9 @@ function TemplatesTab({ lang }) {
       {/* Confirm: Delete plan */}
       <ConfirmModal
         visible={!!confirmDel}
-        title={lang === 'tr' ? 'Planı Sil' : 'Delete Plan'}
+        title={t('deletePlan', lang)}
         message={confirmDel ? (lang === 'tr' ? `"${confirmDel.title}" silinecek. Aktif programdaysa kaldırılır.` : `"${confirmDel.title}" will be deleted. Removed from active program if set.`) : ''}
-        confirmLabel={lang === 'tr' ? 'Sil' : 'Delete'}
+        confirmLabel={t('delete', lang)}
         confirmColor="#dc2626"
         lang={lang}
         onCancel={() => setConfirmDel(null)}
@@ -1464,25 +1479,26 @@ function TemplatesTab({ lang }) {
           await deleteMyPlan(confirmDel.id);
           getMyPlans().then(setMyPlans);
           setConfirmDel(null);
-          showToast(lang === 'tr' ? 'Plan silindi.' : 'Plan deleted.', 'error');
+          showToast(t('planDeleted', lang), 'error');
         }}
       />
 
       {/* Confirm: Set active program */}
       <ConfirmModal
         visible={!!confirmAct}
-        title={lang === 'tr' ? 'Aktif Program Yap' : 'Set Active Program'}
+        title={t('setActiveProgramTitle', lang)}
         message={confirmAct ? (lang === 'tr' ? `"${confirmAct.plan?.title}" tüm günleriyle birlikte aktif program olacak.` : `"${confirmAct.plan?.title}" with all days will be set as your active program.`) : ''}
-        confirmLabel={lang === 'tr' ? 'Ayarla' : 'Set'}
+        confirmLabel={t('set', lang)}
         confirmColor={C.lime}
         lang={lang}
         onCancel={() => setConfirmAct(null)}
         onConfirm={async () => {
           const { plan, isFullPlan } = confirmAct;
           await setActiveProgram({
-            id:          plan.id,
-            title:       plan.title,
-            description: plan.description,
+            id:              plan.id,
+            title:           plan.title,
+            description:     plan.description,
+            description_en:  plan.description_en,
             // Full plan: multiple workouts; single workout: wrapped in array
             workouts:    plan.workouts.map(w => ({
               name:       w.name,
@@ -1503,13 +1519,13 @@ function TemplatesTab({ lang }) {
       {view === 'filter' && (
         <View style={[wt.fill, { backgroundColor: C.bg }]}>
           <View style={ft.header}>
-            <Text style={ft.title}>{lang === 'tr' ? 'Filtreler' : 'Filters'}</Text>
+            <Text style={ft.title}>{t('filters', lang)}</Text>
             <TouchableOpacity onPress={() => setView('main')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons name="close" size={24} color={C.text} />
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
-            <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Gün Sayısı' : 'Number of days'}</Text>
+            <Text style={ft.sectionLabel}>{t('numberOfDays', lang)}</Text>
             <View style={ft.chipRow}>
               {[1,2,3,4,5,6].map(d => (
                 <TouchableOpacity key={d} style={[ft.filterChip, filterDays.includes(d) && ft.filterChipActive]} onPress={() => toggleArr(filterDays, setFilterDays, d)}>
@@ -1517,7 +1533,7 @@ function TemplatesTab({ lang }) {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Seviye' : 'Level'}</Text>
+            <Text style={ft.sectionLabel}>{t('level', lang)}</Text>
             <View style={[ft.chipRow, { gap: 10 }]}>
               {['beginner','intermediate','advanced'].map(lv => (
                 <TouchableOpacity key={lv} style={[ft.filterChip, { flex: 1 }, filterLvl.includes(lv) && ft.filterChipActive]} onPress={() => toggleArr(filterLvl, setFilterLvl, lv)}>
@@ -1526,7 +1542,7 @@ function TemplatesTab({ lang }) {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={ft.sectionLabel}>{lang === 'tr' ? 'Hedef' : 'Goal'}</Text>
+            <Text style={ft.sectionLabel}>{t('goal', lang)}</Text>
             <View style={ft.iconGrid}>
               {[{g:'powerlifting',icon:'barbell-outline'},{g:'bodybuilding',icon:'body-outline'},{g:'fat_loss',icon:'scale-outline'},{g:'athleticism',icon:'walk-outline'},{g:'strength',icon:'flash-outline'}].map(({g,icon}) => (
                 <TouchableOpacity key={g} style={[ft.filterIconChip, filterGoal.includes(g) && ft.filterChipActive]} onPress={() => toggleArr(filterGoal, setFilterGoal, g)}>
@@ -1539,7 +1555,7 @@ function TemplatesTab({ lang }) {
           <View style={{ padding: 16 }}>
             <TouchableOpacity style={ft.filterBtn} onPress={() => setView('main')}>
               <LinearGradient colors={['#dc2626','#7f1d1d']} style={ft.filterBtnGrad}>
-                <Text style={ft.filterBtnTxt}>{lang === 'tr' ? 'Filtrele' : 'Filter'}</Text>
+                <Text style={ft.filterBtnTxt}>{t('filter', lang)}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -1551,34 +1567,71 @@ function TemplatesTab({ lang }) {
         <View style={[wt.fill, { backgroundColor: C.bg }]}>
           <SubHdr title={selected.title} onBack={() => { setView('main'); setSelected(null); }} />
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-            <Text style={ft.detailDesc}>{selected.description}</Text>
+            <Text style={ft.detailDesc}>{lang === 'en' && selected.description_en ? selected.description_en : selected.description}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
               <Ionicons name="people-outline" size={14} color={C.dim} />
-              <Text style={{ color: C.muted, fontSize: 12 }}>{(selected.athleteCount || 1).toLocaleString()} {lang === 'tr' ? 'sporcu' : 'athletes'}</Text>
+              <Text style={{ color: C.muted, fontSize: 12 }}>{(selected.athleteCount || 1).toLocaleString()} {t('athletes', lang)}</Text>
             </View>
-            <Text style={ft.detailSection}>{lang === 'tr' ? 'Seviye' : 'Level'}</Text>
+            <Text style={ft.detailSection}>{t('level', lang)}</Text>
             <View style={ft.tagRow}>
               <View style={[ft.tag, { backgroundColor: lvColor + '22', borderColor: lvColor + '44' }]}>
                 <Text style={[ft.tagTxt, { color: lvColor }]}>{levelLabel(selected.level)}</Text>
               </View>
             </View>
-            <Text style={ft.detailSection}>{lang === 'tr' ? 'Hedef' : 'Goal'}</Text>
+            <Text style={ft.detailSection}>{t('goal', lang)}</Text>
             <View style={ft.tagRow}>
               {(selected.goals || []).map(g => (
                 <View key={g} style={ft.tag}><Text style={ft.tagTxt}>{goalLabel(g)}</Text></View>
               ))}
             </View>
-            <Text style={ft.detailSection}>{lang === 'tr' ? 'Haftalık Gün' : 'Days per Week'}</Text>
-            <View style={ft.tagRow}><View style={ft.tag}><Text style={ft.tagTxt}>{selected.days} {lang === 'tr' ? 'gün' : 'days'}</Text></View></View>
-            <Text style={ft.detailSection}>{lang === 'tr' ? 'Antrenmanlar' : 'Workouts'}</Text>
-            {(selected.workouts || []).map((w, i) => (
-              <Animated.View key={i} entering={FadeInDown.delay(i * 50).duration(280)} style={ft.workoutItem}>
-                <Text style={ft.workoutItemTitle}>{lang === 'en' && w.name_en ? w.name_en : w.name}</Text>
-                {(w.exercises || []).map((ex, j) => (
-                  <Text key={j} style={ft.workoutExercise}>• {typeof ex === 'string' ? ex : ex.name}</Text>
-                ))}
-              </Animated.View>
-            ))}
+            <Text style={ft.detailSection}>{t('daysPerWeek', lang)}</Text>
+            <View style={ft.tagRow}><View style={ft.tag}><Text style={ft.tagTxt}>{selected.days} {t('days', lang)}</Text></View></View>
+            <Text style={ft.detailSection}>{t('workoutsLabel', lang)}</Text>
+            {(selected.workouts || []).map((w, i) => {
+              const DAY_SHORT_TR = { 1:'Pzt', 2:'Sal', 3:'Çar', 4:'Per', 5:'Cum', 6:'Cmt', 0:'Paz' };
+              const DAY_SHORT_EN = { 1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 0:'Sun' };
+              const DAY_ORDER    = [1, 2, 3, 4, 5, 6, 0];
+              const dayLabel     = (d) => lang === 'tr' ? DAY_SHORT_TR[d] : DAY_SHORT_EN[d];
+              return (
+                <Animated.View key={i} entering={FadeInDown.delay(i * 50).duration(280)} style={ft.workoutItem}>
+                  {/* Başlık + mevcut gün */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={[ft.workoutItemTitle, { marginBottom: 0, flex: 1 }]}>
+                      {lang === 'en' && w.name_en ? w.name_en : w.name}
+                    </Text>
+                    {w.dayOfWeek !== undefined && w.dayOfWeek !== null && (
+                      <View style={ft.dayBadge}>
+                        <Text style={ft.dayBadgeTxt}>{dayLabel(w.dayOfWeek)}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Gün seçici — 7 gün */}
+                  <View style={ft.dayPickerRow}>
+                    {DAY_ORDER.map(d => {
+                      const isActive = w.dayOfWeek === d;
+                      return (
+                        <TouchableOpacity
+                          key={d}
+                          style={[ft.dayPickerChip, isActive && ft.dayPickerChipActive]}
+                          onPress={() => updateWorkoutDay(i, d)}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={[ft.dayPickerTxt, isActive && ft.dayPickerTxtActive]}>
+                            {dayLabel(d)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Egzersizler */}
+                  {(w.exercises || []).map((ex, j) => (
+                    <Text key={j} style={ft.workoutExercise}>• {typeof ex === 'string' ? ex : ex.name}</Text>
+                  ))}
+                </Animated.View>
+              );
+            })}
             <TouchableOpacity
               style={ft.setActivePlanBtn}
               onPress={async () => {
@@ -1593,7 +1646,7 @@ function TemplatesTab({ lang }) {
               <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ft.setActivePlanGrad}>
                 <Ionicons name="calendar-outline" size={18} color="#fff" />
                 <Text style={ft.setActivePlanTxt}>
-                  {lang === 'tr' ? 'Aktif Program Olarak Ayarla' : 'Set as Active Program'}
+                  {t('setActiveProgram', lang)}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -1607,11 +1660,11 @@ function TemplatesTab({ lang }) {
       {/* All Plans / My Plans tab */}
       <View style={ft.subTabBar}>
         {[
-          { key: 'all',  label: lang === 'tr' ? 'Tüm Planlar' : 'All Plans' },
-          { key: 'mine', label: lang === 'tr' ? 'Planlarım' : 'My Plans' },
-        ].map(t => (
-          <TouchableOpacity key={t.key} style={[ft.subTab, activeTab === t.key && ft.subTabActive]} onPress={() => setActiveTab(t.key)}>
-            <Text style={[ft.subTabTxt, activeTab === t.key && ft.subTabTxtActive]}>{t.label}</Text>
+          { key: 'all',  label: t('allPlans', lang) },
+          { key: 'mine', label: t('myPlans', lang) },
+        ].map(tb => (
+          <TouchableOpacity key={tb.key} style={[ft.subTab, activeTab === tb.key && ft.subTabActive]} onPress={() => setActiveTab(tb.key)}>
+            <Text style={[ft.subTabTxt, activeTab === tb.key && ft.subTabTxtActive]}>{tb.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -1624,7 +1677,7 @@ function TemplatesTab({ lang }) {
               <View style={{ alignItems: 'center', paddingVertical: 48 }}>
                 <Ionicons name="bookmark-outline" size={40} color={C.dim} />
                 <Text style={{ color: C.muted, fontSize: 13, marginTop: 12, textAlign: 'center' }}>
-                  {lang === 'tr' ? 'Henüz plan yok.\nAntrenman → Template Oluştur ile ekle.' : 'No plans yet.\nGo to Workouts → Create Template.'}
+                  {t('noPlansYet', lang)}
                 </Text>
               </View>
             ) : myPlans.map((plan, i) => (
@@ -1633,13 +1686,13 @@ function TemplatesTab({ lang }) {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                     <Text style={ft.planTitle}>{plan.title}</Text>
                     <View style={ft.workoutsBadge}>
-                      <Text style={ft.workoutsBadgeTxt}>{plan.days} {lang === 'tr' ? 'gün' : 'days'}</Text>
+                      <Text style={ft.workoutsBadgeTxt}>{plan.days} {t('days', lang)}</Text>
                     </View>
                   </View>
                   {plan.description ? <Text style={ft.planDesc} numberOfLines={2}>{lang === 'en' && plan.description_en ? plan.description_en : plan.description}</Text> : null}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
                     <Ionicons name="person-outline" size={12} color={C.dim} />
-                    <Text style={ft.planAthletes}>{lang === 'tr' ? 'Kişisel plan' : 'Personal plan'}</Text>
+                    <Text style={ft.planAthletes}>{t('personalPlan', lang)}</Text>
                     <TouchableOpacity
                       onPress={() => setConfirmDel(plan)}
                       style={{ marginLeft: 'auto' }}
@@ -1661,19 +1714,19 @@ function TemplatesTab({ lang }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16 }}>
               <TouchableOpacity style={[ft.filterTagBtn, hasFilters && { borderColor: '#dc2626' }]} onPress={() => setView('filter')}>
                 <Ionicons name="options-outline" size={16} color={hasFilters ? '#dc2626' : C.muted} />
-                <Text style={[ft.filterTagTxt, hasFilters && { color: '#dc2626' }]}>{lang === 'tr' ? 'Filtre' : 'Filter'}</Text>
+                <Text style={[ft.filterTagTxt, hasFilters && { color: '#dc2626' }]}>{t('filter', lang)}</Text>
               </TouchableOpacity>
               {['all','free','paid'].map(p => (
                 <TouchableOpacity key={p} style={[ft.paidBtn, showPaid === p && ft.paidBtnActive]} onPress={() => setShowPaid(p)}>
                   <Text style={[ft.paidBtnTxt, showPaid === p && ft.paidBtnTxtActive]}>
-                    {p === 'all' ? (lang === 'tr' ? 'Tümü' : 'All') : p === 'free' ? (lang === 'tr' ? 'Ücretsiz' : 'Free') : (lang === 'tr' ? 'Premium' : 'Premium')}
+                    {p === 'all' ? t('all', lang) : p === 'free' ? t('free', lang) : t('premium', lang)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             <TouchableOpacity style={wt.accordion} onPress={() => setPlansOpen(v => !v)}>
-              <Text style={wt.accordionTitle}>{lang === 'tr' ? 'Antrenman Planları' : 'Training Plans'}</Text>
+              <Text style={wt.accordionTitle}>{t('trainingPlans', lang)}</Text>
               <Ionicons name={plansOpen ? 'chevron-up' : 'chevron-down'} size={18} color='#dc2626' />
             </TouchableOpacity>
 
@@ -1683,13 +1736,13 @@ function TemplatesTab({ lang }) {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                     <Text style={ft.planTitle}>{plan.title}</Text>
                     <View style={ft.workoutsBadge}>
-                      <Text style={ft.workoutsBadgeTxt}>{plan.workouts.length} {lang === 'tr' ? 'antrenman' : 'workouts'}</Text>
+                      <Text style={ft.workoutsBadgeTxt}>{plan.workouts.length} {t('workoutsShort', lang)}</Text>
                     </View>
                   </View>
                   <Text style={ft.planDesc} numberOfLines={2}>{lang === 'en' && plan.description_en ? plan.description_en : plan.description}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
                     <Ionicons name="people-outline" size={12} color={C.dim} />
-                    <Text style={ft.planAthletes}>{plan.athleteCount.toLocaleString()} {lang === 'tr' ? 'sporcu' : 'athletes'}</Text>
+                    <Text style={ft.planAthletes}>{plan.athleteCount.toLocaleString()} {t('athletes', lang)}</Text>
                     {plan.isPaid && (
                       <View style={ft.paidTag}><Ionicons name="lock-closed" size={10} color={C.orange} /><Text style={ft.paidTagTxt}>PRO</Text></View>
                     )}
@@ -1753,9 +1806,16 @@ const ft = StyleSheet.create({
   tagRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag:           { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.s2 },
   tagTxt:        { color: C.text, fontSize: 12, fontWeight: '600' },
-  workoutItem:   { backgroundColor: C.s1, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
+  workoutItem:      { backgroundColor: C.s1, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
   workoutItemTitle: { color: '#dc2626', fontSize: 14, fontWeight: '800', marginBottom: 8 },
   workoutExercise:  { color: C.muted, fontSize: 12, lineHeight: 20 },
+  dayBadge:         { backgroundColor: 'rgba(220,38,38,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)' },
+  dayBadgeTxt:      { color: '#dc2626', fontSize: 11, fontWeight: '800' },
+  dayPickerRow:     { flexDirection: 'row', gap: 4, marginBottom: 10, flexWrap: 'wrap' },
+  dayPickerChip:    { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.s2 },
+  dayPickerChipActive: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
+  dayPickerTxt:     { color: C.muted, fontSize: 11, fontWeight: '600' },
+  dayPickerTxtActive:  { color: '#fff', fontWeight: '800' },
 
   // ── Create Template builder ────────────────────────────────────────────────
   exChip:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.s2, borderRadius: 20, borderWidth: 1, borderColor: C.border, maxWidth: 200 },
@@ -1966,9 +2026,9 @@ export default function ExercisesScreen() {
   const [activeTab, setActiveTab] = useState(0); // 0=Exercises 1=Workouts 2=Templates
 
   const TABS = [
-    { label: lang === 'tr' ? 'Egzersizler' : 'Exercises' },
-    { label: lang === 'tr' ? 'Antrenman'   : 'Workouts'  },
-    { label: lang === 'tr' ? 'Şablonlar'   : 'Templates' },
+    { label: t('tabExercisesLib', lang) },
+    { label: t('tabWorkoutsLib', lang)  },
+    { label: t('tabTemplatesLib', lang) },
   ];
 
   return (

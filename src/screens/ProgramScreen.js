@@ -6,18 +6,30 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { C } from '../utils/theme';
 import { MEDIA_URLS } from '../utils/exerciseUrls';
+import ExerciseMedia from '../components/ExerciseMedia';
 import { saveWorkoutSession, getAllWorkoutLogs, getActiveProgram, clearActiveProgram } from '../utils/storage';
+import { TRAINING_PLANS } from '../data/trainingPlans';
+import { supabase } from '../lib/supabase';
 import { useToast, ConfirmModal } from '../components/Toast';
 import { useLang } from '../context/LanguageContext';
 import { t, MONTHS_SHORT } from '../utils/i18n';
 
 const MEDIA_MAP = MEDIA_URLS;
 
-// Terminology (for pill display)
-const TERM_KEYS = ['RIR','Failure','Süperset','Finisher'];
+// TERM_REGEX: RIR, set×rep, Failure, Süperset, Finisher — hepsi badge olarak gösterilir
+const TERM_REGEX = /(RIR\s*\d+|RIR|\d+[×x]\d+(?:-\d+)?|Failure|Süperset|Superset|Finisher)/g;
+
+// Set/rep gibi nötr badge — modal yok
+function RepBadge({ val }) {
+  return (
+    <View style={s.repBadge}>
+      <Text style={s.repBadgeTxt}>{val}</Text>
+    </View>
+  );
+}
 const TERIMLER = {
   tr: {
     'RIR':      'RIR = Reps In Reserve — Sete biterken hâlâ yapabileceğin tekrar sayısı.\nRIR 0 = Failure, RIR 1 = 1 tekrar kaldı.',
@@ -46,17 +58,22 @@ function fmtDate(iso, lang) {
 // ─── TerimPill ─────────────────────────────────────────────────────────────────
 function TerimPill({ terim, lang }) {
   const [open, setOpen] = useState(false);
-  const aciklama = TERIMLER[lang]?.[terim] ?? TERIMLER.tr[terim];
-  if (!aciklama) return <Text style={s.terimPlain}>{terim}</Text>;
+  // "RIR1" veya "RIR 2" → lookup key "RIR", display "RIR 1" / "RIR 2"
+  const lookupKey  = terim.startsWith('RIR') ? 'RIR' : terim;
+  const displayVal = terim.startsWith('RIR') && terim.replace('RIR','').trim()
+    ? 'RIR ' + terim.replace('RIR','').trim()
+    : terim;
+  const aciklama = TERIMLER[lang]?.[lookupKey] ?? TERIMLER.tr[lookupKey];
+  if (!aciklama) return <Text style={s.terimPlain}>{displayVal}</Text>;
   return (
     <>
       <TouchableOpacity style={s.terimPill} onPress={() => setOpen(true)}>
-        <Text style={s.terimPillText}>{terim}</Text>
+        <Text style={s.terimPillText}>{displayVal}</Text>
       </TouchableOpacity>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setOpen(false)}>
           <Animated.View entering={FadeIn.duration(200)} style={s.terimModal}>
-            <Text style={s.terimModalTitle}>{terim}</Text>
+            <Text style={s.terimModalTitle}>{displayVal}</Text>
             <Text style={s.terimModalBody}>{aciklama}</Text>
             <TouchableOpacity style={s.terimModalClose} onPress={() => setOpen(false)}>
               <Text style={{ color: C.bg, fontWeight: '700' }}>{t('confirm', lang)}</Text>
@@ -69,27 +86,34 @@ function TerimPill({ terim, lang }) {
 }
 
 // ─── Day card (expandable) ────────────────────────────────────────────────────
-function DayCard({ workout, index, workoutLogs, onLog, lang }) {
-  const [open, setOpen] = useState(index === 0); // first day open by default
+const DAY_NAMES_TR = { 0:'Pazar', 1:'Pazartesi', 2:'Salı', 3:'Çarşamba', 4:'Perşembe', 5:'Cuma', 6:'Cumartesi' };
+const DAY_NAMES_EN = { 0:'Sunday', 1:'Monday', 2:'Tuesday', 3:'Wednesday', 4:'Thursday', 5:'Friday', 6:'Saturday' };
+
+function DayCard({ workout, index, workoutLogs, onLog, onPlay, lang, open, onToggle, mediaMap }) {
   const exercises = workout.exercises ?? [];
   const DAY_COLORS = [C.lime, C.blue, C.orange, C.teal, C.purple, C.green, C.red];
   const color = DAY_COLORS[index % DAY_COLORS.length];
+
+  // dayOfWeek varsa gerçek gün adını göster
+  const hasDow = workout.dayOfWeek !== undefined && workout.dayOfWeek !== null;
+  const dayLabel = hasDow
+    ? (lang === 'tr' ? DAY_NAMES_TR[workout.dayOfWeek] : DAY_NAMES_EN[workout.dayOfWeek])
+    : `${t('dayN', lang)} ${index + 1}`;
+  const workoutName = lang === 'en' && workout.name_en ? workout.name_en : workout.name;
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 60).duration(320)}>
       <TouchableOpacity
         style={[s.card, open && { borderColor: color + '55' }]}
-        onPress={() => setOpen(v => !v)}
+        onPress={() => onToggle(index)}
         activeOpacity={0.85}
       >
         <View style={[s.cardBar, { backgroundColor: color }]} />
         <View style={s.cardHeader}>
           <View style={[s.tipBadge, { backgroundColor: color + '20' }]}>
-            <Text style={[s.tipText, { color }]}>
-              {lang === 'tr' ? `GÜN ${index + 1}` : `DAY ${index + 1}`}
-            </Text>
+            <Text style={[s.tipText, { color }]}>{dayLabel}</Text>
           </View>
-          <Text style={s.cardTitle}>{workout.name}</Text>
+          <Text style={s.cardTitle}>{workoutName}</Text>
           <Ionicons
             name={open ? 'chevron-up' : 'chevron-down'}
             size={18} color={C.dim}
@@ -100,14 +124,14 @@ function DayCard({ workout, index, workoutLogs, onLog, lang }) {
         {open && exercises.length > 0 && (
           <View style={s.exList}>
             {exercises.map((ex, j) => (
-              <ExerciseRow key={j} hareket={ex} onLog={onLog} lang={lang} />
+              <ExerciseRow key={j} hareket={ex} onLog={onLog} onPlay={onPlay} lang={lang} mediaMap={mediaMap} />
             ))}
           </View>
         )}
 
         {open && exercises.length === 0 && (
           <Text style={{ color: C.dim, fontSize: 12, padding: 14 }}>
-            {lang === 'tr' ? 'Egzersiz yok.' : 'No exercises.'}
+            {t('noExercises', lang)}
           </Text>
         )}
       </TouchableOpacity>
@@ -116,43 +140,53 @@ function DayCard({ workout, index, workoutLogs, onLog, lang }) {
 }
 
 // ─── Exercise row ──────────────────────────────────────────────────────────────
-function ExerciseRow({ hareket, onLog, lang }) {
+function ExerciseRow({ hareket, onLog, lang, onPlay, mediaMap = {} }) {
   const name = typeof hareket === 'string' ? hareket : hareket.name;
-  const gif  = Object.keys(MEDIA_MAP).find(k => name.startsWith(k));
-  const gifSrc = gif ? MEDIA_MAP[gif] : null;
+  // Temiz isim: "Lat Pulldown 2×6-8 RIR1-Failure" → "Lat Pulldown"
+  const cleanName = name
+    .replace(/\s+\d+[×x].+/, '')
+    .replace(/\s+(RIR|Failure|Superset|Süperset|Finisher).+/i, '')
+    .trim();
+  // DB'den gelen webm_url önce, yoksa MEDIA_MAP fallback
+  const gifSrc = mediaMap[cleanName]
+    ?? (() => { const k = Object.keys(MEDIA_MAP).find(k => name.startsWith(k)); return k ? MEDIA_MAP[k] : null; })();
 
-  // Parse RIR/sets from name if string
   const displayName = name.replace(/^\*Finisher:\s*/i, '');
   const isFinisher  = name.startsWith('*');
 
+  // TERM_REGEX: "RIR1", "RIR 2", "Failure", "Süperset", "Finisher" tek parça
   const parts = [];
-  let remaining = displayName;
-  TERM_KEYS.forEach(tk => {
-    const idx = remaining.indexOf(tk);
-    if (idx !== -1) {
-      if (idx > 0) parts.push({ type: 'text', val: remaining.slice(0, idx) });
-      parts.push({ type: 'terim', val: tk });
-      remaining = remaining.slice(idx + tk.length);
-    }
-  });
-  if (remaining) parts.push({ type: 'text', val: remaining });
+  let lastIdx = 0;
+  TERM_REGEX.lastIndex = 0;
+  let match;
+  while ((match = TERM_REGEX.exec(displayName)) !== null) {
+    if (match.index > lastIdx)
+      parts.push({ type: 'text', val: displayName.slice(lastIdx, match.index) });
+    parts.push({ type: 'terim', val: match[0] });
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < displayName.length)
+    parts.push({ type: 'text', val: displayName.slice(lastIdx) });
 
   return (
     <View style={s.exRow}>
       <View style={s.exBullet} />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>
-          {parts.map((p, i) =>
-            p.type === 'terim'
-              ? <TerimPill key={i} terim={p.val} lang={lang} />
-              : <Text key={i} style={[s.exText, isFinisher && { color: C.orange }]}>{p.val}</Text>
-          )}
+          {parts.map((p, i) => {
+            if (p.type !== 'terim') return (
+              <Text key={i} style={[s.exText, isFinisher && { color: C.orange }]}>{p.val}</Text>
+            );
+            // set×rep pattern → RepBadge, geri kalanlar → TerimPill
+            if (/^\d+[×x]\d+/.test(p.val)) return <RepBadge key={i} val={p.val} />;
+            return <TerimPill key={i} terim={p.val} lang={lang} />;
+          })}
         </View>
       </View>
       <View style={{ flexDirection: 'row', gap: 6, marginLeft: 6 }}>
         {gifSrc && (
-          <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="play-circle-outline" size={18} color={C.lime} />
+          <TouchableOpacity onPress={() => onPlay?.(gifSrc, cleanName)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="play-circle-outline" size={20} color={C.lime} />
           </TouchableOpacity>
         )}
         <TouchableOpacity style={s.logBtn} onPress={() => onLog(name)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -165,19 +199,61 @@ function ExerciseRow({ hareket, onLog, lang }) {
 
 // ─── Main ProgramScreen ────────────────────────────────────────────────────────
 export default function ProgramScreen() {
-  const { lang } = useLang();
+  const { lang }   = useLang();
+  const route      = useRoute();
+  const focusDay   = route.params?.focusDay; // dayOfWeek passed from HomeScreen
   const [activeProgram, setActiveProgramState] = useState(null);
   const [workoutLogs,   setWorkoutLogs]         = useState({});
   const [logModal,      setLogModal]             = useState(null);
   const [logSets,       setLogSets]              = useState([{ reps: '', kg: '' }, { reps: '', kg: '' }, { reps: '', kg: '' }]);
   const [open,          setOpen]                 = useState(true);
   const [confirmClear,  setConfirmClear]         = useState(false);
+  const [mediaModal,    setMediaModal]           = useState(null);
+  const [openCards,     setOpenCards]            = useState({});
+  const [mediaMap,      setMediaMap]             = useState({}); // { cleanName: webm_url }
   const { show: showToast, ToastNode }           = useToast();
 
   useFocusEffect(useCallback(() => {
-    getActiveProgram().then(p => setActiveProgramState(p));
+    getActiveProgram().then(async p => {
+      // Kayıtlı programda description_en yoksa TRAINING_PLANS'tan tamamla
+      if (p && !p.description_en) {
+        const template = TRAINING_PLANS.find(tp => tp.id === p.id);
+        if (template?.description_en) p = { ...p, description_en: template.description_en };
+      }
+      setActiveProgramState(p);
+      const workouts = p?.workouts ?? [];
+      const next = {};
+      workouts.forEach((w, i) => {
+        next[i] = focusDay !== undefined ? w.dayOfWeek === focusDay : false;
+      });
+      setOpenCards(next);
+
+      // DB'den webm_url çek — ilike ile fuzzy match
+      const allEx = workouts.flatMap(w => w.exercises ?? []);
+      const cleanNames = [...new Set(allEx.map(e => {
+        const s = typeof e === 'string' ? e : e.name;
+        return s.replace(/\s+\d+[×x].+/, '').replace(/\s+(RIR|Failure|Superset|Süperset|Finisher).+/i, '').trim();
+      }).filter(Boolean))];
+
+      if (cleanNames.length > 0) {
+        const orFilter = cleanNames.map(n => `name.ilike.%${n}%`).join(',');
+        const { data } = await supabase.from('exercises')
+          .select('name, webm_url')
+          .or(orFilter);
+
+        const map = {};
+        cleanNames.forEach(cn => {
+          const match = (data || []).find(r =>
+            r.webm_url && r.name.toLowerCase().includes(cn.toLowerCase())
+          );
+          if (match) map[cn] = match.webm_url;
+        });
+        setMediaMap(map);
+      }
+    });
     getAllWorkoutLogs().then(setWorkoutLogs);
-  }, []));
+    return () => setOpenCards({});
+  }, [focusDay]));
 
   const openLog = (exerciseName) => {
     setLogModal({ name: exerciseName });
@@ -209,12 +285,10 @@ export default function ProgramScreen() {
       <View style={[s.fill, { alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
         <Ionicons name="calendar-outline" size={56} color={C.dim} />
         <Text style={{ color: C.text, fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
-          {lang === 'tr' ? 'Aktif Program Yok' : 'No Active Program'}
+          {t('noActiveProgram', lang)}
         </Text>
         <Text style={{ color: C.muted, fontSize: 13, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
-          {lang === 'tr'
-            ? 'Egzersiz → Antrenman sekmesinde bir antrenman oluşturup "Aktif Program Olarak Ayarla" butonuna bas.'
-            : 'Go to Exercises → Workouts, create a workout and tap "Set as Active Program".'}
+          {t('noActiveProgramDesc', lang)}
         </Text>
       </View>
     );
@@ -232,11 +306,9 @@ export default function ProgramScreen() {
       {ToastNode}
       <ConfirmModal
         visible={confirmClear}
-        title={lang === 'tr' ? 'Programı Kaldır' : 'Remove Program'}
-        message={lang === 'tr'
-          ? `"${activeProgram?.title}" aktif programdan kaldırılacak. Exercises → Templates'ten yeni bir program seçebilirsiniz.`
-          : `"${activeProgram?.title}" will be removed as your active program. You can select a new one from Exercises → Templates.`}
-        confirmLabel={lang === 'tr' ? 'Kaldır' : 'Remove'}
+        title={t('removeProgram', lang)}
+        message={`"${activeProgram?.title}" ${t('removeProgramMsg', lang)}`}
+        confirmLabel={t('remove', lang)}
         confirmColor="#dc2626"
         lang={lang}
         onCancel={() => setConfirmClear(false)}
@@ -244,7 +316,7 @@ export default function ProgramScreen() {
           await clearActiveProgram();
           setActiveProgramState(null);
           setConfirmClear(false);
-          showToast(lang === 'tr' ? 'Program kaldırıldı.' : 'Program removed.', 'error');
+          showToast(t('programRemoved', lang), 'error');
         }}
       />
 
@@ -256,7 +328,7 @@ export default function ProgramScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="close-circle-outline" size={20} color={C.red} />
-          <Text style={s.clearBtnTxt}>{lang === 'tr' ? 'Programı Kaldır' : 'Remove'}</Text>
+          <Text style={s.clearBtnTxt}>{t('removeProgram', lang)}</Text>
         </TouchableOpacity>
       </View>
 
@@ -266,12 +338,14 @@ export default function ProgramScreen() {
         <Animated.View entering={FadeInDown.duration(300)} style={s.programHeader}>
           <View style={[s.tipBadge, { backgroundColor: C.lime + '20', marginBottom: 6 }]}>
             <Text style={[s.tipText, { color: C.lime }]}>
-              {lang === 'tr' ? 'AKTİF PROGRAM' : 'ACTIVE PROGRAM'}
+              {t('activeProgram', lang)}
             </Text>
           </View>
           <Text style={s.programTitle}>{activeProgram.title}</Text>
           {activeProgram.description ? (
-            <Text style={s.cardDesc} numberOfLines={2}>{activeProgram.description}</Text>
+            <Text style={s.cardDesc} numberOfLines={2}>
+              {lang === 'en' && activeProgram.description_en ? activeProgram.description_en : activeProgram.description}
+            </Text>
           ) : null}
         </Animated.View>
 
@@ -283,17 +357,42 @@ export default function ProgramScreen() {
             index={wi}
             workoutLogs={workoutLogs}
             onLog={openLog}
+            onPlay={(src, name) => setMediaModal({ src, name })}
             lang={lang}
+            open={!!openCards[wi]}
+            mediaMap={mediaMap}
+            onToggle={i => setOpenCards(prev => ({ ...prev, [i]: !prev[i] }))}
           />
         ))}
 
         {workouts.length === 0 && (
           <Text style={{ color: C.dim, fontSize: 12, textAlign: 'center', marginTop: 24 }}>
-            {lang === 'tr' ? 'Bu programda egzersiz yok.' : 'No exercises in this program.'}
+            {t('noExercisesInProgram', lang)}
           </Text>
         )}
 
       </ScrollView>
+
+      {/* Egzersiz medya modalı */}
+      <Modal visible={!!mediaModal} transparent animationType="fade" onRequestClose={() => setMediaModal(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.88)', justifyContent: 'center', alignItems: 'center' }}
+          activeOpacity={1} onPress={() => setMediaModal(null)}>
+          <View style={{ width: '90%', backgroundColor: C.s1, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.border }}>
+            <View style={{ width: '100%', height: 240, backgroundColor: C.s2 }}>
+              <ExerciseMedia source={mediaModal?.src} style={{ width: '100%', height: 240 }} />
+            </View>
+            <View style={{ padding: 16 }}>
+              <Text style={{ color: C.text, fontSize: 14, fontWeight: '700', marginBottom: 12 }} numberOfLines={2}>
+                {mediaModal?.name}
+              </Text>
+              <TouchableOpacity onPress={() => setMediaModal(null)}
+                style={{ backgroundColor: C.s2, borderRadius: 12, paddingVertical: 10, alignItems: 'center' }}>
+                <Text style={{ color: C.muted, fontWeight: '700' }}>{t('close', lang)}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Log Modal */}
       {logModal && (
@@ -377,6 +476,8 @@ const s = StyleSheet.create({
   exText:   { color: '#b0bec5', fontSize: 13, lineHeight: 20 },
   logBtn:   { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(20,184,166,0.15)', borderWidth: 1, borderColor: C.teal, alignItems: 'center', justifyContent: 'center' },
 
+  repBadge:        { backgroundColor: 'rgba(232,244,74,0.12)', borderWidth: 1, borderColor: 'rgba(232,244,74,0.3)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  repBadgeTxt:     { color: C.lime, fontSize: 12, fontWeight: '700' },
   terimPill:       { backgroundColor: 'rgba(56,189,248,0.15)', borderWidth: 1, borderColor: 'rgba(56,189,248,0.35)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   terimPillText:   { color: C.blue, fontSize: 12, fontWeight: '700' },
   terimPlain:      { color: '#b0bec5', fontSize: 13 },

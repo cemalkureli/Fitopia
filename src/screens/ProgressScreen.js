@@ -444,12 +444,10 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
             <AnimatedRN.View entering={FadeIn.duration(400)} style={g.noGenderCard}>
               <Ionicons name="person-circle-outline" size={48} color={C.dim} />
               <Text style={g.noGenderTitle}>
-                {lang === 'tr' ? 'Cinsiyet Seçilmedi' : 'Gender Not Set'}
+                {t('genderNotSet', lang)}
               </Text>
               <Text style={g.noGenderSub}>
-                {lang === 'tr'
-                  ? 'Modelin yüklenmesi için cinsiyetini seçmelisin.'
-                  : 'Select your gender to load your model.'}
+                {t('genderNotSetSub', lang)}
               </Text>
               <TouchableOpacity
                 style={g.noGenderBtn}
@@ -457,7 +455,7 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
                 activeOpacity={0.8}
               >
                 <Text style={g.noGenderBtnTxt}>
-                  {lang === 'tr' ? 'Profile Git' : 'Go to Profile'}
+                  {t('goToProfile', lang)}
                 </Text>
                 <Ionicons name="arrow-forward" size={14} color={C.bg} />
               </TouchableOpacity>
@@ -484,9 +482,7 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           </View>
         ) : (
           <Text style={g.noMeasure}>
-            {lang === 'tr'
-              ? 'Ölçüm eklemek için → Ölçüm sekmesi'
-              : 'Add measurements → Measure tab'}
+            {t('addMeasurementsHint', lang)}
           </Text>
         )}
       </AnimatedRN.View>
@@ -697,9 +693,9 @@ export default function ProgressScreen() {
       {/* Confirm delete exercise */}
       <ConfirmModal
         visible={!!confirmDel}
-        title={lang === 'tr' ? 'Egzersizi Sil' : 'Delete Exercise'}
-        message={confirmDel ? (lang === 'tr' ? `"${confirmDel}" ve tüm geçmiş kayıtları silinecek.` : `"${confirmDel}" and all its records will be deleted.`) : ''}
-        confirmLabel={lang === 'tr' ? 'Sil' : 'Delete'}
+        title={t('deleteExercise', lang)}
+        message={confirmDel ? `"${confirmDel}" ${t('exerciseDeletedMsg', lang)}` : ''}
+        confirmLabel={t('delete', lang)}
         confirmColor="#dc2626"
         lang={lang}
         onCancel={() => setConfirmDel(null)}
@@ -707,7 +703,7 @@ export default function ProgressScreen() {
           await deleteAllExerciseSessions(confirmDel);
           setWorkoutLogs(await getAllWorkoutLogs());
           setConfirmDel(null);
-          showToast(lang === 'tr' ? 'Egzersiz silindi.' : 'Exercise deleted.', 'error');
+          showToast(t('exerciseDeleted', lang), 'error');
         }}
       />
       {ToastNode}

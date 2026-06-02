@@ -63,7 +63,7 @@ function StatCard({ icon, value, label, color, delay }) {
 }
 
 // Haftanın günleri — log + program bilgisiyle zenginleştirilmiş
-function ActivityWeek({ logs, program, lang }) {
+function ActivityWeek({ logs, program, lang, navigation }) {
   const days  = DAYS_SHORT[lang] ?? DAYS_SHORT.tr;
   const today = new Date();
   const week  = Array.from({ length: 7 }, (_, i) => {
@@ -89,8 +89,17 @@ function ActivityWeek({ logs, program, lang }) {
         const workout  = dayMeta(d);
         const meta     = workout ? workoutMeta(workout.name_en || workout.name) : null;
 
+        const hasTap = !!workout || active;
         return (
-          <View key={i} style={s.activityDay}>
+          <TouchableOpacity
+            key={i}
+            style={s.activityDay}
+            activeOpacity={hasTap ? 0.7 : 1}
+            onPress={() => {
+              if (!hasTap) return;
+              navigation.navigate('Program', { focusDay: d.getDay() });
+            }}
+          >
             <View style={[
               s.activityDot,
               active && { backgroundColor: C.lime },
@@ -109,7 +118,7 @@ function ActivityWeek({ logs, program, lang }) {
             <Text style={[s.activityDayLabel, isToday && { color: C.lime }]}>
               {days[d.getDay()]}
             </Text>
-          </View>
+          </TouchableOpacity>
         );
       })}
     </View>
@@ -182,37 +191,46 @@ export default function HomeScreen() {
               <View style={s.todayHeader}>
                 <Ionicons name="lock-closed-outline" size={22} color={C.dim} />
                 <Text style={[s.todayType, { color: C.dim }]}>
-                  {lang === 'tr' ? 'Program Seçilmedi' : 'No Active Program'}
+                  {t('noProgramSelected', lang)}
                 </Text>
               </View>
               <Text style={s.todayLabel}>{t('todayWorkout', lang)}</Text>
               <Text style={[s.todaySub, { color: C.muted }]}>
-                {lang === 'tr'
-                  ? 'Egzersizler → Şablonlar bölümünden bir program aktif et'
-                  : 'Go to Exercises → Templates and set an active program'}
+                {t('activateProgramHint', lang)}
               </Text>
               <View style={s.lockHint}>
                 <Ionicons name="arrow-forward" size={13} color={C.lime} />
-                <Text style={s.lockHintTxt}>{lang === 'tr' ? 'Program Seç' : 'Choose Program'}</Text>
+                <Text style={s.lockHintTxt}>{t('chooseProgram', lang)}</Text>
               </View>
             </LinearGradient>
           </TouchableOpacity>
         ) : todayWorkout ? (
-          /* ─ Aktif program + bugün antrenman var ─ */
-          <LinearGradient colors={[todayMeta.color + '22', todayMeta.color + '08']}
-            style={[s.todayCard, { borderColor: todayMeta.color + '44' }]}>
-            <View style={s.todayHeader}>
-              <Ionicons name={todayMeta.icon} size={22} color={todayMeta.color} />
-              <Text style={[s.todayType, { color: todayMeta.color }]}>
-                {lang === 'en' && todayWorkout.name_en ? todayWorkout.name_en : todayWorkout.name}
-              </Text>
-            </View>
-            <Text style={s.todayLabel}>{t('todayWorkout', lang)}</Text>
-            <Text style={s.todaySub}>
-              {(todayWorkout.exercises || []).slice(0, 3).map(e => typeof e === 'string' ? e.split(' ')[0] : e.name).join(' · ')}
-              {(todayWorkout.exercises || []).length > 3 ? ' ...' : ''}
-            </Text>
-          </LinearGradient>
+          /* ─ Aktif program + bugün antrenman var — tap ile Program'ı aç ─ */
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Program', { focusDay: new Date().getDay() })}
+          >
+            <LinearGradient colors={[todayMeta.color + '22', todayMeta.color + '08']}
+              style={[s.todayCard, { borderColor: todayMeta.color + '44' }]}>
+              <View style={s.todayHeader}>
+                <Ionicons name={todayMeta.icon} size={22} color={todayMeta.color} />
+                <Text style={[s.todayType, { color: todayMeta.color }]}>
+                  {lang === 'en' && todayWorkout.name_en ? todayWorkout.name_en : todayWorkout.name}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={todayMeta.color + '88'} />
+              </View>
+              <Text style={s.todayLabel}>{t('todayWorkout', lang)}</Text>
+              {/* Egzersiz listesi — temiz isimler, alt alta */}
+              {(todayWorkout.exercises || []).map((e, i) => {
+                const raw = typeof e === 'string' ? e : e.name;
+                // set/rep ve RIR bilgisini at, sadece hareket adı
+                const name = raw.replace(/\s+\d+[×x].+/, '').replace(/\s+(RIR|Failure|Superset|Süperset|Finisher).+/i, '').trim();
+                return (
+                  <Text key={i} style={s.todayExLine}>• {name}</Text>
+                );
+              })}
+            </LinearGradient>
+          </TouchableOpacity>
         ) : (
           /* ─ Aktif program var ama bugün dinlenme günü ─ */
           <LinearGradient colors={[C.muted + '22', C.muted + '08']}
@@ -230,7 +248,7 @@ export default function HomeScreen() {
       {/* Bu hafta aktivitesi */}
       <Animated.View entering={FadeInDown.delay(160).duration(400)} style={s.sectionCard}>
         <Text style={s.sectionTitle}>{t('thisWeek', lang)}</Text>
-        <ActivityWeek logs={logs} program={program} lang={lang} />
+        <ActivityWeek logs={logs} program={program} lang={lang} navigation={navigation} />
       </Animated.View>
 
       {/* İstatistikler */}
@@ -284,6 +302,7 @@ const s = StyleSheet.create({
   todayType:   { fontSize: 13, fontWeight: '800', letterSpacing: 0.8, flex: 1 },
   todayLabel:  { color: C.muted, fontSize: 11, fontWeight: '600', marginBottom: 4 },
   todaySub:    { color: C.text, fontSize: 13, lineHeight: 20 },
+  todayExLine: { color: C.text, fontSize: 12, lineHeight: 20, marginTop: 1 },
   lockHint:    { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
   lockHintTxt: { color: C.lime, fontSize: 12, fontWeight: '700' },
 
