@@ -355,15 +355,14 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
       if (!data?.user) return;
       const uid = data.user.id;
 
-      // Gender — always fresh, no cache (single lightweight query)
-      supabase.from('profiles').select('gender').eq('id', uid).single()
-        .then(({ data: p }) => {
-          setGender(p?.gender || null);
-        });
-
-      // Measurements (cached 2 min)
+      // Gender + cache check — paralel başlat
       const mKey = `measurements_${uid}`;
-      const mc2 = await cacheGet(mKey);
+      const [gResult, mc2] = await Promise.all([
+        supabase.from('profiles').select('gender').eq('id', uid).single(),
+        cacheGet(mKey),
+      ]);
+      setGender(gResult.data?.gender || null);
+
       if (mc2) {
         setLatestMeasure(mc2.data);
         if (!mc2.stale) return;

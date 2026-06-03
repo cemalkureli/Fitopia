@@ -133,9 +133,14 @@ export default function HomeScreen() {
   const [program, setProgram] = useState(null);   // active program or null
 
   useFocusEffect(useCallback(() => {
-    getAllWorkoutLogs().then(setLogs);
-    getActiveProgram().then(setProgram);
-    supabase.auth.getUser().then(({ data }) => {
+    // Parallel: tüm data fetch'leri aynı anda başlat
+    Promise.all([
+      getAllWorkoutLogs(),
+      getActiveProgram(),
+      supabase.auth.getUser(),
+    ]).then(([logs, prog, { data }]) => {
+      setLogs(logs);
+      setProgram(prog);
       if (data?.user) {
         const meta = data.user.user_metadata;
         setProfile({ name: meta?.full_name || data.user.email?.split('@')[0] || t('athlete', lang) });

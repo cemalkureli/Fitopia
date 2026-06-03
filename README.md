@@ -1,6 +1,6 @@
 # Fitopia
 
-Fitopia is a React Native fitness tracking app built with Expo, featuring workout logging, exercise library, and progress tracking — backed by Supabase.
+Fitopia is a React Native fitness tracking app built with Expo — workout logging, exercise library, training plans, progress tracking, and an interactive muscle-map mascot. Backend: Supabase.
 
 ## Stack
 
@@ -10,22 +10,24 @@ Fitopia is a React Native fitness tracking app built with Expo, featuring workou
 | Backend | Supabase (Auth, PostgreSQL, Storage) |
 | Navigation | React Navigation v6 (Bottom Tabs) |
 | Animations | React Native Reanimated v3 |
-| Storage | expo-secure-store (auth tokens), AsyncStorage (workout logs) |
+| Storage | AsyncStorage (session + workout logs) |
 | Video | expo-video (WebM VP9) |
 | Icons | @expo/vector-icons (Ionicons) |
+| i18n | Custom t() system — TR / EN |
 
 ## Features
 
-- **Auth** — Email/password login & register, JWT stored securely
-- **Home** — Weekly activity tracker, workout stats, recent sessions
-- **Program** — 7-day split program (Push/Pull/Leg), collapsible cards, set logging
-- **Exercises** — 298-exercise library with WebM video previews, category filter, search
-- **Progress** — Per-exercise history, PR tracking, mini volume charts
-- **Profile** — Avatar upload (Supabase Storage), body stats, settings
+- **Auth** — Email/password, session persisted via AsyncStorage (auto-login)
+- **Home** — Active program today card, weekly activity, workout stats
+- **Workouts** — Custom workout builder, exercise picker, per-exercise set/rep/RIR logging
+- **Exercises** — Library with filters, WebM video previews, community rating
+- **Templates** — Training plan templates (bilingual), drag-to-day builder, set-as-active
+- **Progress** — Mascot with interactive muscle zones → navigate to exercises, measurements, overload charts
+- **Profile** — Avatar, body stats, gender, units (kg/lb, cm/in), language toggle
 
 ## Setup
 
-### 1. Clone
+### 1. Clone & install
 
 ```bash
 git clone https://github.com/cemalkureli/Fitopia.git
@@ -33,27 +35,15 @@ cd Fitopia
 npm install
 ```
 
-### 2. Supabase
+### 2. Environment
 
-Create a project at [supabase.com](https://supabase.com) and run the SQL in `src/lib/supabase.js` (see comment block at the bottom).
-
-Update `app.config.js`:
-```js
-supabaseUrl: 'YOUR_SUPABASE_URL',
-supabaseAnonKey: 'YOUR_SUPABASE_ANON_KEY',
+Create `.env` in project root:
+```
+EXPO_PUBLIC_SUPABASE_URL=your_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_key
 ```
 
-### 3. Exercise Videos
-
-Convert GIFs to WebM (requires ffmpeg):
-```bash
-# Run from project root
-Get-ChildItem "path/to/gifs" -Filter "*.gif" | ForEach-Object {
-  ffmpeg -i $_.FullName -c:v libvpx-vp9 -crf 33 -b:v 0 -loop 0 -an "assets/exercises/$($_.BaseName).webm" -y
-}
-```
-
-### 4. Start
+### 3. Start
 
 ```bash
 npx expo start --android
@@ -63,38 +53,37 @@ npx expo start --android
 
 ```
 src/
-├── lib/
-│   └── supabase.js        # Supabase client + auth helpers
-├── navigation/            # (embedded in App.js)
+├── lib/supabase.js          # Supabase client (AsyncStorage session)
+├── context/
+│   ├── LanguageContext.js   # TR/EN language provider
+│   ├── UnitsContext.js      # kg/lb, cm/in
+│   └── MuscleFilterContext.js # Mascot → exercises filter bridge
 ├── screens/
-│   ├── auth/
-│   │   ├── LoginScreen.js
-│   │   └── RegisterScreen.js
-│   ├── HomeScreen.js      # Dashboard
-│   ├── ProgramScreen.js   # Weekly workout program
-│   ├── ExercisesScreen.js # Exercise library
-│   ├── ProgressScreen.js  # PR & history tracking
-│   └── ProfileScreen.js   # User profile + avatar
+│   ├── auth/LoginScreen.js
+│   ├── auth/RegisterScreen.js
+│   ├── HomeScreen.js        # Dashboard + active program
+│   ├── ExercisesScreen.js   # 3-tab: Library / Workouts / Templates
+│   ├── ProgramScreen.js     # Active program day cards + logging
+│   ├── ProgressScreen.js    # Mascot, measurements, overload
+│   └── ProfileScreen.js     # User settings
 ├── components/
-│   └── ExerciseMedia.js   # expo-video WebM player
+│   ├── MascotFlipCard.js    # Interactive muscle zones (tap → exercises)
+│   └── ExerciseMedia.js     # expo-video WebM player
+├── data/
+│   ├── trainingPlans.js     # Static template plans (TR+EN)
+│   └── zoneData.js          # Muscle zone lookup tables (auto-generated)
 └── utils/
-    ├── theme.js            # Color palette
-    └── storage.js          # AsyncStorage helpers
-```
-
-## Supabase Schema
-
-```sql
--- profiles table (auto-populated via trigger on auth.users insert)
-create table profiles (
-  id uuid references auth.users on delete cascade primary key,
-  full_name text, email text, weight numeric,
-  height numeric, goal text, avatar_url text,
-  created_at timestamptz default now()
-);
-alter table profiles enable row level security;
-
--- Storage: avatars bucket (public read, owner write)
+    ├── cache.js             # Stale-while-revalidate cache (mem + AsyncStorage)
+    ├── i18n.js              # Translation keys TR/EN
+    ├── storage.js           # AsyncStorage helpers
+    └── theme.js             # Color palette
+assets/
+├── mascot_male/             # front.png, back.png + zone masks
+├── mascot_female/           # front.png, back.png + zone masks
+└── zones/                   # Per-muscle overlay PNGs (auto-generated)
+scripts/
+├── process_assets.js        # Generates zone lookup tables from mask images
+└── comfyui_muscle_prompts.txt # ComfyUI prompts for muscle overlays
 ```
 
 ## License
