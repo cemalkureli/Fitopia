@@ -1,0 +1,1032 @@
+/**
+ * AICoachScreen — Kişiselleştirilmiş AI Fitness Koçu
+ * 22 adımlı değerlendirme sihirbazı. Dark theme, Fitopia renk sistemi.
+ */
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  Dimensions, Animated,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import AnimatedRN, { FadeInDown, FadeIn, FadeInUp } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { C } from '../utils/theme';
+import { supabase } from '../lib/supabase';
+import { useLang } from '../context/LanguageContext';
+import RulerPicker from '../components/RulerPicker';
+import WheelPicker from '../components/WheelPicker';
+
+const { width: SW } = Dimensions.get('window');
+
+// ─── Adım sırası ──────────────────────────────────────────────────────────────
+const STEPS = [
+  { id: 'welcome' },
+  { id: 'gender',         cat: 1 },
+  { id: 'goal',           cat: 1 },
+  { id: 'motivation',     cat: 1 },
+  { id: 'focus',          cat: 1 },
+  { id: 'birth_year',     cat: 2 },
+  { id: 'height',         cat: 2 },
+  { id: 'weight',         cat: 2 },
+  { id: 'target_weight',  cat: 2 },
+  { id: 'body_shape',     cat: 2 },
+  { id: 'occupation',     cat: 3 },
+  { id: 'workout_place',  cat: 3 },
+  { id: 'ex_type',        cat: 3 },
+  { id: 'injury',         cat: 3 },
+  { id: 'activity',       cat: 3 },
+  { id: 'frequency',      cat: 3 },
+  { id: 'level',          cat: 3 },
+  { id: 'pushups',        cat: 3 },
+  { id: 'running',        cat: 3 },
+  { id: 'comparison' },
+  { id: 'generating' },
+  { id: 'result' },
+];
+
+const CAT_LABELS = {
+  1: { tr: 'HEDEF & ODAK',        en: 'GOAL & FOCUS'       },
+  2: { tr: 'VÜCUDUNUz HAKKINDA', en: 'ABOUT YOUR BODY'    },
+  3: { tr: 'FİTNESS DEĞERLENDİRME', en: 'FITNESS ASSESSMENT' },
+};
+
+// ─── Yardımcılar ──────────────────────────────────────────────────────────────
+function bmi(w, h) { return h > 0 ? (w / ((h / 100) ** 2)).toFixed(1) : null; }
+function bmiInfo(v, lang) {
+  const n = parseFloat(v);
+  if (n < 18.5) return [lang === 'tr' ? 'Zayıf'         : 'Underweight',   C.blue,   lang === 'tr' ? 'Kilo almak faydalı olabilir.' : 'Gaining some weight may be beneficial.'];
+  if (n < 25)   return [lang === 'tr' ? 'Normal'         : 'Normal',        C.lime,   lang === 'tr' ? 'Harika bir rakam! Böyle devam et.' : 'Great figure! Keep it up.'];
+  if (n < 30)   return [lang === 'tr' ? 'Fazla Kilolu'   : 'Overweight',    C.orange, lang === 'tr' ? 'Biraz kilo vermek sağlığını iyileştirir.' : 'Losing some weight will improve your health.'];
+  return          [lang === 'tr' ? 'Obez'            : 'Obese',         C.red,    lang === 'tr' ? 'Sağlıklı kilo hedeflenmeli.' : 'Healthy weight should be targeted.'];
+}
+function projDays(cur, tgt, freq) {
+  const diff = Math.abs(cur - tgt);
+  if (diff < 0.1) return 14;
+  return Math.round((diff / (0.25 + (freq - 1) * 0.08)) * 7);
+}
+function addDays(n) {
+  const d = new Date(); d.setDate(d.getDate() + n); return d;
+}
+function fmtDate(d, lang) {
+  return d.toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', { month: 'short', day: 'numeric' });
+}
+
+// ─── Küçük bileşenler ─────────────────────────────────────────────────────────
+
+// Progress header
+function StepHeader({ step, onBack, lang }) {
+  const cat = step.cat;
+  return (
+    <View style={s.hdr}>
+      <TouchableOpacity onPress={onBack} hitSlop={{ top:12,bottom:12,left:12,right:12 }} style={s.hdrBack}>
+        <Ionicons name="arrow-back" size={22} color={C.text} />
+      </TouchableOpacity>
+      <View style={s.hdrCenter}>
+        <Text style={s.hdrCatN}>0{cat}</Text>
+        <Text style={s.hdrCatL}>{CAT_LABELS[cat]?.[lang]}</Text>
+      </View>
+      <View style={s.hdrBars}>
+        {[1,2,3].map(n => (
+          <View key={n} style={s.hdrBarSeg}>
+            <View style={[s.hdrBarFill, { flex: n <= cat ? 1 : 0 }]} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// NEXT button
+function NextBtn({ onPress, disabled, label }) {
+  return (
+    <View style={s.nextWrap}>
+      <TouchableOpacity onPress={onPress} disabled={!!disabled} activeOpacity={0.85}>
+        <LinearGradient colors={disabled ? [C.s2,C.s2] : ['#e8f44a','#a3c200']} style={s.nextBtn}>
+          <Text style={[s.nextTxt, disabled && { color: C.dim }]}>{label ?? 'NEXT'}</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// Seçenek satırı
+function OptionRow({ label, sublabel, icon, selected, onPress, color, multi }) {
+  const c = color ?? C.lime;
+  return (
+    <TouchableOpacity
+      style={[s.optRow, selected && { borderColor: c, backgroundColor: c + '14' }]}
+      onPress={onPress} activeOpacity={0.8}
+    >
+      {icon && <Ionicons name={icon} size={20} color={selected ? c : C.muted} style={{ marginRight: 12 }} />}
+      <View style={{ flex: 1 }}>
+        <Text style={[s.optLbl, selected && { color: c, fontWeight: '800' }]}>{label}</Text>
+        {sublabel ? <Text style={s.optSub}>{sublabel}</Text> : null}
+      </View>
+      <View style={[s.optCheck, selected && { backgroundColor: c, borderColor: c }]}>
+        {selected && <Ionicons name={multi ? 'checkmark' : 'checkmark'} size={12} color="#000" />}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// Büyük hedef kartı
+function GoalCard({ label, icon, color, selected, onPress, tip }) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ marginBottom: 10 }}>
+      <LinearGradient
+        colors={selected ? [color + 'DD', color + '88'] : [C.s1, C.s1]}
+        style={[s.goalCard, selected && { borderColor: color }]}
+      >
+        <Ionicons name={icon} size={36} color={selected ? '#fff' : color} />
+        <Text style={[s.goalLbl, selected && { color: '#fff' }]}>{label}</Text>
+        {selected && tip ? (
+          <AnimatedRN.View entering={FadeIn.duration(250)} style={s.goalTip}>
+            <Text style={s.goalTipTxt}>{tip}</Text>
+          </AnimatedRN.View>
+        ) : null}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
+// Vücut şekli slider
+const SHAPES = [
+  { k: 0, icon: 'body', color: '#06b6d4' },
+  { k: 1, icon: 'body', color: '#4ade80' },
+  { k: 2, icon: 'body', color: C.lime   },
+  { k: 3, icon: 'body', color: C.orange },
+  { k: 4, icon: 'body', color: '#f97316'},
+  { k: 5, icon: 'body', color: C.red    },
+];
+const SHAPE_LBL = {
+  0: { tr:'Çok İnce',     en:'Very Cut'     },
+  1: { tr:'İnce',         en:'Cut'          },
+  2: { tr:'Normal',       en:'Normal'       },
+  3: { tr:'Dolgun',       en:'Slightly Plump'},
+  4: { tr:'Kilolu',       en:'Plump'        },
+  5: { tr:'Obez',         en:'Obese'        },
+};
+function BodyShapePicker({ value, onChange, lang }) {
+  const sh = SHAPES[value];
+  return (
+    <View>
+      <View style={s.shapeRow}>
+        {SHAPES.map(sh2 => (
+          <TouchableOpacity key={sh2.k} onPress={() => onChange(sh2.k)} style={[s.shapeBtn, value === sh2.k && { borderColor: sh2.color }]}>
+            <LinearGradient colors={value === sh2.k ? [sh2.color+'44',sh2.color+'22'] : [C.s2,C.s2]} style={s.shapeBtnGrad}>
+              <Ionicons name="body" size={18 + sh2.k * 2} color={value === sh2.k ? sh2.color : C.dim} />
+            </LinearGradient>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={s.shapeRowLbl}>
+        <Text style={s.shapeLblSide}>{lang === 'tr' ? 'İnce' : 'Cut'}</Text>
+        <Text style={[s.shapeSelected, { color: sh.color }]}>{SHAPE_LBL[value]?.[lang]}</Text>
+        <Text style={s.shapeLblSide}>{lang === 'tr' ? 'Kilolu' : 'Plump'}</Text>
+      </View>
+    </View>
+  );
+}
+
+// Aktivite slider
+const ACT_OPTS = [
+  { icon: 'desktop-outline',  tr: 'Hareketsiz',  en: 'Sedentary',   desc_tr: 'Gün boyu masada oturuyorum',            desc_en: 'I sit at my desk all day'                    },
+  { icon: 'walk-outline',     tr: 'Az Aktif',    en: 'Low Active',  desc_tr: 'Ara sıra 30 dk yürüyüş yapıyorum',       desc_en: 'I occasionally exercise or walk 30 minutes'  },
+  { icon: 'bicycle-outline',  tr: 'Orta Aktif',  en: 'Moderate',    desc_tr: 'Günde 1 saat antrenman yapıyorum',        desc_en: 'I spend an hour working out every day'       },
+  { icon: 'barbell-outline',  tr: 'Aktif',       en: 'Active',      desc_tr: 'Yoğun antrenman yapmayı seviyorum',       desc_en: 'I love working out and want more exercises'  },
+];
+
+// Projeksiyon grafiği
+function ProjectionChart({ curKg, tgtKg, days, lang }) {
+  const lose   = curKg > tgtKg;
+  const diff   = Math.abs(curKg - tgtKg).toFixed(1);
+  const endDate = addDays(days);
+  const segs    = 8;
+  const pts     = Array.from({ length: segs }, (_, i) => {
+    const t = i / (segs - 1);
+    return lose ? 1 - t * 0.82 : 0.18 + t * 0.82;
+  });
+  return (
+    <View style={s.chart}>
+      <Text style={s.chartTitle}>{lang === 'tr' ? 'Hedef Tahmini' : 'Goal Projection'}</Text>
+      <View style={s.chartKgRow}>
+        <Text style={s.chartCur}>{curKg} kg</Text>
+        <Ionicons name="arrow-forward" size={16} color={C.dim} />
+        <Text style={[s.chartTgt, { color: C.lime }]}>{tgtKg} kg</Text>
+      </View>
+      <View style={s.chartBars}>
+        {pts.map((h2, i) => (
+          <View key={i} style={s.chartBarCol}>
+            <LinearGradient
+              colors={i === segs-1 ? [C.lime,'#a3c200'] : [C.teal+'99',C.blue+'33']}
+              style={[s.chartBar, { height: `${h2 * 100}%` }]}
+            />
+          </View>
+        ))}
+      </View>
+      <View style={s.chartDates}>
+        <Text style={s.chartDate}>{lang === 'tr' ? 'Bugün' : 'Today'}</Text>
+        <Text style={[s.chartDate, { color: C.lime, fontWeight: '800' }]}>{fmtDate(endDate, lang)}</Text>
+      </View>
+      <View style={s.chartInfo}>
+        <Ionicons name="checkmark-circle" size={18} color={C.lime} />
+        <Text style={s.chartInfoTxt}>
+          {diff} kg {lose ? (lang === 'tr' ? 'kayıp' : 'loss') : (lang === 'tr' ? 'kazanım' : 'gain')}
+          {' — '}{days} {lang === 'tr' ? 'gün' : 'days'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// Plan kartı
+function PlanCard({ answers, lang }) {
+  const w   = answers.weight;
+  const h2  = answers.height;
+  const b   = bmi(w, h2);
+  const [bLabel, bColor, bDesc] = b ? bmiInfo(b, lang) : ['—', C.muted, ''];
+  const GOAL_LBL = { lose_weight: lang==='tr'?'Kilo Ver':'Lose Weight', build_muscle: lang==='tr'?'Kas Kazan':'Build Muscle', keep_fit: lang==='tr'?'Formda Kal':'Keep Fit' };
+  const LVL_LBL  = { beginner: lang==='tr'?'Başlangıç':'Beginner', intermediate: lang==='tr'?'Orta':'Intermediate', advanced: lang==='tr'?'İleri':'Advanced' };
+  const FOCUS_LBL = { full_body:'Full Body', chest:lang==='tr'?'Göğüs':'Chest', back:lang==='tr'?'Sırt':'Back', arms:lang==='tr'?'Kollar':'Arms', legs:lang==='tr'?'Bacaklar':'Legs', core:'Core' };
+  const items = [
+    { icon:'barbell-outline', lbl: lang==='tr'?'Antrenman':'Training', val: `${answers.workoutFreq}×/` + (lang==='tr'?'hafta':'week') },
+    { icon:'flame-outline',   lbl: lang==='tr'?'Seviye':'Level',       val: LVL_LBL[answers.fitnessLevel] ?? '—' },
+    { icon:'body-outline',    lbl: lang==='tr'?'Odak':'Focus',         val: FOCUS_LBL[answers.focusArea] ?? '—' },
+    { icon:'trophy-outline',  lbl: lang==='tr'?'Hedef':'Goal',         val: GOAL_LBL[answers.goal] ?? '—' },
+  ];
+  return (
+    <View style={s.planCard}>
+      <Text style={s.planTitle}>{lang === 'tr' ? 'Plan Özeti' : 'Plan Summary'}</Text>
+      <View style={s.planGrid}>
+        {items.map((it, i) => (
+          <View key={i} style={s.planItem}>
+            <Ionicons name={it.icon} size={20} color={C.lime} />
+            <Text style={s.planVal}>{it.val}</Text>
+            <Text style={s.planLbl}>{it.lbl}</Text>
+          </View>
+        ))}
+      </View>
+      {b && (
+        <View style={[s.planBmi, { borderColor: bColor + '44' }]}>
+          <Text style={[s.planBmiVal, { color: bColor }]}>BMI {b}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.planBmiLbl, { color: bColor }]}>{bLabel}</Text>
+            <Text style={s.planBmiDesc}>{bDesc}</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// Diğer planlar vs bizim plan karşılaştırması
+function PlanComparison({ lang }) {
+  const theirs = lang==='tr'
+    ? ['Yavaş Sonuç', 'Uygunsuz', 'Kolay Bozulur', 'Sınırlı Destek']
+    : ['Slow Effects', 'Not Suitable', 'Easy to Rebound', 'Limited Support'];
+  const ours = lang==='tr'
+    ? ['Hızlı Değişim', 'Sana Özel', 'Kalıcı Sonuç', 'Takip Kolaylığı']
+    : ['Faster Changes', 'Fit You Perfectly', 'Lasting Results', 'Easy to Follow'];
+  return (
+    <View style={s.cmpRow}>
+      <View style={[s.cmpCard, { backgroundColor: C.s2, borderColor: C.border }]}>
+        <Text style={s.cmpLbl}>{lang==='tr'?'Diğer Planlar':'Other Plans'}</Text>
+        {theirs.map((t,i) => (
+          <View key={i} style={s.cmpItem}>
+            <Ionicons name="close" size={14} color={C.red} />
+            <Text style={s.cmpTxt}>{t}</Text>
+          </View>
+        ))}
+      </View>
+      <LinearGradient colors={['#4f46e5','#2563eb']} style={[s.cmpCard, { borderColor: '#2563eb' }]}>
+        <Text style={[s.cmpLbl, { color: '#fff' }]}>{lang==='tr'?'Planımız':'Our Plan'}</Text>
+        {ours.map((t,i) => (
+          <View key={i} style={s.cmpItem}>
+            <Ionicons name="checkmark-circle" size={14} color="#fff" />
+            <Text style={[s.cmpTxt, { color: '#fff' }]}>{t}</Text>
+          </View>
+        ))}
+      </LinearGradient>
+    </View>
+  );
+}
+
+// ─── Ana ekran ────────────────────────────────────────────────────────────────
+export default function AICoachScreen() {
+  const { lang } = useLang();
+  const [stepIdx, setStepIdx] = useState(0);
+  const [saving,  setSaving]  = useState(false);
+  const [userId,  setUserId]  = useState(null);
+  const [hasProfile, setHasProfile] = useState(false);
+
+  const [a, setA] = useState({  // answers
+    gender:          null,
+    goal:            null,
+    motivation:      [],
+    focusArea:       null,
+    birthYear:       1995,
+    height:          175,
+    weight:          75,
+    targetWeight:    70,
+    bodyShape:       2,
+    targetBodyShape: 1,
+    occupation:      null,
+    workoutPlace:    null,
+    exType:          null,
+    injury:          [],
+    activityLevel:   1,
+    workoutFreq:     3,
+    fitnessLevel:    'intermediate',
+    pushups:         null,
+    running:         null,
+  });
+
+  const set = (k, v) => setA(prev => ({ ...prev, [k]: v }));
+  const toggleArr = (k, v) => setA(prev => ({
+    ...prev,
+    [k]: prev[k].includes(v) ? prev[k].filter(x => x !== v) : [...prev[k], v],
+  }));
+
+  useFocusEffect(useCallback(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data?.user) return;
+      setUserId(data.user.id);
+      supabase.from('ai_profiles').select('*').eq('id', data.user.id).single()
+        .then(({ data: p }) => {
+          if (!p?.completed_at) return;
+          setHasProfile(true);
+          setA(prev => ({
+            ...prev,
+            gender:         p.gender ?? prev.gender,
+            goal:           p.goal ?? prev.goal,
+            focusArea:      p.focus_area ?? prev.focusArea,
+            height:         p.height_cm ?? prev.height,
+            weight:         p.weight_kg ?? prev.weight,
+            targetWeight:   p.target_weight_kg ?? prev.targetWeight,
+            bodyShape:      p.body_shape ?? prev.bodyShape,
+            targetBodyShape:p.target_body_shape ?? prev.targetBodyShape,
+            activityLevel:  p.activity_level ?? prev.activityLevel,
+            workoutFreq:    p.workout_freq ?? prev.workoutFreq,
+            fitnessLevel:   p.fitness_level ?? prev.fitnessLevel,
+          }));
+          setStepIdx(STEPS.findIndex(s => s.id === 'result'));
+        });
+    });
+  }, []));
+
+  const step = STEPS[stepIdx];
+
+  const canNext = () => {
+    switch (step?.id) {
+      case 'gender':       return !!a.gender;
+      case 'goal':         return !!a.goal;
+      case 'motivation':   return a.motivation.length > 0;
+      case 'focus':        return !!a.focusArea;
+      case 'occupation':   return !!a.occupation;
+      case 'workout_place':return !!a.workoutPlace;
+      case 'ex_type':      return !!a.exType;
+      case 'pushups':      return !!a.pushups;
+      case 'running':      return !!a.running;
+      default: return true;
+    }
+  };
+
+  const goNext = async () => {
+    if (step.id === 'running') {
+      setSaving(true);
+      setStepIdx(s => s + 1); // comparison
+    } else if (step.id === 'comparison') {
+      setStepIdx(s => s + 1); // generating
+      await saveProfile();
+      await new Promise(r => setTimeout(r, 2500));
+      setStepIdx(STEPS.findIndex(s => s.id === 'result'));
+      setSaving(false);
+    } else {
+      setStepIdx(s => s + 1);
+    }
+  };
+
+  const goBack = () => { if (stepIdx > 0) setStepIdx(s => s - 1); };
+
+  const saveProfile = async () => {
+    if (!userId) return;
+    await supabase.from('ai_profiles').upsert({
+      id:                userId,
+      gender:            a.gender,
+      goal:              a.goal,
+      focus_area:        a.focusArea,
+      height_cm:         a.height,
+      weight_kg:         a.weight,
+      target_weight_kg:  a.targetWeight,
+      body_shape:        a.bodyShape,
+      target_body_shape: a.targetBodyShape,
+      activity_level:    a.activityLevel,
+      workout_freq:      a.workoutFreq,
+      fitness_level:     a.fitnessLevel,
+      motivation:        a.motivation,
+      injury_areas:      a.injury,
+      completed_at:      new Date().toISOString(),
+      updated_at:        new Date().toISOString(),
+    });
+    setHasProfile(true);
+  };
+
+  // ─── Adım render ────────────────────────────────────────────────────────────
+  const renderStep = () => {
+    switch (step?.id) {
+
+      // 0. Welcome
+      case 'welcome': return (
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <AnimatedRN.View entering={FadeIn.duration(500)} style={s.welcomeWrap}>
+            <LinearGradient colors={[C.lime+'22', C.lime+'06']} style={s.coachCircle}>
+              <Ionicons name="medal" size={52} color={C.lime} />
+            </LinearGradient>
+            <Text style={s.welcomeHi}>{lang==='tr'?'Merhaba!':'Hello!'}</Text>
+            <Text style={s.welcomeDesc}>
+              {lang==='tr'
+                ? 'Kişisel antrenörünüzüm.\nSize özel plan için\nbir kaç soru soracağım.'
+                : "I'm your personal coach.\nA few questions to build\nyour personalized plan."}
+            </Text>
+            {hasProfile && (
+              <TouchableOpacity
+                onPress={() => setStepIdx(STEPS.findIndex(s2=>s2.id==='result'))}
+                style={s.existingBtn}
+              >
+                <Ionicons name="checkmark-circle" size={16} color={C.lime} />
+                <Text style={s.existingTxt}>{lang==='tr'?'Mevcut planı görüntüle':'View existing plan'}</Text>
+              </TouchableOpacity>
+            )}
+          </AnimatedRN.View>
+          <View style={{ padding: 16 }}>
+            <TouchableOpacity onPress={goNext} activeOpacity={0.85}>
+              <LinearGradient colors={['#e8f44a','#a3c200']} style={s.readyBtn}>
+                <Text style={s.readyTxt}>{lang==='tr'?"Hazırım →":"I'm Ready →"}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      );
+
+      // 1. Cinsiyet
+      case 'gender': return (
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <Text style={s.q}>{lang==='tr'?'Cinsiyetiniz?':"What's your gender?"}</Text>
+          <Text style={s.qsub}>{lang==='tr'?'Sizi daha iyi tanıyalım':'Let us know you better'}</Text>
+          <View style={s.genderRow}>
+            {[
+              { k:'male',   lbl: lang==='tr'?'Erkek':'Male',   icon:'man',   col: C.blue },
+              { k:'female', lbl: lang==='tr'?'Kadın':'Female', icon:'woman', col:'#f97316' },
+            ].map(g => (
+              <TouchableOpacity key={g.k} style={[s.genderCard, a.gender===g.k&&{borderColor:g.col,backgroundColor:g.col+'18'}]} onPress={()=>set('gender',g.k)} activeOpacity={0.8}>
+                {a.gender===g.k && <Ionicons name="checkmark-circle" size={20} color={g.col} style={s.genderCheck}/>}
+                <Ionicons name={g.icon} size={56} color={a.gender===g.k?g.col:C.dim} />
+                <Text style={[s.genderLbl, a.gender===g.k&&{color:g.col,fontWeight:'800'}]}>{g.lbl}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity onPress={()=>{set('gender','other');setStepIdx(s=>s+1);}} style={s.otherBtn}>
+            <Text style={s.otherTxt}>{lang==='tr'?'Diğer / Belirtmek istemiyorum':"Others / I'd rather not say"}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      );
+
+      // 2. Hedef
+      case 'goal': {
+        const goals = [
+          { k:'lose_weight',  lbl:lang==='tr'?'Kilo Ver':'Lose Weight',  icon:'flame-outline',   col:C.orange, tip:lang==='tr'?'🔥 Daha sağlıklı, daha hafif bir sen!':'🔥 Slim & fit ahead! Get ready for a healthier you.' },
+          { k:'build_muscle', lbl:lang==='tr'?'Kas Kazan':'Build Muscle', icon:'barbell-outline', col:C.lime,   tip:lang==='tr'?'💪 Kas kazan, özgüven kazan!':'💪 Muscle up, confidence up!' },
+          { k:'keep_fit',     lbl:lang==='tr'?'Formda Kal':'Keep Fit',    icon:'heart-outline',   col:C.teal,   tip:lang==='tr'?'😊 Aktif kal, sağlıklı kal!':'😊 Stay active, stay healthy!' },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Ana hedefiniz?':"What's your main goal?"}</Text>
+            {goals.map(g=><GoalCard key={g.k} label={g.lbl} icon={g.icon} color={g.col} selected={a.goal===g.k} onPress={()=>set('goal',g.k)} tip={g.tip}/>)}
+          </ScrollView>
+        );
+      }
+
+      // 3. Motivasyon
+      case 'motivation': {
+        const opts = [
+          { k:'attractive',  lbl:lang==='tr'?'Daha çekici görün':'Look more attractive',   icon:'sparkles-outline'   },
+          { k:'stronger',    lbl:lang==='tr'?'Daha güçlü ol':'Get stronger',               icon:'barbell-outline'    },
+          { k:'health',      lbl:lang==='tr'?'Sağlığı iyileştir':'Improve health',          icon:'medkit-outline'     },
+          { k:'confident',   lbl:lang==='tr'?'Kendine güven':'Feel confident',              icon:'happy-outline'      },
+          { k:'energy',      lbl:lang==='tr'?'Enerji kazan':'Boost energy',                 icon:'flash-outline'      },
+          { k:'stress',      lbl:lang==='tr'?'Stresi azalt':'Release stress',               icon:'leaf-outline'       },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Sizi en çok ne motive eder?':'What motivates you the most?'}</Text>
+            <Text style={s.qsub}>{lang==='tr'?'Birden fazla seçebilirsiniz':'Multiple selections allowed'}</Text>
+            {opts.map(o=><OptionRow key={o.k} label={o.lbl} icon={o.icon} selected={a.motivation.includes(o.k)} onPress={()=>toggleArr('motivation',o.k)} multi />)}
+          </ScrollView>
+        );
+      }
+
+      // 4. Odak bölge
+      case 'focus': {
+        const areas = [
+          { k:'full_body', lbl:lang==='tr'?'Tüm Vücut':'Full Body',    icon:'body-outline'               },
+          { k:'arms',      lbl:lang==='tr'?'Kollar':'Arms',            icon:'fitness-outline'            },
+          { k:'chest',     lbl:lang==='tr'?'Göğüs':'Chest',           icon:'shirt-outline'              },
+          { k:'core',      lbl:lang==='tr'?'Karın / Core':'Abs / Core',icon:'radio-button-on-outline'    },
+          { k:'legs',      lbl:lang==='tr'?'Bacaklar':'Legs',          icon:'walk-outline'               },
+          { k:'back',      lbl:lang==='tr'?'Sırt':'Back',              icon:'accessibility-outline'      },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Odak bölgeniz?':"What's your focus area?"}</Text>
+            <View style={s.focusGrid}>
+              {areas.map(a2=>(
+                <TouchableOpacity key={a2.k} style={[s.focusCard, a.focusArea===a2.k&&{borderColor:C.lime,backgroundColor:C.lime+'14'}]} onPress={()=>set('focusArea',a2.k)} activeOpacity={0.8}>
+                  <Ionicons name={a2.icon} size={28} color={a.focusArea===a2.k?C.lime:C.muted} />
+                  <Text style={[s.focusLbl, a.focusArea===a2.k&&{color:C.lime,fontWeight:'800'}]}>{a2.lbl}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        );
+      }
+
+      // 5. Doğum yılı
+      case 'birth_year': {
+        const years = Array.from({length:80},(_,i)=>2010-i);
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Doğum yılınız?':"What's your birth year?"}</Text>
+            <View style={s.infoCard}>
+              <Ionicons name="information-circle-outline" size={18} color={C.muted} />
+              <Text style={s.infoCardTxt}>
+                {lang==='tr'?'Yaş grubunuza göre antrenman ayarlanır.':'Used to adjust workout for your age group.'}
+              </Text>
+            </View>
+            <WheelPicker values={years} value={a.birthYear} onChange={v=>set('birthYear',v)} color={C.lime} />
+          </ScrollView>
+        );
+      }
+
+      // 6. Boy
+      case 'height':
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Boyunuz?':"What's your height?"}</Text>
+            <RulerPicker value={a.height} onChange={v=>set('height',v)} min={120} max={230} unit="cm" color={C.lime} />
+          </ScrollView>
+        );
+
+      // 7. Kilo
+      case 'weight': {
+        const b = bmi(a.weight, a.height);
+        const [bl, bc, bd] = b ? bmiInfo(b, lang) : ['—', C.muted, ''];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Mevcut kilonuz?':"What's your current weight?"}</Text>
+            <RulerPicker value={a.weight} onChange={v=>set('weight',v)} min={30} max={250} unit="kg" color={C.lime} step={0.5} />
+            {b && (
+              <AnimatedRN.View entering={FadeIn.duration(250)} style={[s.bmiCard,{borderColor:bc+'55'}]}>
+                <Text style={[s.bmiVal,{color:bc}]}>{b}</Text>
+                <View style={{flex:1}}>
+                  <Text style={{color:C.text,fontWeight:'700'}}>BMI <Text style={{color:bc}}>({bl})</Text></Text>
+                  <Text style={{color:C.muted,fontSize:12,marginTop:2}}>{bd}</Text>
+                </View>
+              </AnimatedRN.View>
+            )}
+          </ScrollView>
+        );
+      }
+
+      // 8. Hedef kilo
+      case 'target_weight': {
+        const diff = (a.weight - a.targetWeight).toFixed(1);
+        const isLose = a.weight > a.targetWeight;
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Hedef kilonuz?':"What's your target weight?"}</Text>
+            <RulerPicker value={a.targetWeight} onChange={v=>set('targetWeight',v)} min={30} max={250} unit="kg" color={C.orange} step={0.5} />
+            {Math.abs(diff) > 0.1 && (
+              <AnimatedRN.View entering={FadeIn.duration(250)} style={[s.bmiCard,{borderColor:C.lime+'55'}]}>
+                <Ionicons name="flag-outline" size={28} color={C.lime} />
+                <View style={{flex:1}}>
+                  <Text style={{color:C.lime,fontWeight:'800',fontSize:15}}>
+                    {Math.abs(diff)} kg {isLose?(lang==='tr'?'kayıp':'loss'):(lang==='tr'?'kazanım':'gain')}
+                  </Text>
+                  <Text style={{color:C.muted,fontSize:12,marginTop:2}}>
+                    {lang==='tr'?'Makul bir hedef!':'Reasonable goal!'}
+                  </Text>
+                </View>
+              </AnimatedRN.View>
+            )}
+          </ScrollView>
+        );
+      }
+
+      // 9. Vücut şekli
+      case 'body_shape':
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Şu anki vücut şekliniz?':"What's your current body shape?"}</Text>
+            <BodyShapePicker value={a.bodyShape} onChange={v=>set('bodyShape',v)} lang={lang} />
+            <Text style={[s.q,{marginTop:20}]}>{lang==='tr'?'Hedef vücut şekliniz?':"What's your target body shape?"}</Text>
+            <BodyShapePicker value={a.targetBodyShape} onChange={v=>set('targetBodyShape',v)} lang={lang} />
+          </ScrollView>
+        );
+
+      // 10. Meslek
+      case 'occupation': {
+        const occ = [
+          { k:'student',    lbl:lang==='tr'?'Öğrenci':'Student',             icon:'school-outline'    },
+          { k:'fulltime',   lbl:lang==='tr'?'Tam zamanlı çalışan':'Full-time employee', icon:'briefcase-outline' },
+          { k:'parttime',   lbl:lang==='tr'?'Yarı zamanlı':'Part-time worker', icon:'bag-outline'      },
+          { k:'freelance',  lbl:lang==='tr'?'Freelancer':'Freelancer',        icon:'laptop-outline'    },
+          { k:'homemaker',  lbl:lang==='tr'?'Ev hanımı/reisi':'Homemaker',    icon:'home-outline'      },
+          { k:'business',   lbl:lang==='tr'?'İşletme sahibi':'Business owner',icon:'storefront-outline'},
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Sizi en iyi anlatan hangisi?':'What best describes you?'}</Text>
+            {occ.map(o=><OptionRow key={o.k} label={o.lbl} icon={o.icon} selected={a.occupation===o.k} onPress={()=>set('occupation',o.k)} />)}
+          </ScrollView>
+        );
+      }
+
+      // 11. Antrenman yeri
+      case 'workout_place': {
+        const places = [
+          { k:'gym',    lbl:lang==='tr'?'Spor Salonu':'Gym',              icon:'barbell-outline',   sub:lang==='tr'?'Tam ekipman':'Full equipment'    },
+          { k:'home',   lbl:lang==='tr'?'Evde':'At Home',                 icon:'home-outline',      sub:lang==='tr'?'Minimal ekipman':'Minimal equipment' },
+          { k:'outdoor',lbl:lang==='tr'?'Açık Hava':'Outdoors',           icon:'sunny-outline',     sub:lang==='tr'?'Park, saha':'Park, field'        },
+          { k:'yoga',   lbl:lang==='tr'?'Yoga Mat':'On the yoga mat',     icon:'flower-outline',    sub:lang==='tr'?'Zemin hareketleri':'Floor exercises' },
+          { k:'any',    lbl:lang==='tr'?'Her yer':'Any place is OK',      icon:'globe-outline',     sub:lang==='tr'?'Esnek program':'Flexible routine'  },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Genellikle nerede antrenman yaparsınız?':'Where do you usually work out?'}</Text>
+            {places.map(p=><OptionRow key={p.k} label={p.lbl} sublabel={p.sub} icon={p.icon} selected={a.workoutPlace===p.k} onPress={()=>set('workoutPlace',p.k)} />)}
+          </ScrollView>
+        );
+      }
+
+      // 12. Egzersiz tipi
+      case 'ex_type': {
+        const types = [
+          { k:'no_equip',  lbl:lang==='tr'?'Ekipmansız':'No equipment',     icon:'body-outline'               },
+          { k:'no_jump',   lbl:lang==='tr'?'Zıplamadan':'No jumping',        icon:'remove-circle-outline'      },
+          { k:'floor',     lbl:lang==='tr'?'Zemin hareketleri':'Floor/lying exercises', icon:'albums-outline' },
+          { k:'any',       lbl:lang==='tr'?'Farketmez':'No preference',      icon:'checkmark-done-outline'     },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Hangi egzersiz tipini tercih edersiniz?':'Which exercise type do you prefer?'}</Text>
+            {types.map(t=><OptionRow key={t.k} label={t.lbl} icon={t.icon} selected={a.exType===t.k} onPress={()=>set('exType',t.k)} />)}
+          </ScrollView>
+        );
+      }
+
+      // 13. Sakatlık/rahatsızlık
+      case 'injury': {
+        const areas = [
+          { k:'none',      lbl:lang==='tr'?'Yok':'None',              icon:'checkmark-circle-outline' },
+          { k:'knee',      lbl:lang==='tr'?'Diz':'Knee',              icon:'accessibility-outline'    },
+          { k:'lower_back',lbl:lang==='tr'?'Alt Sırt':'Lower back',   icon:'body-outline'              },
+          { k:'shoulder',  lbl:lang==='tr'?'Omuz':'Shoulder',         icon:'fitness-outline'           },
+          { k:'ankle',     lbl:lang==='tr'?'Ayak Bileği':'Ankle',     icon:'walk-outline'              },
+          { k:'wrist',     lbl:lang==='tr'?'Bilek':'Wrist',           icon:'hand-right-outline'        },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Herhangi bir rahatsızlık var mı?':'Any discomfort or concerns?'}</Text>
+            <View style={s.infoCard}>
+              <Ionicons name="medical-outline" size={18} color={C.muted} />
+              <Text style={s.infoCardTxt}>
+                {lang==='tr'?'Bölgeleri özel olarak gözetleyelim.':'We will focus on areas needing extra care.'}
+              </Text>
+            </View>
+            {areas.map(ar=><OptionRow key={ar.k} label={ar.lbl} icon={ar.icon} selected={a.injury.includes(ar.k)} onPress={()=>{ if(ar.k==='none'){set('injury',['none']);}else{toggleArr('injury',ar.k);}}} multi />)}
+          </ScrollView>
+        );
+      }
+
+      // 14. Aktivite seviyesi
+      case 'activity': {
+        const cur = ACT_OPTS[a.activityLevel];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Aktivite seviyeniz?':"What's your activity level?"}</Text>
+            <View style={s.actIconWrap}>
+              <LinearGradient colors={[C.lime+'22',C.lime+'06']} style={s.actIconCircle}>
+                <Ionicons name={cur.icon} size={48} color={C.lime} />
+              </LinearGradient>
+              <Text style={s.actDesc}>{cur['desc_'+lang]}</Text>
+            </View>
+            <View style={s.sliderRow}>
+              {ACT_OPTS.map((_,i)=>(
+                <TouchableOpacity key={i} onPress={()=>set('activityLevel',i)} hitSlop={{top:12,bottom:12,left:12,right:12}}>
+                  <View style={[s.sliderDot, a.activityLevel===i&&{backgroundColor:C.lime,width:22,height:22,borderRadius:11}]} />
+                </TouchableOpacity>
+              ))}
+              <View style={s.sliderLine}/>
+            </View>
+            <View style={s.sliderLabels}>
+              <Text style={s.sliderLbl}>{lang==='tr'?'Hareketsiz':'Sedentary'}</Text>
+              <Text style={s.sliderLbl}>{lang==='tr'?'Aktif':'Active'}</Text>
+            </View>
+          </ScrollView>
+        );
+      }
+
+      // 15. Antrenman sıklığı
+      case 'frequency': {
+        const FREQ_DESC = {
+          1: lang==='tr'?'Meşgulüm ama haftada bir antrenman yapmak istiyorum.':'I\'m busy but still want to fit in a workout once a week.',
+          2: lang==='tr'?'Biraz zamanım var ama çok değil.':'I have a bit of free time, but not too much.',
+          3: lang==='tr'?'Antrenmanı yaşam tarzımın parçası yapıyorum.':'I enjoy working out as part of my lifestyle.',
+          4: lang==='tr'?'Kendimi zorlamaya hazırım!':'I\'m willing to work hard and push myself!',
+        };
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Ne sıklıkla antrenman yapmak istersiniz?':'How often would you like to work out?'}</Text>
+            <View style={s.actIconWrap}>
+              <LinearGradient colors={[C.blue+'22',C.blue+'06']} style={s.actIconCircle}>
+                <Text style={s.freqBig}>{a.workoutFreq}</Text>
+              </LinearGradient>
+              <Text style={s.actDesc}>{FREQ_DESC[a.workoutFreq]}</Text>
+              <Text style={[s.actDesc,{color:C.lime,fontWeight:'800'}]}>{a.workoutFreq} {lang==='tr'?'kez/hafta':'times/week'}</Text>
+            </View>
+            <View style={s.sliderRow}>
+              {[1,2,3,4].map(n=>(
+                <TouchableOpacity key={n} onPress={()=>set('workoutFreq',n)} hitSlop={{top:12,bottom:12,left:12,right:12}}>
+                  <View style={[s.sliderDot, a.workoutFreq===n&&{backgroundColor:C.blue,width:22,height:22,borderRadius:11}]} />
+                </TouchableOpacity>
+              ))}
+              <View style={s.sliderLine}/>
+            </View>
+            <View style={s.sliderLabels}>
+              <Text style={s.sliderLbl}>{lang==='tr'?'Az':'Less'}</Text>
+              <Text style={s.sliderLbl}>{lang==='tr'?'Çok':'More'}</Text>
+            </View>
+          </ScrollView>
+        );
+      }
+
+      // 16. Fitness seviyesi
+      case 'level': {
+        const lvls = [
+          { k:'beginner',     lbl:lang==='tr'?'Başlamak kolay':'Easy to start',       icon:'leaf-outline',       col:C.teal,  tip:lang==='tr'?'Yeni başlıyorum veya uzun süredir yapmıyorum.':'New or haven\'t exercised in a while.' },
+          { k:'intermediate', lbl:lang==='tr'?'Hafif ter dök':'Break a light sweat',  icon:'water-outline',      col:C.lime,  tip:lang==='tr'?'Düzenli spor yapıyorum, biraz zorlanmak istiyorum.':'I exercise regularly, want some challenge.' },
+          { k:'advanced',     lbl:lang==='tr'?'Zorlu':'A bit challenging',            icon:'flame-outline',      col:C.orange,tip:lang==='tr'?'💪 Limitlerini zorla! Beraber güçleneceğiz.':'💪 Push your limits! We\'ll witness a stronger you.' },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Antrenman tercihiniz?':'Choose your preferred workout level'}</Text>
+            {lvls.map(lv=><OptionRow key={lv.k} label={lv.lbl} sublabel={a.fitnessLevel===lv.k?lv.tip:undefined} icon={lv.icon} selected={a.fitnessLevel===lv.k} onPress={()=>set('fitnessLevel',lv.k)} color={lv.col} />)}
+          </ScrollView>
+        );
+      }
+
+      // 17. Şınav kapasitesi
+      case 'pushups': {
+        const opts = [
+          { k:'beginner',     lbl:lang==='tr'?'Başlangıç (3-5)':'Beginner',     sublbl:'3-5 push-ups',    icon:'leaf-outline'    },
+          { k:'intermediate', lbl:lang==='tr'?'Orta (5-10)':'Intermediate',      sublbl:'5-10 push-ups',   icon:'trending-up-outline' },
+          { k:'advanced',     lbl:lang==='tr'?'İleri (10+)':'Advanced',          sublbl:'10+ push-ups',    icon:'flame-outline'   },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Tek seferde kaç şınav çekebilirsiniz?':'How many push-ups can you do at one time?'}</Text>
+            {opts.map(o=><OptionRow key={o.k} label={o.lbl} sublabel={o.sublbl} icon={o.icon} selected={a.pushups===o.k} onPress={()=>set('pushups',o.k)} />)}
+          </ScrollView>
+        );
+      }
+
+      // 18. Koşu sonrası
+      case 'running': {
+        const opts = [
+          { k:'breathless',    lbl:lang==='tr'?'Nefes nefese':'Breathless',     icon:'sad-outline',   tip:lang==='tr'?'😊 Sorun değil! Kardiyoyu geliştireceğiz.':'😊 No big deal! We\'ll boost your cardio.' },
+          { k:'slightly_tired',lbl:lang==='tr'?'Biraz yorulurum':'Slightly tired',icon:'hand-right-outline',tip:lang==='tr'?'💧 Güzel! Dayanıklılığını artıracağız.':'💧 Good work! We\'ll enhance your endurance.' },
+          { k:'relaxed',       lbl:lang==='tr'?'Rahat hissederim':'Feel relaxed', icon:'happy-outline', tip:lang==='tr'?'😎 Etkileyici! Seviyeni daha da artıracağız.':'😎 Impressive! We\'ll take it even further.' },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Hızlı koşu sonrası nasıl hissedersiniz?':'How do you feel after fast running?'}</Text>
+            {opts.map(o=><OptionRow key={o.k} label={o.lbl} sublabel={a.running===o.k?o.tip:undefined} icon={o.icon} selected={a.running===o.k} onPress={()=>set('running',o.k)} />)}
+          </ScrollView>
+        );
+      }
+
+      // 19. Planlar karşılaştırması (marketing screen)
+      case 'comparison': return (
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <Text style={s.q}>{lang==='tr'?'Fitness\'ı daha kolay & etkili yapalım!':'Let\'s make your fitness easier & more effective!'}</Text>
+          <PlanComparison lang={lang} />
+          <View style={{paddingTop:8}}>
+            <TouchableOpacity onPress={goNext} activeOpacity={0.85}>
+              <LinearGradient colors={['#4f46e5','#2563eb']} style={s.readyBtn}>
+                <Text style={s.readyTxt}>{lang==='tr'?'Planımı Al →':'Get My Plan →'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      );
+
+      // 20. Üretiliyor
+      case 'generating': {
+        const genItems = [
+          lang==='tr'?'Vücut verileri analiz ediliyor':'Analyzing body data',
+          lang==='tr'?'Metabolizma hesaplanıyor':'Calculating metabolism',
+          lang==='tr'?'Odak egzersizler seçiliyor':'Picking targeted exercises',
+          lang==='tr'?'Fitness seviyesi ayarlanıyor':'Adjusting your fitness level',
+        ];
+        return (
+          <View style={s.genWrap}>
+            <Text style={s.genTitle}>{lang==='tr'?'Koçunuz planınızı hazırlıyor...':'Your coach is creating your plan...'}</Text>
+            {genItems.map((lbl,i)=>(
+              <AnimatedRN.View key={i} entering={FadeInDown.delay(i*500).duration(350)} style={s.genItem}>
+                <LinearGradient colors={[C.lime+'33',C.lime+'11']} style={s.genDot}>
+                  <Ionicons name="checkmark" size={14} color={C.lime} />
+                </LinearGradient>
+                <View style={{flex:1}}>
+                  <Text style={s.genLbl}>{lbl}</Text>
+                  <View style={s.genBarBg}>
+                    <LinearGradient colors={[C.lime,C.teal]} style={s.genBarFill}/>
+                  </View>
+                </View>
+              </AnimatedRN.View>
+            ))}
+          </View>
+        );
+      }
+
+      // 21. Sonuç
+      case 'result': {
+        const days = projDays(a.weight, a.targetWeight, a.workoutFreq);
+        return (
+          <ScrollView contentContainerStyle={{padding:16,paddingBottom:48}} showsVerticalScrollIndicator={false}>
+            <AnimatedRN.View entering={FadeInUp.duration(400)}>
+              <Text style={[s.q,{textAlign:'center',marginBottom:4}]}>
+                {lang==='tr'?'🎯 Planınız hazır!':'🎯 Your plan is ready!'}
+              </Text>
+              <Text style={[s.qsub,{textAlign:'center',marginBottom:16}]}>
+                {lang==='tr'?'Verilere dayalı tahminleriniz':'Your data-driven projections'}
+              </Text>
+              <ProjectionChart curKg={a.weight} tgtKg={a.targetWeight} days={days} lang={lang} />
+              <PlanCard answers={a} lang={lang} />
+              <TouchableOpacity style={s.restartBtn} onPress={()=>{ setStepIdx(0); setHasProfile(false); }} activeOpacity={0.8}>
+                <Ionicons name="refresh-outline" size={16} color={C.muted}/>
+                <Text style={s.restartTxt}>{lang==='tr'?'Planı Güncelle':'Update Plan'}</Text>
+              </TouchableOpacity>
+            </AnimatedRN.View>
+          </ScrollView>
+        );
+      }
+
+      default: return null;
+    }
+  };
+
+  const isQuestion = !!step?.cat;
+  const showNext   = isQuestion && !['comparison'].includes(step?.id);
+
+  return (
+    <View style={s.container}>
+      {isQuestion && <StepHeader step={step} onBack={goBack} lang={lang} />}
+      <View style={{flex:1}}>{renderStep()}</View>
+      {showNext && <NextBtn onPress={goNext} disabled={!canNext()||saving} label={lang==='tr'?'DEVAM':'NEXT'} />}
+    </View>
+  );
+}
+
+// ─── Stiller ──────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  container:    { flex:1, backgroundColor:C.bg },
+  scroll:       { padding:16, paddingBottom:16 },
+
+  // Step header
+  hdr:          { paddingHorizontal:16, paddingTop:12, paddingBottom:8 },
+  hdrBack:      { position:'absolute', left:16, top:14, zIndex:1 },
+  hdrCenter:    { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8, marginBottom:10 },
+  hdrCatN:      { color:C.lime, fontSize:13, fontWeight:'900' },
+  hdrCatL:      { color:C.muted, fontSize:11, fontWeight:'700', letterSpacing:1 },
+  hdrBars:      { flexDirection:'row', gap:4, height:3 },
+  hdrBarSeg:    { flex:1, backgroundColor:C.s3, borderRadius:2, overflow:'hidden', flexDirection:'row' },
+  hdrBarFill:   { backgroundColor:C.lime, height:'100%' },
+
+  // NEXT
+  nextWrap:     { padding:16, paddingBottom:24 },
+  nextBtn:      { borderRadius:16, height:56, alignItems:'center', justifyContent:'center' },
+  nextTxt:      { color:C.bg, fontSize:16, fontWeight:'900', letterSpacing:0.5 },
+
+  // Questions
+  q:            { color:C.text, fontSize:22, fontWeight:'900', marginBottom:6, lineHeight:30 },
+  qsub:         { color:C.muted, fontSize:14, marginBottom:16 },
+
+  // Option row
+  optRow:       { flexDirection:'row', alignItems:'center', backgroundColor:C.s1, borderRadius:16, padding:16, borderWidth:1.5, borderColor:C.border, marginBottom:10 },
+  optLbl:       { color:C.text, fontSize:15, fontWeight:'700' },
+  optSub:       { color:C.muted, fontSize:12, marginTop:3, lineHeight:18 },
+  optCheck:     { width:22, height:22, borderRadius:11, borderWidth:1.5, borderColor:C.border, alignItems:'center', justifyContent:'center' },
+
+  // Goal card
+  goalCard:     { borderRadius:18, padding:20, borderWidth:1.5, borderColor:C.border, flexDirection:'row', alignItems:'center', flexWrap:'wrap', gap:14 },
+  goalLbl:      { color:C.text, fontSize:18, fontWeight:'900', flex:1 },
+  goalTip:      { width:'100%', backgroundColor:'rgba(255,255,255,0.12)', borderRadius:12, padding:12 },
+  goalTipTxt:   { color:'#fff', fontSize:13, lineHeight:20 },
+
+  // Welcome
+  welcomeWrap:  { alignItems:'center', paddingTop:32, paddingBottom:24, paddingHorizontal:24 },
+  coachCircle:  { width:104, height:104, borderRadius:52, alignItems:'center', justifyContent:'center', marginBottom:24, borderWidth:1, borderColor:C.lime+'33' },
+  welcomeHi:    { color:C.text, fontSize:38, fontWeight:'900', marginBottom:14 },
+  welcomeDesc:  { color:C.muted, fontSize:16, textAlign:'center', lineHeight:26 },
+  existingBtn:  { flexDirection:'row', alignItems:'center', gap:8, backgroundColor:C.lime+'14', borderRadius:12, padding:12, borderWidth:1, borderColor:C.lime+'33', marginTop:20, alignSelf:'stretch' },
+  existingTxt:  { color:C.lime, fontWeight:'700', fontSize:13, flex:1 },
+  readyBtn:     { borderRadius:16, height:56, alignItems:'center', justifyContent:'center' },
+  readyTxt:     { color:C.bg, fontSize:17, fontWeight:'900' },
+
+  // Gender
+  genderRow:    { flexDirection:'row', gap:12, marginBottom:16 },
+  genderCard:   { flex:1, alignItems:'center', backgroundColor:C.s1, borderRadius:18, padding:24, borderWidth:1.5, borderColor:C.border, gap:12, position:'relative' },
+  genderCheck:  { position:'absolute', top:10, right:10 },
+  genderLbl:    { color:C.text, fontSize:16, fontWeight:'700' },
+  otherBtn:     { alignItems:'center', paddingVertical:14 },
+  otherTxt:     { color:C.muted, fontSize:13 },
+
+  // Focus grid
+  focusGrid:    { flexDirection:'row', flexWrap:'wrap', gap:10 },
+  focusCard:    { width:(SW-42)/2, backgroundColor:C.s1, borderRadius:16, padding:18, borderWidth:1.5, borderColor:C.border, alignItems:'center', gap:10 },
+  focusLbl:     { color:C.text, fontSize:13, fontWeight:'700', textAlign:'center' },
+
+  // BMI card
+  bmiCard:      { flexDirection:'row', alignItems:'center', gap:16, backgroundColor:C.s1, borderRadius:16, padding:16, borderWidth:1, marginTop:16 },
+  bmiVal:       { fontSize:40, fontWeight:'900' },
+
+  // Info card
+  infoCard:     { flexDirection:'row', alignItems:'center', gap:10, backgroundColor:C.s1, borderRadius:14, padding:14, borderWidth:1, borderColor:C.border, marginBottom:16 },
+  infoCardTxt:  { color:C.muted, fontSize:13, flex:1 },
+
+  // Activity/Frequency slider
+  actIconWrap:  { alignItems:'center', paddingVertical:20, gap:14 },
+  actIconCircle:{ width:96, height:96, borderRadius:48, alignItems:'center', justifyContent:'center', borderWidth:1, borderColor:C.lime+'33' },
+  actDesc:      { color:C.text, fontSize:15, textAlign:'center', lineHeight:22, paddingHorizontal:16 },
+  freqBig:      { color:C.lime, fontSize:60, fontWeight:'900', lineHeight:68 },
+  sliderRow:    { flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginHorizontal:8, position:'relative', paddingVertical:12 },
+  sliderLine:   { position:'absolute', height:2, backgroundColor:C.s3, left:12, right:12, zIndex:-1 },
+  sliderDot:    { width:16, height:16, borderRadius:8, backgroundColor:C.s3, borderWidth:2, borderColor:C.border },
+  sliderLabels: { flexDirection:'row', justifyContent:'space-between', marginTop:4 },
+  sliderLbl:    { color:C.dim, fontSize:12, fontWeight:'600' },
+
+  // Body shape
+  shapeRow:     { flexDirection:'row', gap:4, marginBottom:10 },
+  shapeBtn:     { flex:1, borderRadius:10, borderWidth:1.5, borderColor:'transparent', overflow:'hidden' },
+  shapeBtnGrad: { alignItems:'center', justifyContent:'flex-end', paddingBottom:6, paddingTop:4, height:68 },
+  shapeRowLbl:  { flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:12 },
+  shapeLblSide: { color:C.dim, fontSize:11, fontWeight:'600' },
+  shapeSelected:{ fontSize:14, fontWeight:'800', flex:1, textAlign:'center' },
+
+  // Plan comparison
+  cmpRow:       { flexDirection:'row', gap:10 },
+  cmpCard:      { flex:1, borderRadius:18, padding:16, borderWidth:1.5, gap:10 },
+  cmpLbl:       { color:C.muted, fontSize:14, fontWeight:'800', marginBottom:4 },
+  cmpItem:      { flexDirection:'row', alignItems:'center', gap:8 },
+  cmpTxt:       { color:C.muted, fontSize:13, flex:1 },
+
+  // Generating
+  genWrap:      { flex:1, padding:24, justifyContent:'center' },
+  genTitle:     { color:C.text, fontSize:22, fontWeight:'900', textAlign:'center', marginBottom:36, lineHeight:30 },
+  genItem:      { flexDirection:'row', alignItems:'center', gap:14, marginBottom:28 },
+  genDot:       { width:36, height:36, borderRadius:18, alignItems:'center', justifyContent:'center' },
+  genLbl:       { color:C.text, fontSize:14, fontWeight:'700', marginBottom:6 },
+  genBarBg:     { height:4, backgroundColor:C.s3, borderRadius:2, overflow:'hidden' },
+  genBarFill:   { height:'100%', width:'100%', borderRadius:2 },
+
+  // Chart
+  chart:        { backgroundColor:C.s1, borderRadius:18, padding:16, borderWidth:1, borderColor:C.border, marginVertical:16 },
+  chartTitle:   { color:C.muted, fontSize:12, fontWeight:'700', marginBottom:8, textAlign:'center' },
+  chartKgRow:   { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:12, marginBottom:12 },
+  chartCur:     { color:C.muted, fontSize:22, fontWeight:'800' },
+  chartTgt:     { fontSize:28, fontWeight:'900' },
+  chartBars:    { flexDirection:'row', alignItems:'flex-end', height:72, gap:3, marginBottom:6 },
+  chartBarCol:  { flex:1, height:'100%', justifyContent:'flex-end' },
+  chartBar:     { borderRadius:4, width:'100%' },
+  chartDates:   { flexDirection:'row', justifyContent:'space-between', marginBottom:10 },
+  chartDate:    { color:C.dim, fontSize:12 },
+  chartInfo:    { flexDirection:'row', alignItems:'center', gap:8, backgroundColor:C.lime+'18', borderRadius:12, padding:12 },
+  chartInfoTxt: { color:C.lime, fontSize:13, fontWeight:'700', flex:1 },
+
+  // Plan card
+  planCard:     { backgroundColor:C.s1, borderRadius:18, padding:16, borderWidth:1, borderColor:C.border, marginBottom:16 },
+  planTitle:    { color:C.text, fontSize:15, fontWeight:'800', marginBottom:14, textAlign:'center' },
+  planGrid:     { flexDirection:'row', flexWrap:'wrap', gap:10, marginBottom:12 },
+  planItem:     { flex:1, minWidth:'44%', backgroundColor:C.s2, borderRadius:12, padding:12, alignItems:'center', gap:4 },
+  planVal:      { color:C.text, fontSize:15, fontWeight:'900', textAlign:'center' },
+  planLbl:      { color:C.muted, fontSize:11, fontWeight:'600', textAlign:'center' },
+  planBmi:      { flexDirection:'row', alignItems:'center', gap:12, borderRadius:12, padding:12, borderWidth:1 },
+  planBmiVal:   { fontSize:28, fontWeight:'900' },
+  planBmiLbl:   { fontSize:14, fontWeight:'800' },
+  planBmiDesc:  { color:C.muted, fontSize:12, marginTop:2 },
+
+  // Result
+  restartBtn:   { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:6, padding:12, backgroundColor:C.s1, borderRadius:12, borderWidth:1, borderColor:C.border },
+  restartTxt:   { color:C.muted, fontSize:13, fontWeight:'600' },
+});

@@ -23,6 +23,7 @@ import ProgramScreen  from './src/screens/ProgramScreen';
 import ExercisesScreen from './src/screens/ExercisesScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
 import ProfileScreen  from './src/screens/ProfileScreen';
+import AICoachScreen  from './src/screens/AICoachScreen';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,6 +46,7 @@ const TAB_ICONS = {
   Program:    { focused: 'barbell',     outline: 'barbell-outline' },
   Egzersizler:{ focused: 'fitness',     outline: 'fitness-outline' },
   İlerleme:   { focused: 'trending-up', outline: 'trending-up-outline' },
+  Koç:        { focused: 'medal',       outline: 'medal-outline' },
   Profil:     { focused: 'person',      outline: 'person-outline' },
 };
 
@@ -150,6 +152,7 @@ function MainTabs({ onSignOut }) {
         <Tab.Screen name="Program"     component={ProgramScreen}  options={{ tabBarLabel: lang === 'tr' ? 'WORKOUTS' : 'WORKOUTS' }} />
         <Tab.Screen name="Egzersizler" component={ExercisesScreen}options={{ tabBarLabel: t('tabExercises', lang) }} />
         <Tab.Screen name="İlerleme"    component={ProgressScreen} options={{ tabBarLabel: t('tabProgress', lang) }} />
+        <Tab.Screen name="Koç"         component={AICoachScreen}  options={{ tabBarLabel: lang === 'tr' ? 'KOÇ' : 'COACH' }} />
         <Tab.Screen name="Profil"      options={{ tabBarLabel: t('tabProfile', lang) }}>
           {() => <ProfileScreen onSignOut={onSignOut} />}
         </Tab.Screen>

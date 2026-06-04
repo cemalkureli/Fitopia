@@ -14,6 +14,7 @@ import { getAllWorkoutLogs } from '../utils/storage';
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight, fmtHeight } from '../context/UnitsContext';
 import { t } from '../utils/i18n';
+import RulerPicker from '../components/RulerPicker';
 
 const { width } = Dimensions.get('window');
 const SUPPORT_EMAIL = 'cemalkureli@gmail.com';
@@ -159,27 +160,34 @@ function SubDesc({ text, delay = 60 }) {
 }
 
 // ─── Number edit sub-screen ───────────────────────────────────────────────────
-function NumberSub({ title, unit, value, desc, onBack, onSave, bgColors }) {
-  const [val, setVal] = useState(value || '');
+function NumberSub({ title, unit, value, desc, onBack, onSave, bgColors, min, max }) {
+  const initNum = parseFloat(value) || (min ?? 0);
+  const [num, setNum] = useState(initNum);
+  const useRuler = min !== undefined && max !== undefined;
   return (
     <View style={ss.fill}>
       <SubBg colors={bgColors} />
       <SubHeader title={title} onBack={onBack} />
       <SubDesc text={desc} />
       <AnimatedRN.View entering={FadeInDown.delay(120).duration(280)} style={ss.numWrap}>
-        <View style={ss.numRow}>
-          <TextInput
-            style={ss.numInput}
-            value={val}
-            onChangeText={setVal}
-            keyboardType="decimal-pad"
-            placeholderTextColor={C.dim}
-            placeholder="0"
-            autoFocus
-          />
-          <Text style={ss.numUnit}>{unit}</Text>
-        </View>
-        <TouchableOpacity style={ss.saveBtn} onPress={() => onSave(val)}>
+        {useRuler ? (
+          // Cetvel kaydırıcı (boy / kilo gibi değerler için)
+          <RulerPicker value={num} onChange={setNum} min={min} max={max} unit={unit} color="#dc2626" />
+        ) : (
+          <View style={ss.numRow}>
+            <TextInput
+              style={ss.numInput}
+              value={String(num)}
+              onChangeText={v => setNum(parseFloat(v) || 0)}
+              keyboardType="decimal-pad"
+              placeholderTextColor={C.dim}
+              placeholder="0"
+              autoFocus
+            />
+            <Text style={ss.numUnit}>{unit}</Text>
+          </View>
+        )}
+        <TouchableOpacity style={ss.saveBtn} onPress={() => onSave(String(num))}>
           <LinearGradient colors={['#dc2626', '#7f1d1d']} style={ss.saveGrad}>
             <Text style={ss.saveTxt}>Kaydet</Text>
           </LinearGradient>
@@ -461,22 +469,24 @@ export default function ProfileScreen({ onSignOut }) {
   if (sub === 'height') return (
     <NumberSub
       title={t('changeHeight', lang)}
-      unit={lengthUnit} value={profile?.height ? String(profile.height) : ''}
-      desc={lang === 'tr' ? 'Boyunuzu girin.' : 'Enter your height.'}
+      unit={lengthUnit} value={profile?.height ? String(profile.height) : '175'}
+      desc={lang === 'tr' ? 'Boyunuzu seçin.' : 'Select your height.'}
       bgColors={['rgba(20,184,166,0.12)', 'rgba(2,6,23,0)']}
       onBack={() => setSub(null)}
       onSave={v => saveField('height', v)}
+      min={120} max={230}
     />
   );
 
   if (sub === 'weight') return (
     <NumberSub
       title={t('changeWeight', lang)}
-      unit={weightUnit} value={profile?.weight ? String(profile.weight) : ''}
-      desc={lang === 'tr' ? 'Kilonuzu girin.' : 'Enter your weight.'}
+      unit={weightUnit} value={profile?.weight ? String(profile.weight) : '75'}
+      desc={lang === 'tr' ? 'Kilonuzu seçin.' : 'Select your weight.'}
       bgColors={['rgba(56,189,248,0.12)', 'rgba(2,6,23,0)']}
       onBack={() => setSub(null)}
       onSave={v => saveField('weight', v)}
+      min={30} max={250}
     />
   );
 

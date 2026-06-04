@@ -21,15 +21,18 @@ Rules:
 - `src/data/zoneData.js` — auto-generated muscle zone lookup tables (run scripts/process_assets.js)
 
 **Screens:**
-- `HomeScreen` — active program today card (tap → Program tab), weekly activity dots, stats
+- `HomeScreen` — active program today card (tap → Program tab), weekly activity dots, stats, AI coach card
 - `ExercisesScreen` — 3 tabs: Library (filter/search/pagination), Workouts (custom), Templates
 - `ProgramScreen` — active program day cards, open state controlled by parent, media modal
 - `ProgressScreen` — mascot (MascotFlipCard), measurements, overload charts
-- `ProfileScreen` — avatar, body stats, gender, language, units
+- `ProfileScreen` — avatar, body stats, gender, language, units (height/weight use RulerPicker)
+- `AICoachScreen` — 22-step fitness assessment wizard → projection chart + plan summary; saves to `ai_profiles` Supabase table
 
 **Components:**
 - `MascotFlipCard` — tap muscle → overlay PNG highlight → navigate to filtered exercises
 - `ExerciseMedia` — expo-video WebM player, video outside ScrollView to prevent jump
+- `RulerPicker` — horizontal scroll ruler for weight/height (used in AICoachScreen + ProfileScreen)
+- `WheelPicker` — vertical snap scroll wheel for year/value selection (used in AICoachScreen)
 
 **Contexts:** LanguageProvider · UnitsProvider · MuscleFilterProvider (mascot→exercises bridge)
 

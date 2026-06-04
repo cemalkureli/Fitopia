@@ -128,12 +128,12 @@ function ActivityWeek({ logs, program, lang, navigation }) {
 export default function HomeScreen() {
   const { lang }       = useLang();
   const navigation     = useNavigation();
-  const [logs,    setLogs]    = useState({});
-  const [profile, setProfile] = useState(null);
-  const [program, setProgram] = useState(null);   // active program or null
+  const [logs,       setLogs]       = useState({});
+  const [profile,    setProfile]    = useState(null);
+  const [program,    setProgram]    = useState(null);
+  const [coachGoal,  setCoachGoal]  = useState(null); // ai_profiles goal summary
 
   useFocusEffect(useCallback(() => {
-    // Parallel: tüm data fetch'leri aynı anda başlat
     Promise.all([
       getAllWorkoutLogs(),
       getActiveProgram(),
@@ -144,6 +144,11 @@ export default function HomeScreen() {
       if (data?.user) {
         const meta = data.user.user_metadata;
         setProfile({ name: meta?.full_name || data.user.email?.split('@')[0] || t('athlete', lang) });
+        // AI Coach projeksiyonu
+        supabase.from('ai_profiles')
+          .select('goal, weight_kg, target_weight_kg, workout_freq, completed_at')
+          .eq('id', data.user.id).single()
+          .then(({ data: cp }) => { if (cp?.completed_at) setCoachGoal(cp); });
       }
     });
   }, [lang]));
@@ -266,6 +271,35 @@ export default function HomeScreen() {
           <StatCard icon="trophy-outline"   value={totalLogs}        label={t('totalSessions', lang)}   color={C.orange} delay={420} />
         </View>
       </Animated.View>
+
+      {/* AI Coach hedef kartı */}
+      {coachGoal && (
+        <Animated.View entering={FadeInDown.delay(280).duration(400)}>
+          <TouchableOpacity
+            style={[s.sectionCard, { borderColor: C.lime + '33', flexDirection: 'row', alignItems: 'center', gap: 12 }]}
+            onPress={() => navigation.navigate('Koç')}
+            activeOpacity={0.8}
+          >
+            <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: C.lime + '18', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="medal" size={22} color={C.lime} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.lime, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginBottom: 2 }}>
+                {lang === 'tr' ? 'AI KOÇUN' : 'AI COACH'}
+              </Text>
+              <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
+                {coachGoal.goal === 'lose_weight' && (lang === 'tr' ? `Hedef: ${coachGoal.target_weight_kg} kg` : `Goal: ${coachGoal.target_weight_kg} kg`)}
+                {coachGoal.goal === 'build_muscle' && (lang === 'tr' ? 'Kas geliştirme programı aktif' : 'Muscle building plan active')}
+                {coachGoal.goal === 'keep_fit'    && (lang === 'tr' ? 'Form koruma programı aktif' : 'Keep fit plan active')}
+              </Text>
+              <Text style={{ color: C.muted, fontSize: 11, marginTop: 1 }}>
+                {coachGoal.workout_freq}× {lang === 'tr' ? 'haftalık antrenman' : 'workouts/week'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={C.lime + '88'} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* Son antrenmanlar */}
       {Object.keys(logs).length > 0 && (
