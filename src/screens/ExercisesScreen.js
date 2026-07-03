@@ -13,7 +13,6 @@ import { supabase } from '../lib/supabase';
 import ExerciseMedia from '../components/ExerciseMedia';
 import { useLang } from '../context/LanguageContext';
 import { t, CATEGORY_LABELS, MUSCLE_LABELS } from '../utils/i18n';
-import { getFavorites, toggleFavorite } from '../utils/storage';
 import { TRAINING_PLANS, PLAN_FILTERS } from '../data/trainingPlans';
 import { setActiveProgram, getMyPlans, saveMyPlan, deleteMyPlan, getActiveProgram, clearActiveProgram } from '../utils/storage';
 import { useMuscleFilter } from '../context/MuscleFilterContext';
@@ -129,7 +128,7 @@ const eb = StyleSheet.create({
 });
 
 // ─── Egzersiz satırı ─────────────────────────────────────────────────────────
-const ExerciseRow = memo(({ item, onPress, lang, isFav, onToggleFav }) => {
+const ExerciseRow = memo(({ item, onPress, lang }) => {
   const color    = CAT_COLOR[item.category] ?? C.lime;
   const catLabel = CATEGORY_LABELS[lang]?.[item.category] ?? item.category;
   const muscle   = MUSCLE_LABELS[lang]?.[item.primary_muscle] ?? item.primary_muscle;
@@ -164,14 +163,6 @@ const ExerciseRow = memo(({ item, onPress, lang, isFav, onToggleFav }) => {
           </View>
         )}
       </View>
-      {/* Favori butonu */}
-      <TouchableOpacity
-        onPress={e => { e.stopPropagation?.(); onToggleFav(item.name); }}
-        hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-        style={{ padding: 4 }}
-      >
-        <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? C.red : C.dim} />
-      </TouchableOpacity>
       <Ionicons name="chevron-forward" size={14} color={C.dim} />
     </TouchableOpacity>
   );
@@ -1773,7 +1764,6 @@ function ExercisesLibrary({ lang }) {
   const [muscle,    setMuscle]    = useState(''); // primary_muscle filter
   const [diff,      setDiff]      = useState(0);
   const [selected,  setSelected]  = useState(null);
-  const [favorites, setFavorites] = useState([]);
   const offsetRef   = useRef(0);
   const searchTimer = useRef(null);
 
@@ -1790,13 +1780,6 @@ function ExercisesLibrary({ lang }) {
       clearMuscleFilter();
     }
   }, [muscleFilter]));
-
-  useEffect(() => { getFavorites().then(setFavorites); }, []);
-
-  const handleToggleFav = useCallback(async (exerciseName) => {
-    const updated = await toggleFavorite(exerciseName);
-    setFavorites([...updated]);
-  }, []);
 
   const fetchExercises = useCallback(async (reset = false) => {
     const offset = reset ? 0 : offsetRef.current;
@@ -1872,8 +1855,8 @@ function ExercisesLibrary({ lang }) {
   }, [cat, muscle, diff, search]);
 
   const renderItem = useCallback(({ item }) => (
-    <ExerciseRow item={item} onPress={setSelected} lang={lang} isFav={favorites.includes(item.name)} onToggleFav={handleToggleFav} />
-  ), [lang, favorites, handleToggleFav]);
+    <ExerciseRow item={item} onPress={setSelected} lang={lang} />
+  ), [lang]);
 
   const renderChip = useCallback(({ item: chip }) => {
     const label = lang === 'tr' ? chip.label_tr : chip.label_en;

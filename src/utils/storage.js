@@ -262,3 +262,44 @@ export async function toggleFavorite(exerciseName) {
   await AsyncStorage.setItem(KEY_FAVORITES, JSON.stringify(favs));
   return favs;
 }
+
+// ─── Card game (swipe likes / dislikes) ───────────────────────────────────────
+// Her kayıt bir egzersiz objesi: { name, category, primary_muscle, thumb_url }
+const KEY_CARD_LIKES    = 'fitopia_card_likes';
+const KEY_CARD_DISLIKES = 'fitopia_card_dislikes';
+
+async function readList(key) {
+  const raw = await AsyncStorage.getItem(key);
+  return raw ? JSON.parse(raw) : [];
+}
+export const getCardLikes    = () => readList(KEY_CARD_LIKES);
+export const getCardDislikes = () => readList(KEY_CARD_DISLIKES);
+
+// Bir karta karar ver: 'like' | 'dislike'. Aynı egzersizi iki listeden de
+// temizler, sonra hedef listenin başına ekler. Güncel listeleri döndürür.
+export async function decideCard(ex, decision) {
+  const [likes, dislikes] = await Promise.all([getCardLikes(), getCardDislikes()]);
+  const strip = (arr) => arr.filter(x => x.name !== ex.name);
+  let L = strip(likes), D = strip(dislikes);
+  const entry = { name: ex.name, category: ex.category, primary_muscle: ex.primary_muscle, thumb_url: ex.thumb_url ?? null };
+  if (decision === 'like') L = [entry, ...L]; else D = [entry, ...D];
+  await Promise.all([
+    AsyncStorage.setItem(KEY_CARD_LIKES, JSON.stringify(L)),
+    AsyncStorage.setItem(KEY_CARD_DISLIKES, JSON.stringify(D)),
+  ]);
+  return { likes: L, dislikes: D };
+}
+
+export async function removeCard(name, list) {
+  const key = list === 'like' ? KEY_CARD_LIKES : KEY_CARD_DISLIKES;
+  const arr = (await readList(key)).filter(x => x.name !== name);
+  await AsyncStorage.setItem(key, JSON.stringify(arr));
+  return arr;
+}
+
+export async function resetCards() {
+  await Promise.all([
+    AsyncStorage.removeItem(KEY_CARD_LIKES),
+    AsyncStorage.removeItem(KEY_CARD_DISLIKES),
+  ]);
+}

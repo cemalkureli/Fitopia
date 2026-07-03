@@ -9,7 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { C } from '../utils/theme';
-import { saveWorkoutSession, getAllWorkoutLogs, getFavorites, deleteWorkoutSession, deleteAllExerciseSessions, getActiveProgram } from '../utils/storage';
+import { saveWorkoutSession, getAllWorkoutLogs, deleteWorkoutSession, deleteAllExerciseSessions, getActiveProgram } from '../utils/storage';
+import CardGameScreen from './CardGameScreen';
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
 import MascotFlipCard from '../components/MascotFlipCard';
@@ -664,17 +665,14 @@ export default function ProgressScreen() {
   const { lang }                       = useLang();
   const { weightUnit, lengthUnit }     = useUnits();
   const [workoutLogs, setWorkoutLogs]  = useState({});
-  const [favorites,   setFavorites]    = useState([]);
   const [logModal,    setLogModal]     = useState(null);
   const [logSets,     setLogSets]      = useState([{ reps: '', kg: '' }, { reps: '', kg: '' }, { reps: '', kg: '' }]);
-  const [filterProg,  setFilterProg]   = useState('all');
   const [activeTab,   setActiveTab]    = useState(0);
   const [confirmDel,  setConfirmDel]   = useState(null); // exercise name to delete
   const { show: showToast, ToastNode } = useToast();
 
   useFocusEffect(useCallback(() => {
     getAllWorkoutLogs().then(setWorkoutLogs);
-    getFavorites().then(setFavorites);
   }, []));
 
   const openLog = (exerciseName) => {
@@ -699,12 +697,12 @@ export default function ProgressScreen() {
   const updateSet = (i, field, val) => setLogSets(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
 
   const loggedExercises = Object.keys(workoutLogs).filter(ex => (workoutLogs[ex] || []).length > 0);
-  const filteredProg    = filterProg === 'logged' ? loggedExercises : favorites;
 
   const TABS = [
     { label: t('tabGeneral', lang),     icon: 'stats-chart-outline' },
     { label: t('tabProgressive', lang), icon: 'trending-up-outline' },
     { label: t('tabMeasurement', lang), icon: 'body-outline' },
+    { label: lang === 'tr' ? 'Kartlar' : 'Cards', icon: 'albums-outline' },
   ];
 
   return (
@@ -746,36 +744,20 @@ export default function ProgressScreen() {
         <GeneralTab workoutLogs={workoutLogs} lang={lang} weightUnit={weightUnit} lengthUnit={lengthUnit} />
       )}
 
-      {/* Tab 1 — Progressive Overload */}
+      {/* Tab 1 — Progressive Overload (kaydedilen egzersizler) */}
       {activeTab === 1 && (
         <View style={s.fill}>
           <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-            {/* Filter */}
-            <AnimatedRN.View entering={FadeInDown.delay(60).duration(280)} style={s.filterRow}>
-              {[
-                { key: 'all',    label: t('favorites', lang) },
-                { key: 'logged', label: t('logged', lang) },
-              ].map(f => (
-                <TouchableOpacity
-                  key={f.key}
-                  style={[s.filterBtn, filterProg === f.key && s.filterBtnActive]}
-                  onPress={() => setFilterProg(f.key)}
-                >
-                  <Text style={[s.filterText, filterProg === f.key && s.filterTextActive]}>{f.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </AnimatedRN.View>
-
-            {filteredProg.length === 0 ? (
+            {loggedExercises.length === 0 ? (
               <AnimatedRN.View entering={FadeInDown.duration(320)} style={s.emptyWrap}>
-                <Ionicons name={filterProg === 'all' ? 'heart-outline' : 'bar-chart-outline'} size={40} color={C.dim} />
-                <Text style={s.emptyTxt}>{t(filterProg === 'all' ? 'noFavorites' : 'noData', lang)}</Text>
+                <Ionicons name="bar-chart-outline" size={40} color={C.dim} />
+                <Text style={s.emptyTxt}>{t('noData', lang)}</Text>
               </AnimatedRN.View>
             ) : (
-              filteredProg.map((ex, i) => (
+              loggedExercises.map((ex, i) => (
                 <ExerciseCard key={ex} name={ex} sessions={workoutLogs[ex] || []} onLog={openLog} index={i} lang={lang}
                   onReload={() => getAllWorkoutLogs().then(setWorkoutLogs)}
-                  onDelete={filterProg === 'logged' ? (n) => setConfirmDel(n) : undefined} />
+                  onDelete={(n) => setConfirmDel(n)} />
               ))
             )}
           </ScrollView>
@@ -786,6 +768,9 @@ export default function ProgressScreen() {
       {activeTab === 2 && (
         <MeasurementTab lang={lang} weightUnit={weightUnit} lengthUnit={lengthUnit} />
       )}
+
+      {/* Tab 3 — Egzersiz Kartları (swipe oyunu) */}
+      {activeTab === 3 && <CardGameScreen />}
 
       {/* Log Modal */}
       {logModal && (
