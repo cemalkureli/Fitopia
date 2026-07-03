@@ -14,8 +14,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../utils/theme';
 import { supabase } from '../lib/supabase';
 import { useLang } from '../context/LanguageContext';
+import { useUnits } from '../context/UnitsContext';
 import RulerPicker from '../components/RulerPicker';
 import WheelPicker from '../components/WheelPicker';
+import YearDigitPicker from '../components/YearDigitPicker';
+import SyncedUnitField from '../components/SyncedUnitField';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -71,6 +74,35 @@ function addDays(n) {
 function fmtDate(d, lang) {
   return d.toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', { month: 'short', day: 'numeric' });
 }
+
+// Aralık sabitleri
+const YEAR_MIN = 1950, YEAR_MAX = 2015;
+const H_MIN = 120, H_MAX = 220;   // cm
+const W_MIN = 30,  W_MAX = 200;   // kg
+const FREQ_MIN = 1, FREQ_MAX = 7;
+
+// Kilo+boy → BMI → vücut şekli indeksi (0 çok ince … 5 obez). Kullanıcı seçmez,
+// girdiği verilerden türetilir.
+function deriveShape(kg, cm) {
+  const b = cm > 0 ? kg / ((cm / 100) ** 2) : 22;
+  if (b < 18.5) return 0;
+  if (b < 21)   return 1;
+  if (b < 25)   return 2;
+  if (b < 27.5) return 3;
+  if (b < 30)   return 4;
+  return 5;
+}
+
+// Birim dönüşümleri (SyncedUnitField için)
+const HEIGHT_UNITS = [
+  { key: 'cm', label: 'cm', toBase: x => x,          fromBase: b => String(Math.round(b)) },
+  { key: 'ft', label: 'ft', toBase: x => x * 30.48,  fromBase: b => (b / 30.48).toFixed(2) },
+];
+const WEIGHT_UNITS = [
+  { key: 'kg', label: 'kg', toBase: x => x,           fromBase: b => (Math.round(b * 2) / 2).toString() },
+  { key: 'lb', label: 'lb', toBase: x => x / 2.20462, fromBase: b => (b * 2.20462).toFixed(1) },
+];
+const roundHalf = v => Math.round(v * 2) / 2;
 
 // ─── Küçük bileşenler ─────────────────────────────────────────────────────────
 
@@ -167,28 +199,6 @@ const SHAPE_LBL = {
   4: { tr:'Kilolu',       en:'Plump'        },
   5: { tr:'Obez',         en:'Obese'        },
 };
-function BodyShapePicker({ value, onChange, lang }) {
-  const sh = SHAPES[value];
-  return (
-    <View>
-      <View style={s.shapeRow}>
-        {SHAPES.map(sh2 => (
-          <TouchableOpacity key={sh2.k} onPress={() => onChange(sh2.k)} style={[s.shapeBtn, value === sh2.k && { borderColor: sh2.color }]}>
-            <LinearGradient colors={value === sh2.k ? [sh2.color+'44',sh2.color+'22'] : [C.s2,C.s2]} style={s.shapeBtnGrad}>
-              <Ionicons name="body" size={18 + sh2.k * 2} color={value === sh2.k ? sh2.color : C.dim} />
-            </LinearGradient>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <View style={s.shapeRowLbl}>
-        <Text style={s.shapeLblSide}>{lang === 'tr' ? 'İnce' : 'Cut'}</Text>
-        <Text style={[s.shapeSelected, { color: sh.color }]}>{SHAPE_LBL[value]?.[lang]}</Text>
-        <Text style={s.shapeLblSide}>{lang === 'tr' ? 'Kilolu' : 'Plump'}</Text>
-      </View>
-    </View>
-  );
-}
-
 // Aktivite slider
 const ACT_OPTS = [
   { icon: 'desktop-outline',  tr: 'Hareketsiz',  en: 'Sedentary',   desc_tr: 'Gün boyu masada oturuyorum',            desc_en: 'I sit at my desk all day'                    },
@@ -313,12 +323,25 @@ function PlanComparison({ lang }) {
 }
 
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
-export default function AICoachScreen() {
+export default function AICoachScreen({ navigation }) {
   const { lang } = useLang();
+  const { weightUnit, lengthUnit } = useUnits();
   const [stepIdx, setStepIdx] = useState(0);
   const [saving,  setSaving]  = useState(false);
   const [userId,  setUserId]  = useState(null);
   const [hasProfile, setHasProfile] = useState(false);
+
+  // Manuel giriş geçerlilik durumu (aralık dışı → NEXT bloklanır)
+  const [invalidSteps, setInvalidSteps] = useState({});
+  const setStepInvalid = (id, bad) => setInvalidSteps(prev => (prev[id] === bad ? prev : { ...prev, [id]: bad }));
+
+  // Yıl için "taslak" (digit spinner), wheel'i süren committed değerden ayrı
+  const [yearDraft, setYearDraft] = useState(1995);
+
+  // Aktif giriş birimleri (ayarlardaki tercihe göre başlar)
+  const [heightUnit, setHeightUnit] = useState(lengthUnit === 'cm' ? 'cm' : 'ft');
+  const [weightUnitSel, setWeightUnitSel] = useState(weightUnit === 'kg' ? 'kg' : 'lb');
+  const [tgtUnitSel, setTgtUnitSel] = useState(weightUnit === 'kg' ? 'kg' : 'lb');
 
   const [a, setA] = useState({  // answers
     gender:          null,
@@ -383,6 +406,10 @@ export default function AICoachScreen() {
       case 'goal':         return !!a.goal;
       case 'motivation':   return a.motivation.length > 0;
       case 'focus':        return !!a.focusArea;
+      case 'birth_year':   return !invalidSteps.birth_year && yearDraft >= YEAR_MIN && yearDraft <= YEAR_MAX;
+      case 'height':       return !invalidSteps.height;
+      case 'weight':       return !invalidSteps.weight;
+      case 'target_weight':return !invalidSteps.target_weight;
       case 'occupation':   return !!a.occupation;
       case 'workout_place':return !!a.workoutPlace;
       case 'ex_type':      return !!a.exType;
@@ -419,8 +446,8 @@ export default function AICoachScreen() {
       height_cm:         a.height,
       weight_kg:         a.weight,
       target_weight_kg:  a.targetWeight,
-      body_shape:        a.bodyShape,
-      target_body_shape: a.targetBodyShape,
+      body_shape:        deriveShape(a.weight, a.height),
+      target_body_shape: deriveShape(a.targetWeight, a.height),
       activity_level:    a.activityLevel,
       workout_freq:      a.workoutFreq,
       fitness_level:     a.fitnessLevel,
@@ -551,29 +578,51 @@ export default function AICoachScreen() {
         );
       }
 
-      // 5. Doğum yılı
+      // 5. Doğum yılı — wheel + 4 haneli kilit spinner (senkron), aralık kontrolü
       case 'birth_year': {
-        const years = Array.from({length:80},(_,i)=>2010-i);
+        const years = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MAX - i);
+        const outOfRange = yearDraft < YEAR_MIN || yearDraft > YEAR_MAX;
+        const onWheel = (v) => { set('birthYear', v); setYearDraft(v); setStepInvalid('birth_year', false); };
+        const onDigits = (v) => {
+          setYearDraft(v);
+          if (v >= YEAR_MIN && v <= YEAR_MAX) { set('birthYear', v); setStepInvalid('birth_year', false); }
+          else setStepInvalid('birth_year', true);
+        };
         return (
-          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={s.q}>{lang==='tr'?'Doğum yılınız?':"What's your birth year?"}</Text>
             <View style={s.infoCard}>
               <Ionicons name="information-circle-outline" size={18} color={C.muted} />
               <Text style={s.infoCardTxt}>
-                {lang==='tr'?'Yaş grubunuza göre antrenman ayarlanır.':'Used to adjust workout for your age group.'}
+                {lang==='tr'?`Yaş grubunuza göre antrenman ayarlanır (${YEAR_MIN}–${YEAR_MAX}).`:`Used to adjust workout for your age group (${YEAR_MIN}–${YEAR_MAX}).`}
               </Text>
             </View>
-            <WheelPicker values={years} value={a.birthYear} onChange={v=>set('birthYear',v)} color={C.lime} />
+            <WheelPicker values={years} value={a.birthYear} onChange={onWheel} color={C.lime} />
+            <Text style={s.manualLbl}>{lang==='tr'?'veya elle gir':'or enter manually'}</Text>
+            <YearDigitPicker value={yearDraft} onChange={onDigits} color={C.lime} invalid={outOfRange} />
+            {outOfRange && (
+              <Text style={s.errTxt}>
+                {lang==='tr'?`Yıl ${YEAR_MIN} ile ${YEAR_MAX} arasında olmalı.`:`Year must be between ${YEAR_MIN} and ${YEAR_MAX}.`}
+              </Text>
+            )}
           </ScrollView>
         );
       }
 
-      // 6. Boy
+      // 6. Boy — cetvel + cm/ft senkron manuel giriş
       case 'height':
         return (
-          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={s.q}>{lang==='tr'?'Boyunuz?':"What's your height?"}</Text>
-            <RulerPicker value={a.height} onChange={v=>set('height',v)} min={120} max={230} unit="cm" color={C.lime} />
+            <RulerPicker value={a.height} onChange={v=>set('height',v)} min={H_MIN} max={H_MAX} unit="cm" color={C.lime} />
+            <SyncedUnitField
+              baseValue={a.height} onBase={v=>set('height',v)}
+              min={H_MIN} max={H_MAX} units={HEIGHT_UNITS}
+              activeUnit={heightUnit} onUnitChange={setHeightUnit} color={C.lime}
+              onValidityChange={bad=>setStepInvalid('height', bad)}
+              invalidMsg={lang==='tr'?`Boy ${H_MIN}–${H_MAX} cm arasında olmalı.`:`Height must be ${H_MIN}–${H_MAX} cm.`}
+              prefUnitLabel={lang==='tr'?`Ayarlar: ${lengthUnit==='cm'?'cm':'ft/in'}`:`Settings: ${lengthUnit==='cm'?'cm':'ft/in'}`}
+            />
           </ScrollView>
         );
 
@@ -582,9 +631,17 @@ export default function AICoachScreen() {
         const b = bmi(a.weight, a.height);
         const [bl, bc, bd] = b ? bmiInfo(b, lang) : ['—', C.muted, ''];
         return (
-          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={s.q}>{lang==='tr'?'Mevcut kilonuz?':"What's your current weight?"}</Text>
-            <RulerPicker value={a.weight} onChange={v=>set('weight',v)} min={30} max={250} unit="kg" color={C.lime} step={0.5} />
+            <RulerPicker value={a.weight} onChange={v=>set('weight',v)} min={W_MIN} max={W_MAX} unit="kg" color={C.lime} step={0.5} />
+            <SyncedUnitField
+              baseValue={a.weight} onBase={v=>set('weight',v)}
+              min={W_MIN} max={W_MAX} units={WEIGHT_UNITS} roundBase={roundHalf}
+              activeUnit={weightUnitSel} onUnitChange={setWeightUnitSel} color={C.lime}
+              onValidityChange={bad=>setStepInvalid('weight', bad)}
+              invalidMsg={lang==='tr'?`Kilo ${W_MIN}–${W_MAX} kg arasında olmalı.`:`Weight must be ${W_MIN}–${W_MAX} kg.`}
+              prefUnitLabel={lang==='tr'?`Ayarlar: ${weightUnit}`:`Settings: ${weightUnit}`}
+            />
             {b && (
               <AnimatedRN.View entering={FadeIn.duration(250)} style={[s.bmiCard,{borderColor:bc+'55'}]}>
                 <Text style={[s.bmiVal,{color:bc}]}>{b}</Text>
@@ -603,9 +660,17 @@ export default function AICoachScreen() {
         const diff = (a.weight - a.targetWeight).toFixed(1);
         const isLose = a.weight > a.targetWeight;
         return (
-          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={s.q}>{lang==='tr'?'Hedef kilonuz?':"What's your target weight?"}</Text>
-            <RulerPicker value={a.targetWeight} onChange={v=>set('targetWeight',v)} min={30} max={250} unit="kg" color={C.orange} step={0.5} />
+            <RulerPicker value={a.targetWeight} onChange={v=>set('targetWeight',v)} min={W_MIN} max={W_MAX} unit="kg" color={C.orange} step={0.5} />
+            <SyncedUnitField
+              baseValue={a.targetWeight} onBase={v=>set('targetWeight',v)}
+              min={W_MIN} max={W_MAX} units={WEIGHT_UNITS} roundBase={roundHalf}
+              activeUnit={tgtUnitSel} onUnitChange={setTgtUnitSel} color={C.orange}
+              onValidityChange={bad=>setStepInvalid('target_weight', bad)}
+              invalidMsg={lang==='tr'?`Hedef kilo ${W_MIN}–${W_MAX} kg arasında olmalı.`:`Target must be ${W_MIN}–${W_MAX} kg.`}
+              prefUnitLabel={lang==='tr'?`Ayarlar: ${weightUnit}`:`Settings: ${weightUnit}`}
+            />
             {Math.abs(diff) > 0.1 && (
               <AnimatedRN.View entering={FadeIn.duration(250)} style={[s.bmiCard,{borderColor:C.lime+'55'}]}>
                 <Ionicons name="flag-outline" size={28} color={C.lime} />
@@ -623,16 +688,50 @@ export default function AICoachScreen() {
         );
       }
 
-      // 9. Vücut şekli
-      case 'body_shape':
+      // 9. Vücut şekli — kullanıcı SEÇMEZ, girdiği kilo/boy/hedeften türetilir
+      case 'body_shape': {
+        const curShape = deriveShape(a.weight, a.height);
+        const tgtShape = deriveShape(a.targetWeight, a.height);
+        const cur = SHAPES[curShape], tgt = SHAPES[tgtShape];
+        const same = curShape === tgtShape;
         return (
           <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-            <Text style={s.q}>{lang==='tr'?'Şu anki vücut şekliniz?':"What's your current body shape?"}</Text>
-            <BodyShapePicker value={a.bodyShape} onChange={v=>set('bodyShape',v)} lang={lang} />
-            <Text style={[s.q,{marginTop:20}]}>{lang==='tr'?'Hedef vücut şekliniz?':"What's your target body shape?"}</Text>
-            <BodyShapePicker value={a.targetBodyShape} onChange={v=>set('targetBodyShape',v)} lang={lang} />
+            <Text style={s.q}>{lang==='tr'?'Vücut dönüşümünüz':'Your body transformation'}</Text>
+            <Text style={s.qsub}>{lang==='tr'?'Verdiğin bilgilere göre hesaplandı':'Calculated from your data'}</Text>
+
+            <View style={s.shapeCompare}>
+              <AnimatedRN.View entering={FadeInDown.duration(400)} style={s.shapeSide}>
+                <Text style={s.shapeCap}>{lang==='tr'?'Şu an':'Now'}</Text>
+                <LinearGradient colors={[cur.color+'33', cur.color+'0A']} style={[s.shapeFig,{borderColor:cur.color+'55'}]}>
+                  <Ionicons name="body" size={54 + curShape*3} color={cur.color} />
+                </LinearGradient>
+                <Text style={[s.shapeName,{color:cur.color}]}>{SHAPE_LBL[curShape]?.[lang]}</Text>
+              </AnimatedRN.View>
+
+              <AnimatedRN.View entering={FadeIn.delay(350).duration(400)} style={s.shapeArrow}>
+                <Ionicons name="arrow-forward" size={26} color={C.lime} />
+              </AnimatedRN.View>
+
+              <AnimatedRN.View entering={FadeInDown.delay(200).duration(400)} style={s.shapeSide}>
+                <Text style={[s.shapeCap,{color:C.lime}]}>{lang==='tr'?'Hedef':'Goal'}</Text>
+                <LinearGradient colors={[tgt.color+'44', tgt.color+'11']} style={[s.shapeFig,{borderColor:tgt.color}]}>
+                  <Ionicons name="body" size={54 + tgtShape*3} color={tgt.color} />
+                </LinearGradient>
+                <Text style={[s.shapeName,{color:tgt.color}]}>{SHAPE_LBL[tgtShape]?.[lang]}</Text>
+              </AnimatedRN.View>
+            </View>
+
+            <AnimatedRN.View entering={FadeInUp.delay(500).duration(350)} style={[s.infoCard,{marginTop:8}]}>
+              <Ionicons name="sparkles-outline" size={18} color={C.lime} />
+              <Text style={s.infoCardTxt}>
+                {same
+                  ? (lang==='tr'?'Formunu korumaya odaklı bir plan hazırlayacağız.':"We'll build a plan focused on keeping your shape.")
+                  : (lang==='tr'?'Bu dönüşüm için sana özel bir plan hazırlıyoruz.':"We'll craft a personalized plan for this transformation.")}
+              </Text>
+            </AnimatedRN.View>
           </ScrollView>
         );
+      }
 
       // 10. Meslek
       case 'occupation': {
@@ -737,36 +836,55 @@ export default function AICoachScreen() {
         );
       }
 
-      // 15. Antrenman sıklığı
+      // 15. Antrenman sıklığı — +/- sayaç, 1-7/hafta, aşırı antrenman uyarısı
       case 'frequency': {
         const FREQ_DESC = {
-          1: lang==='tr'?'Meşgulüm ama haftada bir antrenman yapmak istiyorum.':'I\'m busy but still want to fit in a workout once a week.',
+          1: lang==='tr'?'Meşgulüm ama haftada bir antrenman yapmak istiyorum.':"I'm busy but still want to fit in a workout once a week.",
           2: lang==='tr'?'Biraz zamanım var ama çok değil.':'I have a bit of free time, but not too much.',
           3: lang==='tr'?'Antrenmanı yaşam tarzımın parçası yapıyorum.':'I enjoy working out as part of my lifestyle.',
-          4: lang==='tr'?'Kendimi zorlamaya hazırım!':'I\'m willing to work hard and push myself!',
+          4: lang==='tr'?'Kendimi zorlamaya hazırım!':"I'm willing to work hard and push myself!",
+          5: lang==='tr'?'Düzenli ve yoğun çalışmayı seviyorum.':'I love training regularly and intensely.',
+          6: lang==='tr'?'Neredeyse her gün spordayım.':"I'm at the gym almost every day.",
+          7: lang==='tr'?'Her gün antrenman yapmak istiyorum.':'I want to train every single day.',
         };
+        const freq = a.workoutFreq;
+        const overtrain = freq >= 6;
+        const dec = () => set('workoutFreq', Math.max(FREQ_MIN, freq - 1));
+        const inc = () => set('workoutFreq', Math.min(FREQ_MAX, freq + 1));
         return (
           <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
             <Text style={s.q}>{lang==='tr'?'Ne sıklıkla antrenman yapmak istersiniz?':'How often would you like to work out?'}</Text>
             <View style={s.actIconWrap}>
               <LinearGradient colors={[C.blue+'22',C.blue+'06']} style={s.actIconCircle}>
-                <Text style={s.freqBig}>{a.workoutFreq}</Text>
+                <Text style={s.freqBig}>{freq}</Text>
               </LinearGradient>
-              <Text style={s.actDesc}>{FREQ_DESC[a.workoutFreq]}</Text>
-              <Text style={[s.actDesc,{color:C.lime,fontWeight:'800'}]}>{a.workoutFreq} {lang==='tr'?'kez/hafta':'times/week'}</Text>
+              <Text style={[s.actDesc,{color:C.lime,fontWeight:'800'}]}>{freq} {lang==='tr'?'kez/hafta':'times / week'}</Text>
+              <Text style={s.actDesc}>{FREQ_DESC[freq]}</Text>
             </View>
-            <View style={s.sliderRow}>
-              {[1,2,3,4].map(n=>(
-                <TouchableOpacity key={n} onPress={()=>set('workoutFreq',n)} hitSlop={{top:12,bottom:12,left:12,right:12}}>
-                  <View style={[s.sliderDot, a.workoutFreq===n&&{backgroundColor:C.blue,width:22,height:22,borderRadius:11}]} />
-                </TouchableOpacity>
-              ))}
-              <View style={s.sliderLine}/>
+            <View style={s.counterRow}>
+              <TouchableOpacity onPress={dec} disabled={freq<=FREQ_MIN} activeOpacity={0.8}
+                style={[s.counterBtn, freq<=FREQ_MIN && {opacity:0.35}]}>
+                <Ionicons name="remove" size={28} color={C.text} />
+              </TouchableOpacity>
+              <View style={s.counterVal}>
+                <Text style={s.counterValTxt}>{freq}</Text>
+                <Text style={s.counterValSub}>/ {FREQ_MAX}</Text>
+              </View>
+              <TouchableOpacity onPress={inc} disabled={freq>=FREQ_MAX} activeOpacity={0.8}
+                style={[s.counterBtn, freq>=FREQ_MAX && {opacity:0.35}]}>
+                <Ionicons name="add" size={28} color={C.text} />
+              </TouchableOpacity>
             </View>
-            <View style={s.sliderLabels}>
-              <Text style={s.sliderLbl}>{lang==='tr'?'Az':'Less'}</Text>
-              <Text style={s.sliderLbl}>{lang==='tr'?'Çok':'More'}</Text>
-            </View>
+            {overtrain && (
+              <AnimatedRN.View entering={FadeIn.duration(250)} style={s.warnCard}>
+                <Ionicons name="warning-outline" size={18} color={C.orange} />
+                <Text style={s.warnTxt}>
+                  {lang==='tr'
+                    ? 'Çok sık antrenman toparlanmayı zorlaştırır; dinlenme günleri verimi artırır.'
+                    : 'Training too often hinders recovery — rest days improve results.'}
+                </Text>
+              </AnimatedRN.View>
+            )}
           </ScrollView>
         );
       }
@@ -873,6 +991,20 @@ export default function AICoachScreen() {
               </Text>
               <ProjectionChart curKg={a.weight} tgtKg={a.targetWeight} days={days} lang={lang} />
               <PlanCard answers={a} lang={lang} />
+
+              {/* Şablonlara geç (Egzersizler → Templates) */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => navigation?.navigate('Egzersizler', { initialTab: 2 })}
+                style={{ marginBottom: 12 }}
+              >
+                <LinearGradient colors={['#e8f44a','#a3c200']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.templatesBtn}>
+                  <Ionicons name="albums-outline" size={18} color={C.bg} />
+                  <Text style={s.templatesTxt}>{lang==='tr'?'Antrenman Şablonlarını Gör':'View Workout Templates'}</Text>
+                  <Ionicons name="arrow-forward" size={18} color={C.bg} />
+                </LinearGradient>
+              </TouchableOpacity>
+
               <TouchableOpacity style={s.restartBtn} onPress={()=>{ setStepIdx(0); setHasProfile(false); }} activeOpacity={0.8}>
                 <Ionicons name="refresh-outline" size={16} color={C.muted}/>
                 <Text style={s.restartTxt}>{lang==='tr'?'Planı Güncelle':'Update Plan'}</Text>
@@ -976,13 +1108,30 @@ const s = StyleSheet.create({
   sliderLabels: { flexDirection:'row', justifyContent:'space-between', marginTop:4 },
   sliderLbl:    { color:C.dim, fontSize:12, fontWeight:'600' },
 
-  // Body shape
-  shapeRow:     { flexDirection:'row', gap:4, marginBottom:10 },
-  shapeBtn:     { flex:1, borderRadius:10, borderWidth:1.5, borderColor:'transparent', overflow:'hidden' },
-  shapeBtnGrad: { alignItems:'center', justifyContent:'flex-end', paddingBottom:6, paddingTop:4, height:68 },
-  shapeRowLbl:  { flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:12 },
-  shapeLblSide: { color:C.dim, fontSize:11, fontWeight:'600' },
-  shapeSelected:{ fontSize:14, fontWeight:'800', flex:1, textAlign:'center' },
+  // Body shape (türetilmiş, animasyonlu karşılaştırma)
+  shapeCompare: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginVertical:20, gap:8 },
+  shapeSide:    { flex:1, alignItems:'center', gap:10 },
+  shapeCap:     { color:C.muted, fontSize:12, fontWeight:'700', letterSpacing:1, textTransform:'uppercase' },
+  shapeFig:     { width:112, height:132, borderRadius:20, borderWidth:1.5, alignItems:'center', justifyContent:'center' },
+  shapeName:    { fontSize:15, fontWeight:'800' },
+  shapeArrow:   { paddingHorizontal:2 },
+
+  // Sıklık sayacı (+/-)
+  counterRow:   { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:20, marginTop:8 },
+  counterBtn:   { width:64, height:64, borderRadius:20, backgroundColor:C.s1, borderWidth:1.5, borderColor:C.border, alignItems:'center', justifyContent:'center' },
+  counterVal:   { flexDirection:'row', alignItems:'baseline', gap:4, minWidth:90, justifyContent:'center' },
+  counterValTxt:{ color:C.text, fontSize:44, fontWeight:'900' },
+  counterValSub:{ color:C.dim, fontSize:16, fontWeight:'700' },
+  warnCard:     { flexDirection:'row', alignItems:'center', gap:10, backgroundColor:C.orange+'14', borderRadius:14, padding:14, borderWidth:1, borderColor:C.orange+'44', marginTop:18 },
+  warnTxt:      { color:C.orange, fontSize:12.5, fontWeight:'600', flex:1, lineHeight:18 },
+
+  // Manuel giriş / hata
+  manualLbl:    { color:C.dim, fontSize:12, fontWeight:'600', textAlign:'center', marginTop:18, marginBottom:2, letterSpacing:0.5 },
+  errTxt:       { color:C.red, fontSize:12.5, fontWeight:'600', textAlign:'center', marginTop:12 },
+
+  // Şablonlara geç butonu
+  templatesBtn: { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:10, borderRadius:16, height:54 },
+  templatesTxt: { color:C.bg, fontSize:15, fontWeight:'900', letterSpacing:0.3 },
 
   // Plan comparison
   cmpRow:       { flexDirection:'row', gap:10 },

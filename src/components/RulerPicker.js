@@ -1,86 +1,80 @@
 /**
- * RulerPicker — yatay cetvel kaydırıcı
- * Kilo / Boy seçimi için. Merkezdeki çizgi seçili değeri gösterir.
+ * RulerPicker — yatay cetvel kaydırıcı (ScrollView tabanlı).
+ * Merkezdeki çizgi seçili değeri gösterir. Dışarıdan `value` değişince
+ * (ör. altındaki cm/ft veya kg/lb metin girişi ile senkron) otomatik olarak
+ * o değere kayar.
  */
-import React, { useRef, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, Dimensions } from 'react-native';
+import React, { useRef, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { C } from '../utils/theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const ITEM_W  = 8;   // her tick arası piksel
-const CENTER  = Math.floor(SCREEN_W / 2);
+const ITEM_W = 8;
+const CENTER = Math.floor(SCREEN_W / 2);
 
 export default function RulerPicker({
-  value,
-  onChange,
-  min = 30,
-  max = 250,
-  step = 1,
-  unit = '',
-  color = C.lime,
+  value, onChange, min = 30, max = 250, step = 1, unit = '', color = C.lime,
 }) {
-  const listRef  = useRef(null);
-  const isScrolling = useRef(false);
-
-  // Veriden offset hesapla
-  const valueToOffset = (v) => ((v - min) / step) * ITEM_W;
-
-  // Offset'ten değer hesapla
-  const offsetToValue = (offset) => {
-    const raw = Math.round(offset / ITEM_W) * step + min;
-    return Math.max(min, Math.min(max, raw));
-  };
+  const scrollRef = useRef(null);
+  const lastEmitted = useRef(value);
 
   const ticks = [];
-  for (let v = min; v <= max; v += step) ticks.push(v);
+  for (let v = min; v <= max; v += step) ticks.push(Math.round(v / step) * step);
 
-  const handleScrollEnd = useCallback((e) => {
-    const offset = e.nativeEvent.contentOffset.x;
-    const newVal = offsetToValue(offset);
-    onChange(newVal);
-    isScrolling.current = false;
-  }, [min, max, step]);
-
-  const renderTick = ({ item: v, index }) => {
-    const isMajor  = index % 5 === 0;
-    const isCenter = v === value;
-    return (
-      <View style={[r.tick, isMajor ? r.tickMajor : r.tickMinor]}>
-        {isMajor && (
-          <Text style={[r.tickLabel, isCenter && { color }]}>{v}</Text>
-        )}
-      </View>
-    );
+  const valueToOffset = (v) => ((v - min) / step) * ITEM_W;
+  const offsetToValue = (offset) => {
+    const raw = Math.round(offset / ITEM_W) * step + min;
+    return Math.max(min, Math.min(max, Math.round(raw / step) * step));
   };
+
+  // Dışarıdan value değişince o konuma kay
+  useEffect(() => {
+    if (value === lastEmitted.current) return;
+    scrollRef.current?.scrollTo({ x: valueToOffset(value), animated: true });
+    lastEmitted.current = value;
+  }, [value]);
+
+  // İlk mount
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ x: valueToOffset(value), animated: false });
+  }, []);
+
+  const handleEnd = useCallback((e) => {
+    const v = offsetToValue(e.nativeEvent.contentOffset.x);
+    lastEmitted.current = v;
+    if (v !== value) onChange(v);
+  }, [value, onChange, min, max, step]);
 
   return (
     <View style={r.wrap}>
-      {/* Üst değer göstergesi */}
       <View style={r.valueRow}>
         <Text style={[r.value, { color }]}>{value}</Text>
         <Text style={r.unit}> {unit}</Text>
       </View>
 
-      {/* Cetvel */}
       <View style={r.rulerWrap}>
-        {/* Merkez çizgisi */}
         <View style={[r.centerLine, { backgroundColor: color }]} pointerEvents="none" />
-
-        <FlatList
-          ref={listRef}
-          data={ticks}
-          keyExtractor={(v) => String(v)}
-          renderItem={renderTick}
+        <ScrollView
+          ref={scrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           snapToInterval={ITEM_W}
           decelerationRate="fast"
+          nestedScrollEnabled
+          onMomentumScrollEnd={handleEnd}
+          onScrollEndDrag={handleEnd}
           contentContainerStyle={{ paddingHorizontal: CENTER - ITEM_W / 2 }}
-          onMomentumScrollEnd={handleScrollEnd}
-          onScrollEndDrag={handleScrollEnd}
-          getItemLayout={(_, i) => ({ length: ITEM_W, offset: ITEM_W * i, index: i })}
-          initialScrollIndex={Math.floor((value - min) / step)}
-        />
+        >
+          {ticks.map((v, index) => {
+            const isMajor = index % 5 === 0;
+            const isCenter = v === value;
+            return (
+              <View key={String(v)} style={[r.tick, isMajor ? r.tickMajor : r.tickMinor]}>
+                {isMajor && <Text style={[r.tickLabel, isCenter && { color }]}>{v}</Text>}
+              </View>
+            );
+          })}
+        </ScrollView>
       </View>
     </View>
   );

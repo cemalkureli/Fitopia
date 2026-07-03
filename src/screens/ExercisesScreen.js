@@ -1935,9 +1935,15 @@ function ExercisesLibrary({ lang }) {
 }
 
 // ─── Root ExercisesScreen with 3 tabs ────────────────────────────────────────
-export default function ExercisesScreen() {
+export default function ExercisesScreen({ route }) {
   const { lang } = useLang();
   const [activeTab, setActiveTab] = useState(0); // 0=Exercises 1=Workouts 2=Templates
+
+  // AI Coach "Şablonları Gör" → route param ile Templates sekmesine geç
+  useEffect(() => {
+    const it = route?.params?.initialTab;
+    if (typeof it === 'number') setActiveTab(it);
+  }, [route?.params?.initialTab]);
 
   const TABS = [
     { label: t('tabExercisesLib', lang) },

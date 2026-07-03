@@ -349,24 +349,41 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
   const navigation                      = useNavigation();
   const [gender,       setGender]       = useState(null); // null = not loaded yet / not set
   const [latestMeasure, setLatestMeasure] = useState({});
+  const [bmi,          setBmi]          = useState(null);
 
   useFocusEffect(useCallback(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data?.user) return;
       const uid = data.user.id;
 
-      // Gender + cache check — paralel başlat
+      // Cinsiyet: önce cache'ten anında göster (male/female seçimi Progress'te
+      // hızlı yansısın), sonra Supabase ile doğrula.
+      const gKey = `gender_${uid}`;
       const mKey = `measurements_${uid}`;
-      const [gResult, mc2] = await Promise.all([
-        supabase.from('profiles').select('gender').eq('id', uid).single(),
-        cacheGet(mKey),
-      ]);
-      setGender(gResult.data?.gender || null);
+      const [gc, mc2] = await Promise.all([cacheGet(gKey), cacheGet(mKey)]);
+      if (gc?.data !== undefined && gc?.data !== null) setGender(gc.data);
+      if (mc2) { setLatestMeasure(mc2.data); }
 
-      if (mc2) {
-        setLatestMeasure(mc2.data);
-        if (!mc2.stale) return;
-      }
+      // BMI: Coach (ai_profiles) verisi baskın — tamamlandığında otomatik güncellenir,
+      // manuel giriş olsa bile coach değeri overwrite eder.
+      supabase.from('ai_profiles').select('weight_kg, height_cm, completed_at').eq('id', uid).single()
+        .then(({ data: ai }) => {
+          if (ai?.completed_at && ai.weight_kg && ai.height_cm) {
+            const b = ai.weight_kg / ((ai.height_cm / 100) ** 2);
+            setBmi(Number(b.toFixed(1)));
+          }
+        });
+
+      // Cinsiyet doğrulama (Supabase)
+      supabase.from('profiles').select('gender').eq('id', uid).single()
+        .then(async ({ data: p }) => {
+          const gv = p?.gender || null;
+          setGender(gv);
+          await cacheSet(gKey, gv, TTL.PROFILE ?? 10 * 60 * 1000);
+        });
+
+      // Ölçümler (stale ise yenile)
+      if (mc2 && !mc2.stale) return;
       supabase.from('body_measurements').select('type, value, unit')
         .eq('user_id', uid).order('measured_at', { ascending: false })
         .then(async ({ data: ms }) => {
@@ -462,9 +479,12 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
           )}
         </View>
 
-        {/* Measurement values — animated laser lines */}
-        {measureRows.length > 0 ? (
+        {/* Measurement values — animated laser lines. BMI (Coach kaynaklı) en üstte. */}
+        {(bmi != null || measureRows.length > 0) ? (
           <View style={g.measureList}>
+            {bmi != null && (
+              <MeasureLaserRow key="bmi" label="BMI" value={bmi} unit="" delay={0} index={0} />
+            )}
             {measureRows.map((mt, i) => {
               const m = latestMeasure[mt.key];
               return (
@@ -473,8 +493,8 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
                   label={t(mt.labelKey, lang)}
                   value={m.value}
                   unit={m.unit}
-                  delay={i * 60}
-                  index={i}
+                  delay={(i + (bmi != null ? 1 : 0)) * 60}
+                  index={i + (bmi != null ? 1 : 0)}
                 />
               );
             })}

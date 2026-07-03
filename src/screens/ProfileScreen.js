@@ -15,6 +15,8 @@ import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight, fmtHeight } from '../context/UnitsContext';
 import { t } from '../utils/i18n';
 import RulerPicker from '../components/RulerPicker';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { cacheSet, TTL } from '../utils/cache';
 
 const { width } = Dimensions.get('window');
 const SUPPORT_EMAIL = 'cemalkureli@gmail.com';
@@ -389,6 +391,7 @@ export default function ProfileScreen({ onSignOut }) {
   const [uploading,   setUploading]   = useState(false);
   const [sub,         setSub]         = useState(null);
   const [deleteModal, setDeleteModal] = useState(false);
+  const [signOutModal,setSignOutModal]= useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -415,6 +418,8 @@ export default function ProfileScreen({ onSignOut }) {
   const saveField = async (field, val) => {
     if (!user) return;
     const num = ['weight', 'height'].includes(field) ? parseFloat(val) || null : val;
+    // Cinsiyet önce cache'e yazılır → Progress ekranı male/female'i anında yakalar.
+    if (field === 'gender') { cacheSet(`gender_${user.id}`, num, TTL.PROFILE ?? 10 * 60 * 1000); setProfile(p => ({ ...p, gender: num })); }
     try {
       await updateProfile(user.id, { [field]: num });
       setProfile(p => ({ ...p, [field]: num }));
@@ -447,6 +452,7 @@ export default function ProfileScreen({ onSignOut }) {
     if (!user) return; setSaving(true);
     try {
       const updates = { full_name: form.full_name, weight: parseFloat(form.weight) || null, height: parseFloat(form.height) || null, goal: form.goal, gender: form.gender || null, email: user.email };
+      if (updates.gender) cacheSet(`gender_${user.id}`, updates.gender, TTL.PROFILE ?? 10 * 60 * 1000);
       await updateProfile(user.id, updates);
       setProfile(prev => ({ ...prev, ...updates }));
       setEditModal(false);
@@ -454,10 +460,8 @@ export default function ProfileScreen({ onSignOut }) {
     finally { setSaving(false); }
   };
 
-  const handleSignOut = () => Alert.alert(t('signOut', lang), t('signOutConfirm', lang), [
-    { text: t('cancel', lang), style: 'cancel' },
-    { text: t('signOut', lang), style: 'destructive', onPress: async () => { try { await signOut(); } catch {} onSignOut?.(); } },
-  ]);
+  const handleSignOut = () => setSignOutModal(true);
+  const confirmSignOut = async () => { setSignOutModal(false); try { await signOut(); } catch {} onSignOut?.(); };
 
   const handleContact = () => {
     const subject = encodeURIComponent(t('mailSubject', lang));
@@ -674,6 +678,19 @@ export default function ProfileScreen({ onSignOut }) {
         lang={lang}
         userEmail={user?.email ?? ''}
         onDeleted={() => { setDeleteModal(false); try { signOut(); } catch {} onSignOut?.(); }}
+      />
+
+      {/* Sign out confirm — themed */}
+      <ConfirmDialog
+        visible={signOutModal}
+        icon="log-out-outline"
+        title={t('signOut', lang)}
+        message={t('signOutConfirm', lang)}
+        confirmLabel={t('signOut', lang)}
+        cancelLabel={t('cancel', lang)}
+        danger
+        onConfirm={confirmSignOut}
+        onCancel={() => setSignOutModal(false)}
       />
     </View>
   );
