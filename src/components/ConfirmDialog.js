@@ -17,6 +17,7 @@ export default function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   danger = false,
+  singleAction = false,
   onConfirm,
   onCancel,
 }) {
@@ -34,9 +35,11 @@ export default function ConfirmDialog({
           <Text style={s.title}>{title}</Text>
           {message ? <Text style={s.message}>{message}</Text> : null}
           <View style={s.actions}>
-            <TouchableOpacity onPress={onCancel} style={s.cancelBtn} activeOpacity={0.8}>
-              <Text style={s.cancelTxt}>{cancelLabel}</Text>
-            </TouchableOpacity>
+            {!singleAction && (
+              <TouchableOpacity onPress={onCancel} style={s.cancelBtn} activeOpacity={0.8}>
+                <Text style={s.cancelTxt}>{cancelLabel}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={onConfirm} style={[s.confirmBtn, { backgroundColor: accent }]} activeOpacity={0.85}>
               <Text style={[s.confirmTxt, danger && { color: '#fff' }]}>{confirmLabel}</Text>
             </TouchableOpacity>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Modal, Alert, ActivityIndicator, Image,
@@ -392,6 +393,13 @@ export default function ProfileScreen({ onSignOut }) {
   const [sub,         setSub]         = useState(null);
   const [deleteModal, setDeleteModal] = useState(false);
   const [signOutModal,setSignOutModal]= useState(false);
+  const [comingSoon,  setComingSoon]  = useState(null); // 'rateApp' | 'becomePro'
+
+  // Başka sekmeye geçilince açık alt-ekran/modallar sıfırlansın (geri gelince
+  // Profil kök ekranı görünsün, açık kutu kalmasın).
+  useFocusEffect(useCallback(() => {
+    return () => { setSub(null); setEditModal(false); setSignOutModal(false); setDeleteModal(false); setComingSoon(null); };
+  }, []));
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -547,7 +555,7 @@ export default function ProfileScreen({ onSignOut }) {
       <RadioOption label="lb" selected={weightUnit === 'lb'} onPress={() => setWeightUnit('lb')} delay={130} />
       <SubDesc text={t('lengthUnitDesc', lang)} delay={0} />
       <RadioOption label="cm" selected={lengthUnit === 'cm'} onPress={() => setLengthUnit('cm')} delay={80} />
-      <RadioOption label="in" selected={lengthUnit === 'in'} onPress={() => setLengthUnit('in')} delay={130} />
+      <RadioOption label={lang === 'tr' ? 'feet (ft/in)' : 'feet (ft/in)'} selected={lengthUnit === 'ft'} onPress={() => setLengthUnit('ft')} delay={130} />
     </View>
   );
 
@@ -631,8 +639,8 @@ export default function ProfileScreen({ onSignOut }) {
         <AnimatedRN.View entering={FadeInDown.delay(320).duration(300)} style={s.section}>
           <Text style={s.sectionTitle}>{t('app', lang)}</Text>
           <View style={s.card}>
-            <Row label={t('rateApp', lang)}   onPress={() => {}} />
-            <Row label={t('becomePro', lang)} onPress={() => {}} />
+            <Row label={t('rateApp', lang)}   onPress={() => setComingSoon('rateApp')} />
+            <Row label={t('becomePro', lang)} onPress={() => setComingSoon('becomePro')} />
             <Row label={t('contactUs', lang)} onPress={handleContact} last />
           </View>
         </AnimatedRN.View>
@@ -691,6 +699,18 @@ export default function ProfileScreen({ onSignOut }) {
         danger
         onConfirm={confirmSignOut}
         onCancel={() => setSignOutModal(false)}
+      />
+
+      {/* Rate / Become Pro — "yakında" bilgi kutusu */}
+      <ConfirmDialog
+        visible={!!comingSoon}
+        singleAction
+        icon={comingSoon === 'becomePro' ? 'diamond-outline' : 'star-outline'}
+        title={comingSoon === 'becomePro' ? t('becomePro', lang) : t('rateApp', lang)}
+        message={t('comingSoonMsg', lang)}
+        confirmLabel={t('gotIt', lang)}
+        onConfirm={() => setComingSoon(null)}
+        onCancel={() => setComingSoon(null)}
       />
     </View>
   );

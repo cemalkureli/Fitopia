@@ -19,6 +19,7 @@ import RulerPicker from '../components/RulerPicker';
 import WheelPicker from '../components/WheelPicker';
 import YearDigitPicker from '../components/YearDigitPicker';
 import SyncedUnitField from '../components/SyncedUnitField';
+import HeightField from '../components/HeightField';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -53,6 +54,10 @@ const CAT_LABELS = {
   2: { tr: 'VÜCUDUNUz HAKKINDA', en: 'ABOUT YOUR BODY'    },
   3: { tr: 'FİTNESS DEĞERLENDİRME', en: 'FITNESS ASSESSMENT' },
 };
+
+// Koç hedefi → Şablonlar (Templates) hedef filtresi eşlemesi.
+// Böylece "Planımı Al" Egzersizler→Şablonlar sekmesini seçilen hedefe göre filtreler.
+const GOAL_TO_PLAN = { lose_weight: 'fat_loss', build_muscle: 'bodybuilding', keep_fit: 'general_fitness' };
 
 // ─── Yardımcılar ──────────────────────────────────────────────────────────────
 function bmi(w, h) { return h > 0 ? (w / ((h / 100) ** 2)).toFixed(1) : null; }
@@ -309,12 +314,12 @@ function PlanComparison({ lang }) {
           </View>
         ))}
       </View>
-      <LinearGradient colors={['#4f46e5','#2563eb']} style={[s.cmpCard, { borderColor: '#2563eb' }]}>
-        <Text style={[s.cmpLbl, { color: '#fff' }]}>{lang==='tr'?'Planımız':'Our Plan'}</Text>
+      <LinearGradient colors={['rgba(232,244,74,0.16)','rgba(232,244,74,0.04)']} style={[s.cmpCard, { borderColor: C.lime }]}>
+        <Text style={[s.cmpLbl, { color: C.lime }]}>{lang==='tr'?'Planımız':'Our Plan'}</Text>
         {ours.map((t,i) => (
           <View key={i} style={s.cmpItem}>
-            <Ionicons name="checkmark-circle" size={14} color="#fff" />
-            <Text style={[s.cmpTxt, { color: '#fff' }]}>{t}</Text>
+            <Ionicons name="checkmark-circle" size={14} color={C.lime} />
+            <Text style={[s.cmpTxt, { color: C.text }]}>{t}</Text>
           </View>
         ))}
       </LinearGradient>
@@ -615,13 +620,13 @@ export default function AICoachScreen({ navigation }) {
           <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={s.q}>{lang==='tr'?'Boyunuz?':"What's your height?"}</Text>
             <RulerPicker value={a.height} onChange={v=>set('height',v)} min={H_MIN} max={H_MAX} unit="cm" color={C.lime} />
-            <SyncedUnitField
-              baseValue={a.height} onBase={v=>set('height',v)}
-              min={H_MIN} max={H_MAX} units={HEIGHT_UNITS}
+            <HeightField
+              baseCm={a.height} onBase={v=>set('height',v)}
+              min={H_MIN} max={H_MAX}
               activeUnit={heightUnit} onUnitChange={setHeightUnit} color={C.lime}
               onValidityChange={bad=>setStepInvalid('height', bad)}
               invalidMsg={lang==='tr'?`Boy ${H_MIN}–${H_MAX} cm arasında olmalı.`:`Height must be ${H_MIN}–${H_MAX} cm.`}
-              prefUnitLabel={lang==='tr'?`Ayarlar: ${lengthUnit==='cm'?'cm':'ft/in'}`:`Settings: ${lengthUnit==='cm'?'cm':'ft/in'}`}
+              prefUnitLabel={lang==='tr'?`Ayarlar: ${lengthUnit==='cm'?'cm':'feet'}`:`Settings: ${lengthUnit==='cm'?'cm':'feet'}`}
             />
           </ScrollView>
         );
@@ -941,7 +946,7 @@ export default function AICoachScreen({ navigation }) {
           <PlanComparison lang={lang} />
           <View style={{paddingTop:8}}>
             <TouchableOpacity onPress={goNext} activeOpacity={0.85}>
-              <LinearGradient colors={['#4f46e5','#2563eb']} style={s.readyBtn}>
+              <LinearGradient colors={['#e8f44a','#a3c200']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.readyBtn}>
                 <Text style={s.readyTxt}>{lang==='tr'?'Planımı Al →':'Get My Plan →'}</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -995,7 +1000,12 @@ export default function AICoachScreen({ navigation }) {
               {/* Şablonlara geç (Egzersizler → Templates) */}
               <TouchableOpacity
                 activeOpacity={0.85}
-                onPress={() => navigation?.navigate('Egzersizler', { initialTab: 2 })}
+                onPress={() => navigation?.navigate('Egzersizler', {
+                  initialTab: 2,
+                  filterDays: Math.min(a.workoutFreq || 3, 6),
+                  filterGoal: GOAL_TO_PLAN[a.goal] ?? null,
+                  ts: Date.now(),
+                })}
                 style={{ marginBottom: 12 }}
               >
                 <LinearGradient colors={['#e8f44a','#a3c200']} start={{x:0,y:0}} end={{x:1,y:1}} style={s.templatesBtn}>

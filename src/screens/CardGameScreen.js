@@ -70,9 +70,16 @@ function Deck({ cards, onDecide, lang }) {
   const [index, setIndex] = useState(0);
   const position = useRef(new Animated.ValueXY()).current;
   const burst = useRef(new Animated.Value(0)).current;
+  const animating = useRef(false);
   const [burstKind, setBurstKind] = useState(null); // 'like' | 'dislike'
 
-  useEffect(() => { setIndex(0); position.setValue({ x: 0, y: 0 }); }, [cards]);
+  // En güncel index/cards/onDecide'ı ref'te tut — PanResponder bir kez oluştuğu için
+  // closure'da eski değerleri "dondurmasın" (stale closure bug'ı tamamen ortadan kalkar).
+  const indexRef    = useRef(0);        indexRef.current = index;
+  const cardsRef    = useRef(cards);    cardsRef.current = cards;
+  const onDecideRef = useRef(onDecide); onDecideRef.current = onDecide;
+
+  useEffect(() => { setIndex(0); indexRef.current = 0; position.setValue({ x: 0, y: 0 }); }, [cards]);
 
   const rotate = position.x.interpolate({ inputRange: [-SW / 2, 0, SW / 2], outputRange: ['-9deg', '0deg', '9deg'] });
   const likeOpacity = position.x.interpolate({ inputRange: [10, SWIPE_THRESHOLD], outputRange: [0, 1], extrapolate: 'clamp' });
@@ -89,30 +96,55 @@ function Deck({ cards, onDecide, lang }) {
     ]).start(() => setBurstKind(null));
   };
 
-  const finish = (dir) => {
-    const card = cards[index];
+  // Stabil (useRef ile bir kez oluşan) handler'lar — hep ref'lerden okur.
+  const finish = useRef((dir) => {
+    const card = cardsRef.current[indexRef.current];
+    if (!card || animating.current) return;
+    animating.current = true;
     const decision = dir === 'right' ? 'like' : 'dislike';
     playBurst(decision);
+    // commit YALNIZCA bir kez çalışır: kartı ilerlet + kararı kaydet + kilidi aç.
+    // Hem animasyon callback'i hem de güvenlik timeout'u çağırır; ikisinden
+    // hangisi önce gelirse o iş görür → animating asla takılı kalmaz.
+    let done = false;
+    const commit = () => {
+      if (done) return;
+      done = true;
+      position.setValue({ x: 0, y: 0 });
+      setIndex(i => { const n = i + 1; indexRef.current = n; return n; });
+      onDecideRef.current?.(card, decision);
+      animating.current = false;
+    };
     Animated.timing(position, {
       toValue: { x: dir === 'right' ? SW * 1.3 : -SW * 1.3, y: 40 },
-      duration: 240, useNativeDriver: true,
-    }).start(() => {
-      position.setValue({ x: 0, y: 0 });
-      setIndex(i => i + 1);
-      onDecide?.(card, decision);
-    });
-  };
+      duration: 220, useNativeDriver: true,
+    }).start(commit);
+    setTimeout(commit, 320); // güvenlik: native callback ateşlenmezse bile ilerle
+  }).current;
 
-  const reset = () => Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 6 }).start();
+  const reset = useRef(() => Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 6 }).start()).current;
 
+  // PanResponder: mesafe VEYA hız eşiğini geçince karar ver. Hızlı bir "fiske"de
+  // (parmak az yol katedip yüksek hızla kalkar) eski kod mesafe eşiğine takılıp
+  // kartı geri yaylandırıyordu. Ayrıca animasyon sürerken position'a DOKUNMUYORUz
+  // (reset çağırmıyoruz) — aksi halde finish animasyonu yarıda kesilip kilit
+  // takılı kalıyordu. Süren animasyon kendi doğal süresinde bitiyor.
+  const VX_THRESHOLD = 0.3;
   const pan = useRef(PanResponder.create({
-    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
-    onPanResponderMove: (_, g) => position.setValue({ x: g.dx, y: g.dy * 0.4 }),
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4,
+    onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 4,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderMove: (_, g) => { if (!animating.current) position.setValue({ x: g.dx, y: g.dy * 0.4 }); },
     onPanResponderRelease: (_, g) => {
-      if (g.dx > SWIPE_THRESHOLD) finish('right');
-      else if (g.dx < -SWIPE_THRESHOLD) finish('left');
+      if (animating.current) return; // animasyon sürerken dokunma
+      const right = g.dx > SWIPE_THRESHOLD || (g.vx > VX_THRESHOLD && g.dx > 30);
+      const left  = g.dx < -SWIPE_THRESHOLD || (g.vx < -VX_THRESHOLD && g.dx < -30);
+      if (right) finish('right');
+      else if (left) finish('left');
       else reset();
     },
+    onPanResponderTerminate: () => { if (!animating.current) reset(); },
   })).current;
 
   const remaining = cards.length - index;

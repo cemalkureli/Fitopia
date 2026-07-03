@@ -25,6 +25,8 @@ export const TRANSLATIONS = {
     'cancel':            'İptal',
     'save':              'Kaydet',
     'confirm':           'Tamam',
+    'gotIt':             'Anladım',
+    'comingSoonMsg':     'Bu özellik yakında! İlerideki bir sürümde eklenecek. Takipte kal 💪',
     // Navigation
     'tabHome':        'ANA',
     'tabProgram':     'PROGRAM',
@@ -308,6 +310,8 @@ export const TRANSLATIONS = {
     'cancel':            'Cancel',
     'save':              'Save',
     'confirm':           'OK',
+    'gotIt':             'Got it',
+    'comingSoonMsg':     'This feature is coming soon! It will be added in a future version. Stay tuned 💪',
     // Navigation
     'tabHome':        'HOME',
     'tabProgram':     'PROGRAM',

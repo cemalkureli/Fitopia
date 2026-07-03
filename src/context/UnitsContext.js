@@ -35,8 +35,20 @@ export function fmtWeight(kg, unit) {
   return `${kg} kg`;
 }
 
+// cm → feet+inches, ör. 180cm → 5'11"
+export function cmToFeetInches(cm) {
+  const totalIn = Math.round(cm / 2.54);
+  let ft = Math.floor(totalIn / 12);
+  let inch = totalIn - ft * 12;
+  if (inch === 12) { ft += 1; inch = 0; }
+  return { ft, inch };
+}
+
 export function fmtHeight(cm, unit) {
   if (!cm && cm !== 0) return '—';
-  if (unit === 'in') return `${(cm * 0.393701).toFixed(1)} in`;
+  if (unit === 'ft' || unit === 'in') {
+    const { ft, inch } = cmToFeetInches(cm);
+    return `${ft}'${inch}"`;
+  }
   return `${cm} cm`;
 }

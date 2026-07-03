@@ -1280,15 +1280,23 @@ const ed = StyleSheet.create({
 const LEVEL_COLORS = { beginner: C.green, intermediate: C.orange, advanced: C.red };
 const LEVEL_LABELS_TR = { beginner: 'Başlangıç', intermediate: 'Orta', advanced: 'İleri' };
 const LEVEL_LABELS_EN = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
-const GOAL_LABELS_TR = { strength: 'Güç', bodybuilding: 'Vücut Geliştirme', fat_loss: 'Yağ Yakma', athleticism: 'Atletizm', powerlifting: 'Powerlifting', hypertrophy: 'Hipertrofi' };
-const GOAL_LABELS_EN = { strength: 'Strength', bodybuilding: 'Bodybuilding', fat_loss: 'Fat Loss', athleticism: 'Athleticism', powerlifting: 'Powerlifting', hypertrophy: 'Hypertrophy' };
+const GOAL_LABELS_TR = { strength: 'Güç', bodybuilding: 'Kas Kazan', fat_loss: 'Yağ Yakma', general_fitness: 'Formda Kal', athleticism: 'Atletizm', powerlifting: 'Powerlifting', hypertrophy: 'Hipertrofi' };
+const GOAL_LABELS_EN = { strength: 'Strength', bodybuilding: 'Build Muscle', fat_loss: 'Fat Loss', general_fitness: 'Keep Fit', athleticism: 'Athleticism', powerlifting: 'Powerlifting', hypertrophy: 'Hypertrophy' };
 
-function TemplatesTab({ lang }) {
+function TemplatesTab({ lang, planFilter }) {
   const [view,       setView]       = useState('main');
   const [selected,   setSelected]   = useState(null);
   const [filterDays, setFilterDays] = useState([]);
   const [filterLvl,  setFilterLvl]  = useState([]);
   const [filterGoal, setFilterGoal] = useState([]);
+
+  // AI Koç "Planımı Al" → seçilen gün sayısı + hedefe göre şablonları filtrele.
+  // ts değiştikçe (her navigate) yeniden uygulanır; kullanıcı sonra elle değiştirebilir.
+  useEffect(() => {
+    if (!planFilter) return;
+    if (typeof planFilter.filterDays === 'number') setFilterDays([planFilter.filterDays]);
+    if (planFilter.filterGoal) setFilterGoal([planFilter.filterGoal]);
+  }, [planFilter?.ts]);
   const [showPaid,   setShowPaid]   = useState('all');
   const [plansOpen,  setPlansOpen]  = useState(true);
   const [myPlansOpen,setMyPlansOpen]= useState(true);
@@ -1449,7 +1457,7 @@ function TemplatesTab({ lang }) {
             </View>
             <Text style={ft.sectionLabel}>{t('goal', lang)}</Text>
             <View style={ft.iconGrid}>
-              {[{g:'powerlifting',icon:'barbell-outline'},{g:'bodybuilding',icon:'body-outline'},{g:'fat_loss',icon:'scale-outline'},{g:'athleticism',icon:'walk-outline'},{g:'strength',icon:'flash-outline'}].map(({g,icon}) => (
+              {[{g:'fat_loss',icon:'flame-outline'},{g:'bodybuilding',icon:'barbell-outline'},{g:'general_fitness',icon:'heart-outline'},{g:'strength',icon:'flash-outline'},{g:'powerlifting',icon:'trophy-outline'}].map(({g,icon}) => (
                 <TouchableOpacity key={g} style={[ft.filterIconChip, filterGoal.includes(g) && ft.filterChipActive]} onPress={() => toggleArr(filterGoal, setFilterGoal, g)}>
                   <Ionicons name={icon} size={24} color={filterGoal.includes(g) ? '#fff' : C.muted} />
                   <Text style={[ft.filterIconTxt, filterGoal.includes(g) && { color: '#fff' }]}>{goalLabel(g)}</Text>
@@ -1947,7 +1955,7 @@ export default function ExercisesScreen({ route }) {
 
       {activeTab === 0 && <ExercisesLibrary lang={lang} />}
       {activeTab === 1 && <WorkoutsTab lang={lang} />}
-      {activeTab === 2 && <TemplatesTab lang={lang} />}
+      {activeTab === 2 && <TemplatesTab lang={lang} planFilter={route?.params} />}
     </View>
   );
 }
