@@ -2,6 +2,8 @@ export const TRANSLATIONS = {
   tr: {
     // Auth
     'welcome':           'Antrenmanını takip et. Güçlen.',
+    'welcomeBack':       'Tekrar hoş geldin',
+    'loginSub':          'Devam etmek için giriş yap.',
     'login':             'Giriş Yap',
     'register':          'Kayıt Ol',
     'email':             'E-posta',
@@ -217,6 +219,8 @@ export const TRANSLATIONS = {
     'ratingChangeable':   'Oyunu değiştirebilirsin',
     // Profile screen redesign
     'language':       'Dil',
+    'selectLanguage': 'Dil Seçimi',
+    'selectLanguageSub': 'Uygulama dilini seç.',
     'appearance':     'Görünüm',
     'units':          'Ölçü Birimi',
     'gender':         'Cinsiyet',
@@ -281,6 +285,8 @@ export const TRANSLATIONS = {
   en: {
     // Auth
     'welcome':           'Track your workouts. Get stronger.',
+    'welcomeBack':       'Welcome back',
+    'loginSub':          'Sign in to continue.',
     'login':             'Log In',
     'register':          'Sign Up',
     'email':             'Email',
@@ -496,6 +502,8 @@ export const TRANSLATIONS = {
     'ratingChangeable':   'You can change your rating',
     // Profile screen redesign
     'language':       'Language',
+    'selectLanguage': 'Select Language',
+    'selectLanguageSub': 'Choose the app language.',
     'appearance':     'Appearance',
     'units':          'Units of Measurement',
     'gender':         'Gender',

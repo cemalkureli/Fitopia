@@ -8,10 +8,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  Sora_100Thin, Sora_200ExtraLight, Sora_300Light, Sora_400Regular,
+  Sora_500Medium, Sora_600SemiBold, Sora_700Bold, Sora_800ExtraBold,
+} from '@expo-google-fonts/sora';
 
-import { C } from './src/utils/theme';
+import { C, F } from './src/utils/theme';
 import { supabase } from './src/lib/supabase';
 import { LanguageProvider, useLang } from './src/context/LanguageContext';
+import { LanguageSheetProvider } from './src/context/LanguageSheetContext';
 import { UnitsProvider } from './src/context/UnitsContext';
 import { MuscleFilterProvider } from './src/context/MuscleFilterContext';
 import { t } from './src/utils/i18n';
@@ -74,14 +80,14 @@ function Header() {
       paddingHorizontal:16, paddingVertical:10,
       backgroundColor:C.bg, borderBottomWidth:1, borderBottomColor:C.border,
     }}>
-      <Text style={{ color:C.lime, fontSize:20, fontWeight:'900', letterSpacing:1 }}>
+      <Text style={{ color:C.lime, fontSize:20, fontFamily:F.extrabold, letterSpacing:1 }}>
         FITO<Text style={{ color:C.muted }}>/PIA</Text>
       </Text>
       <View style={{ alignItems:'flex-end' }}>
-        <Text style={{ color:C.text, fontSize:16, fontWeight:'800' }}>
-          {h}:{m}<Text style={{ color:C.muted, fontSize:11 }}>:{sec}</Text>
+        <Text style={{ color:C.text, fontSize:16, fontFamily:F.bold, letterSpacing:0.5 }}>
+          {h}:{m}<Text style={{ color:C.muted, fontSize:11, fontFamily:F.medium }}>:{sec}</Text>
         </Text>
-        <Text style={{ color:C.muted, fontSize:10 }}>{dayStr}</Text>
+        <Text style={{ color:C.muted, fontSize:10, fontFamily:F.medium }}>{dayStr}</Text>
       </View>
     </View>
   );
@@ -167,6 +173,11 @@ export default function App() {
   const [authMode,  setAuthMode]  = useState('login');   // 'login' | 'register'
   const [skipAuth,  setSkipAuth]  = useState(false);
 
+  const [fontsLoaded] = useFonts({
+    Sora_100Thin, Sora_200ExtraLight, Sora_300Light, Sora_400Regular,
+    Sora_500Medium, Sora_600SemiBold, Sora_700Bold, Sora_800ExtraBold,
+  });
+
   useEffect(() => {
     // Mevcut oturumu kontrol et
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -198,11 +209,12 @@ export default function App() {
       <UnitsProvider>
         <MuscleFilterProvider>
           <SafeAreaProvider>
+            <LanguageSheetProvider>
         <StatusBar barStyle="light-content" backgroundColor={C.bg} />
 
-        {session === undefined ? (
+        {(session === undefined || !fontsLoaded) ? (
           <View style={{ flex:1, backgroundColor:C.bg, justifyContent:'center', alignItems:'center' }}>
-            <Text style={{ color:C.lime, fontSize:28, fontWeight:'900', letterSpacing:2 }}>
+            <Text style={{ color:C.lime, fontSize:30, fontFamily:F.extrabold, letterSpacing:3 }}>
               FITO<Text style={{ color:C.muted }}>/PIA</Text>
             </Text>
           </View>
@@ -225,6 +237,7 @@ export default function App() {
             )}
           </SafeAreaView>
         )}
+            </LanguageSheetProvider>
           </SafeAreaProvider>
         </MuscleFilterProvider>
       </UnitsProvider>

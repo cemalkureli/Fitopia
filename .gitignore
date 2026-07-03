@@ -26,3 +26,9 @@ web-build/
 .claude/
 graphify-out/
 .graphifyignore
+
+# AI assistant / agent tooling docs — not part of the app
+CLAUDE.md
+AGENTS.md
+docs/
+.codex/

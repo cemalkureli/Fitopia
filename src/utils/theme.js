@@ -42,6 +42,18 @@ export const TAG_BG = {
   orange: 'rgba(251,146,60,0.12)',
 };
 
+// Font families (Sora — loaded in App.js via @expo-google-fonts/sora)
+export const F = {
+  thin:      'Sora_100Thin',
+  extralight:'Sora_200ExtraLight',
+  light:     'Sora_300Light',
+  regular:   'Sora_400Regular',
+  medium:    'Sora_500Medium',
+  semibold:  'Sora_600SemiBold',
+  bold:      'Sora_700Bold',
+  extrabold: 'Sora_800ExtraBold',
+};
+
 // Gradient helpers
 export const GRAD = {
   lime:  ['#e8f44a', '#a3c200'],
