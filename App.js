@@ -1,9 +1,9 @@
 import 'react-native-url-polyfill/auto';
 import { useEffect, useState } from 'react';
-import { View, Text, StatusBar } from 'react-native';
+import { View, Text, StatusBar, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -93,56 +93,56 @@ function Header() {
   );
 }
 
-// ─── Özel Tab Bar ──────────────────────────────────────────────────────────────
+// ─── Özel Tab Bar — yüzen cam/glassy pill (Apple Fitness tarzı) ──────────────────
 function CustomTabBar({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={{
-      flexDirection:'row', backgroundColor:C.s1,
-      borderTopWidth:1, borderTopColor:C.border,
-      paddingBottom:8, paddingTop:6,
-    }}>
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
-        const label       = options.tabBarLabel ?? route.name;
-        const focused     = state.index === index;
-        const icons       = TAB_ICONS[route.name];
-        const color       = focused ? C.lime : C.dim;
+    <View style={[tb.outer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      <View style={tb.pill}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label   = options.tabBarLabel ?? route.name;
+          const focused = state.index === index;
+          const icons   = TAB_ICONS[route.name];
+          const color   = focused ? C.lime : C.muted;
 
-        return (
-          <View key={route.key} style={{ flex:1, alignItems:'center' }}>
-            {focused && (
-              <Animated.View
-                entering={FadeIn.duration(200)}
-                style={{
-                  position:'absolute', top:0, width:32, height:2,
-                  backgroundColor:C.lime, borderRadius:2,
-                }}
-              />
-            )}
-            <View
-              style={{ alignItems:'center', paddingTop:8 }}
-              onTouchEnd={() => {
-                if (!focused) navigation.navigate(route.name);
-              }}
+          return (
+            <TouchableOpacity
+              key={route.key}
+              activeOpacity={0.8}
+              onPress={() => { if (!focused) navigation.navigate(route.name); }}
+              style={tb.tab}
             >
-              <Ionicons
-                name={focused ? icons?.focused : icons?.outline}
-                size={22}
-                color={color}
-              />
-              <Text style={{
-                fontSize:9, fontWeight:'700', marginTop:3,
-                color, letterSpacing:0.3,
-              }}>
-                {label.toUpperCase()}
-              </Text>
-            </View>
-          </View>
-        );
-      })}
+              <View style={[tb.item, focused && tb.itemActive]}>
+                {focused && (
+                  <Animated.View entering={FadeIn.duration(180)} style={tb.activeBg} pointerEvents="none" />
+                )}
+                <Ionicons name={focused ? icons?.focused : icons?.outline} size={20} color={color} />
+                <Text numberOfLines={1} style={[tb.label, { color }]}>{label.toUpperCase()}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
+
+const tb = StyleSheet.create({
+  outer:      { backgroundColor: C.bg, paddingHorizontal: 12, paddingTop: 8 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(18,25,42,0.92)', borderRadius: 26,
+    borderWidth: 1, borderColor: 'rgba(148,170,214,0.22)',
+    paddingVertical: 7, paddingHorizontal: 6,
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10,
+  },
+  tab:        { flex: 1 },
+  item:       { alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 7, borderRadius: 16, position: 'relative' },
+  itemActive: {},
+  activeBg:   { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(232,244,74,0.13)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(232,244,74,0.28)' },
+  label:      { fontSize: 8.5, fontWeight: '800', letterSpacing: 0.2 },
+});
 
 // ─── Ana Sekmeler ──────────────────────────────────────────────────────────────
 function MainTabs({ onSignOut }) {
