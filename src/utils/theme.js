@@ -1,13 +1,14 @@
 // LiftShift-inspired midnight-dark palette with Fitopia lime accent
 export const C = {
-  // Backgrounds (slate series — daha derin, "premium siyah" tonlar)
-  bg:      '#060911',   // deepest — near-black premium base
-  s1:      '#0c1220',   // surface 1 (kart zemini)
-  s2:      '#161f30',   // surface 2
-  s3:      '#26324a',   // surface 3
-  // Borders — ince açık gri kenar (Apple-pill hissi, kartlara netlik verir)
-  border:  '#2a3750',
-  border2: '#3a4a68',
+  // Backgrounds — cam/transparan cool görünüm: koyu siyah taban + yarı-saydam
+  // kart yüzeyleri. Kartlar tabandan hafif ayrışır, "glassy" hisdi verir.
+  bg:      '#05070E',   // deepest — near-black premium base
+  s1:      'rgba(22,30,48,0.55)',   // surface 1 (kart zemini — glassy)
+  s2:      'rgba(32,43,66,0.60)',   // surface 2 (nested — glassy)
+  s3:      '#28344d',               // surface 3 (opak: track/dot için)
+  // Borders — belirgin, keskin cool kenar (kartlara net çerçeve)
+  border:  'rgba(148,170,214,0.28)',
+  border2: 'rgba(148,170,214,0.42)',
   // Brand accents
   lime:    '#e8f44a',   // Fitopia primary
   teal:    '#14b8a6',   // secondary accent
