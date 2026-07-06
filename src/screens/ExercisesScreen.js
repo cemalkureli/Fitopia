@@ -168,6 +168,51 @@ const ExerciseRow = memo(({ item, onPress, lang }) => {
   );
 });
 
+// ─── Açılır filtre başlığı (accordion) ────────────────────────────────────────
+// Aktif filtrede renkli kenarlık + parlama (glow); açıkken chevron döner.
+function FilterAccordion({ icon, title, value, placeholder, activeColor, hasValue, isOpen, onToggle }) {
+  const color = hasValue ? activeColor : C.dim;
+  return (
+    <TouchableOpacity
+      onPress={onToggle}
+      activeOpacity={0.85}
+      style={[
+        fa.header,
+        isOpen && { borderColor: activeColor + '77', backgroundColor: activeColor + '0A' },
+        hasValue && {
+          borderColor: activeColor,
+          backgroundColor: activeColor + '14',
+          shadowColor: activeColor, shadowOpacity: 0.55, shadowRadius: 9, shadowOffset: { width: 0, height: 0 },
+          elevation: 7,
+        },
+      ]}
+    >
+      <View style={[fa.iconWrap, { backgroundColor: color + '1F' }]}>
+        <Ionicons name={icon} size={15} color={hasValue ? activeColor : C.muted} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={fa.title}>{title}</Text>
+        <Text style={[fa.value, hasValue && { color: activeColor, fontWeight: '800' }]} numberOfLines={1}>
+          {value || placeholder}
+        </Text>
+      </View>
+      <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={hasValue ? activeColor : C.dim} />
+    </TouchableOpacity>
+  );
+}
+
+const fa = StyleSheet.create({
+  row:     { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 8 },
+  header:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: C.s1, borderWidth: 1.5, borderColor: C.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 9 },
+  iconWrap:{ width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  title:   { color: C.dim, fontSize: 9.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  value:   { color: C.muted, fontSize: 13, fontWeight: '600', marginTop: 1 },
+  panel:   { marginHorizontal: 16, marginBottom: 10, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(148,170,214,0.28)', backgroundColor: C.s1, padding: 12, overflow: 'hidden' },
+  grid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.s2 },
+  chipTxt: { color: C.muted, fontSize: 12, fontWeight: '700' },
+});
+
 // ─── Detay bottom sheet ───────────────────────────────────────────────────────
 function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lang }) {
   const [userRating,    setUserRating]    = useState(0);
@@ -1990,29 +2035,22 @@ function ExercisesLibrary({ lang }) {
     <ExerciseRow item={item} onPress={setSelected} lang={lang} />
   ), [lang]);
 
-  const renderChip = useCallback(({ item: chip }) => {
-    const label = lang === 'tr' ? chip.label_tr : chip.label_en;
-    const isActive = chip.filterType === 'all'
-      ? (cat === '' && muscle === '')
-      : chip.filterType === 'cat'
-      ? cat === chip.id
-      : muscle === chip.id;
-    const onPress = () => {
-      if (chip.filterType === 'all') { setCat(''); setMuscle(''); }
-      else if (chip.filterType === 'cat') { setCat(isActive ? '' : chip.id); setMuscle(''); }
-      else { setMuscle(isActive ? '' : chip.id); setCat(''); }
-    };
-    return (
-      <TouchableOpacity
-        style={[s.catBtn, isActive && { backgroundColor: chip.color, borderColor: chip.color }]}
-        onPress={onPress}
-        activeOpacity={0.75}
-      >
-        <Ionicons name={chip.icon} size={14} color={isActive ? '#0a0c0f' : chip.color} />
-        <Text style={[s.catTxt, isActive && { color: '#0a0c0f', fontWeight: '800' }]}>{label}</Text>
-      </TouchableOpacity>
-    );
-  }, [cat, muscle, lang]);
+  // Açılır filtre panelleri: null | 'muscle' | 'diff'
+  const [openFilter, setOpenFilter] = useState(null);
+
+  // Seçili kas/kategori çipi (başlıkta değer + renk için)
+  const activeChip = cat
+    ? FILTER_CHIPS.find(c => c.filterType === 'cat' && c.id === cat)
+    : muscle
+    ? FILTER_CHIPS.find(c => c.filterType === 'muscle' && c.id === muscle)
+    : null;
+
+  const selectChip = (chip, isActive) => {
+    if (chip.filterType === 'all') { setCat(''); setMuscle(''); }
+    else if (chip.filterType === 'cat') { setCat(isActive ? '' : chip.id); setMuscle(''); }
+    else { setMuscle(isActive ? '' : chip.id); setCat(''); }
+    setOpenFilter(null); // seçim sonrası panel kapanır
+  };
 
   const renderFooter = useCallback(() => loadMore ? <ActivityIndicator color={C.teal} style={{ margin: 16 }} /> : null, [loadMore]);
 
@@ -2023,18 +2061,89 @@ function ExercisesLibrary({ lang }) {
         <TextInput style={s.searchInput} placeholder={t('searchPlaceholder', lang)} placeholderTextColor={C.dim} value={search} onChangeText={setSearch} />
         {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color={C.dim} /></TouchableOpacity>}
       </View>
-      <FlatList data={FILTER_CHIPS} keyExtractor={chip => chip.id + chip.filterType} renderItem={renderChip} horizontal showsHorizontalScrollIndicator={false} style={s.catList} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.diffScroll} contentContainerStyle={s.diffContent}>
-        {DIFF_META.map((dm, d) => {
-          const active = diff === d;
-          return (
-            <TouchableOpacity key={d} style={[s.diffBtn, active && { backgroundColor: dm.color, borderColor: dm.color }]} onPress={() => setDiff(active ? 0 : d)} activeOpacity={0.75}>
-              <Ionicons name={dm.icon} size={13} color={active ? '#0a0c0f' : dm.color} />
-              <Text style={[s.diffTxt, active && { color: '#0a0c0f', fontWeight: '800' }]}>{t(dm.key, lang)}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Açılır filtre başlıkları — aktifken renkli parlama */}
+      <View style={fa.row}>
+        <FilterAccordion
+          icon="body-outline"
+          title={t('muscleGroups', lang)}
+          value={activeChip ? (lang === 'tr' ? activeChip.label_tr : activeChip.label_en) : ''}
+          placeholder={lang === 'tr' ? 'Tümü' : 'All'}
+          activeColor={activeChip?.color ?? C.lime}
+          hasValue={!!activeChip}
+          isOpen={openFilter === 'muscle'}
+          onToggle={() => setOpenFilter(o => (o === 'muscle' ? null : 'muscle'))}
+        />
+        <FilterAccordion
+          icon="speedometer-outline"
+          title={t('difficulty', lang)}
+          value={diff > 0 ? t(DIFF_META[diff].key, lang) : ''}
+          placeholder={lang === 'tr' ? 'Tümü' : 'All'}
+          activeColor={diff > 0 ? DIFF_META[diff].color : C.lime}
+          hasValue={diff > 0}
+          isOpen={openFilter === 'diff'}
+          onToggle={() => setOpenFilter(o => (o === 'diff' ? null : 'diff'))}
+        />
+      </View>
+
+      {/* Kas grubu paneli — kademeli chip animasyonu + seçimde glow */}
+      {openFilter === 'muscle' && (
+        <Animated.View entering={FadeInDown.duration(220)} style={fa.panel}>
+          <LinearGradient colors={['rgba(232,244,74,0.05)', 'rgba(255,255,255,0.012)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <View style={fa.grid}>
+            {FILTER_CHIPS.map((chip, i) => {
+              const isActive = chip.filterType === 'all'
+                ? (cat === '' && muscle === '')
+                : chip.filterType === 'cat' ? cat === chip.id : muscle === chip.id;
+              return (
+                <Animated.View key={chip.id + chip.filterType} entering={FadeInDown.delay(i * 16).duration(200)}>
+                  <TouchableOpacity
+                    style={[fa.chip, isActive && {
+                      backgroundColor: chip.color, borderColor: chip.color,
+                      shadowColor: chip.color, shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6,
+                    }]}
+                    onPress={() => selectChip(chip, isActive)}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name={chip.icon} size={13} color={isActive ? '#0a0c0f' : chip.color} />
+                    <Text style={[fa.chipTxt, isActive && { color: '#0a0c0f', fontWeight: '900' }]}>
+                      {lang === 'tr' ? chip.label_tr : chip.label_en}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Zorluk paneli */}
+      {openFilter === 'diff' && (
+        <Animated.View entering={FadeInDown.duration(220)} style={fa.panel}>
+          <LinearGradient colors={['rgba(232,244,74,0.05)', 'rgba(255,255,255,0.012)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <View style={fa.grid}>
+            {DIFF_META.map((dm, d) => {
+              const active = diff === d && d > 0;
+              const isAll = d === 0;
+              const on = isAll ? diff === 0 : active;
+              return (
+                <Animated.View key={dm.key} entering={FadeInDown.delay(d * 30).duration(200)}>
+                  <TouchableOpacity
+                    style={[fa.chip, on && {
+                      backgroundColor: dm.color, borderColor: dm.color,
+                      shadowColor: dm.color, shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6,
+                    }]}
+                    onPress={() => { setDiff(isAll || active ? 0 : d); setOpenFilter(null); }}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name={dm.icon} size={13} color={on ? '#0a0c0f' : dm.color} />
+                    <Text style={[fa.chipTxt, on && { color: '#0a0c0f', fontWeight: '900' }]}>{t(dm.key, lang)}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+          </View>
+        </Animated.View>
+      )}
       <Text style={s.countTxt}>{loading ? '...' : `${exercises.length}+ ${t('exercises', lang)}`}</Text>
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
