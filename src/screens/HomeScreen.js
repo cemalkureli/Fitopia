@@ -168,6 +168,13 @@ export default function HomeScreen() {
   });
 
   const totalLogs = Object.values(logs).reduce((acc, arr) => acc + arr.length, 0);
+
+  // 🔥 Haftalık seri — bu haftadan geriye, art arda ≥1 antrenman kaydı olan hafta sayısı
+  const weekKey = (d) => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - x.getDay()); return x.getTime(); };
+  const weeksWithLog = new Set();
+  Object.values(logs).forEach(sessions => sessions.forEach(sess => weeksWithLog.add(weekKey(new Date(sess.date)))));
+  let streak = 0;
+  for (let cur = weekKey(new Date()); weeksWithLog.has(cur); cur -= 7 * 86400000) streak++;
   const dayName   = days[new Date().getDay()];
   const dateStr   = `${new Date().getDate()} ${months[new Date().getMonth()]}`;
 
@@ -188,7 +195,15 @@ export default function HomeScreen() {
       {/* Selamlama */}
       <Animated.View entering={FadeInDown.duration(450)} style={s.greetWrap}>
         <Text style={s.greetSub}>{greeting(lang)}, {dayName} · {dateStr}</Text>
-        <Text style={s.greetTitle}>{profile?.name ?? t('athlete', lang)} 👋</Text>
+        <View style={s.greetRow}>
+          <Text style={s.greetTitle}>{profile?.name ?? t('athlete', lang)} 👋</Text>
+          {streak > 0 && (
+            <View style={s.streakPill}>
+              <Text style={s.streakFire}>🔥</Text>
+              <Text style={s.streakTxt}>{streak} {lang === 'tr' ? 'hafta' : streak === 1 ? 'week' : 'weeks'}</Text>
+            </View>
+          )}
+        </View>
       </Animated.View>
 
       {/* Bugünkü antrenman */}
@@ -335,6 +350,10 @@ const s = StyleSheet.create({
   greetWrap:  { marginBottom: 20, paddingTop: 8 },
   greetSub:   { color: C.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4 },
   greetTitle: { color: C.text,  fontSize: 26, fontWeight: '900' },
+  greetRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  streakPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(232,244,74,0.10)', borderWidth: 1, borderColor: C.lime + '44' },
+  streakFire: { fontSize: 14 },
+  streakTxt:  { color: C.lime, fontSize: 13, fontWeight: '800' },
 
   todayCard:   { borderRadius: 18, padding: 18, borderWidth: 1, marginBottom: 16 },
   todayHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },

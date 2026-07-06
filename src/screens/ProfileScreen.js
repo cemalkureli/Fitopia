@@ -18,6 +18,7 @@ import { t } from '../utils/i18n';
 import RulerPicker from '../components/RulerPicker';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { cacheSet, TTL } from '../utils/cache';
+import { getReminder, setReminder } from '../utils/reminder';
 
 const { width } = Dimensions.get('window');
 const SUPPORT_EMAIL = 'cemalkureli@gmail.com';
@@ -394,6 +395,7 @@ export default function ProfileScreen({ onSignOut }) {
   const [deleteModal, setDeleteModal] = useState(false);
   const [signOutModal,setSignOutModal]= useState(false);
   const [comingSoon,  setComingSoon]  = useState(null); // 'rateApp' | 'becomePro'
+  const [reminder,    setReminderState] = useState({ enabled: false, hour: 18, minute: 0 });
 
   // Başka sekmeye geçilince açık alt-ekran/modallar sıfırlansın (geri gelince
   // Profil kök ekranı görünsün, açık kutu kalmasın).
@@ -414,7 +416,14 @@ export default function ProfileScreen({ onSignOut }) {
       });
     });
     getAllWorkoutLogs().then(setLogs);
+    getReminder().then(setReminderState);
   }, []);
+
+  // Hatırlatıcıyı uygula (kur/kapat + saat değişimi); izin verilmezse kapalı kalır
+  const applyReminder = async (enabled, hour) => {
+    const ok = await setReminder(enabled, hour, 0, lang);
+    setReminderState({ enabled: enabled && ok, hour, minute: 0 });
+  };
 
   const fullName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('athlete', lang);
   const initials = fullName.trim().split(' ').filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || '?';
@@ -559,6 +568,40 @@ export default function ProfileScreen({ onSignOut }) {
     </View>
   );
 
+  if (sub === 'reminder') {
+    const HOURS = [6, 7, 8, 9, 12, 17, 18, 19, 20, 21];
+    return (
+      <View style={ss.fill}>
+        <SubBg colors={['rgba(232,244,74,0.10)', 'rgba(2,6,23,0)']} />
+        <SubHeader title={t('workoutReminder', lang)} onBack={() => setSub(null)} />
+        <SubDesc text={t('reminderDesc', lang)} />
+        <RadioOption label={lang === 'tr' ? 'Açık' : 'On'}    selected={reminder.enabled}  onPress={() => applyReminder(true, reminder.hour)}  delay={80} />
+        <RadioOption label={lang === 'tr' ? 'Kapalı' : 'Off'} selected={!reminder.enabled} onPress={() => applyReminder(false, reminder.hour)} delay={130} />
+        {reminder.enabled && (
+          <>
+            <SubDesc text={t('reminderTime', lang)} delay={0} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20 }}>
+              {HOURS.map(h => {
+                const on = reminder.hour === h;
+                return (
+                  <TouchableOpacity key={h} onPress={() => applyReminder(true, h)}
+                    style={{
+                      paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1,
+                      borderColor: on ? C.lime : C.border, backgroundColor: on ? C.lime : C.s1,
+                    }}>
+                    <Text style={{ color: on ? C.bg : C.muted, fontSize: 13, fontWeight: on ? '900' : '700' }}>
+                      {String(h).padStart(2, '0')}:00
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+      </View>
+    );
+  }
+
   // ── Main view ────────────────────────────────────────────────────────────────
   return (
     <View style={s.fill}>
@@ -631,7 +674,10 @@ export default function ProfileScreen({ onSignOut }) {
           <View style={s.card}>
             <Row label={t('language', lang)}   value={lang === 'tr' ? 'Türkçe' : 'English'} onPress={() => setSub('language')} />
             <Row label={t('appearance', lang)} value={t('dark', lang)}                       onPress={() => setSub('appearance')} />
-            <Row label={t('units', lang)}      value={`${weightUnit} / ${lengthUnit}`}        onPress={() => setSub('units')} last />
+            <Row label={t('units', lang)}      value={`${weightUnit} / ${lengthUnit}`}        onPress={() => setSub('units')} />
+            <Row label={t('workoutReminder', lang)}
+              value={reminder.enabled ? `${String(reminder.hour).padStart(2, '0')}:00` : (lang === 'tr' ? 'Kapalı' : 'Off')}
+              onPress={() => setSub('reminder')} last />
           </View>
         </AnimatedRN.View>
 

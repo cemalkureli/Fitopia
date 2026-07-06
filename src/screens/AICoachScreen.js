@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedRN, { FadeInDown, FadeIn, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { C } from '../utils/theme';
 import { supabase } from '../lib/supabase';
 import { useLang } from '../context/LanguageContext';
@@ -38,6 +39,7 @@ const STEPS = [
   { id: 'occupation',     cat: 3 },
   { id: 'workout_place',  cat: 3 },
   { id: 'ex_type',        cat: 3 },
+  { id: 'prefs',          cat: 3 },
   { id: 'injury',         cat: 3 },
   { id: 'activity',       cat: 3 },
   { id: 'frequency',      cat: 3 },
@@ -264,12 +266,20 @@ function PlanCard({ answers, lang }) {
   const GOAL_LBL = { lose_weight: lang==='tr'?'Kilo Ver':'Lose Weight', build_muscle: lang==='tr'?'Kas Kazan':'Build Muscle', keep_fit: lang==='tr'?'Formda Kal':'Keep Fit' };
   const LVL_LBL  = { beginner: lang==='tr'?'Başlangıç':'Beginner', intermediate: lang==='tr'?'Orta':'Intermediate', advanced: lang==='tr'?'İleri':'Advanced' };
   const FOCUS_LBL = { full_body:'Full Body', chest:lang==='tr'?'Göğüs':'Chest', back:lang==='tr'?'Sırt':'Back', arms:lang==='tr'?'Kollar':'Arms', legs:lang==='tr'?'Bacaklar':'Legs', core:'Core' };
+  // Çoklu odak: 2 etiket + "+N" (taşmayı önle)
+  const fa = answers.focusAreas ?? [];
+  const focusVal = fa.length === 0 ? '—'
+    : fa.slice(0, 2).map(k => FOCUS_LBL[k] ?? k).join(' · ') + (fa.length > 2 ? ` +${fa.length - 2}` : '');
   const items = [
     { icon:'barbell-outline', lbl: lang==='tr'?'Antrenman':'Training', val: `${answers.workoutFreq}×/` + (lang==='tr'?'hafta':'week') },
     { icon:'flame-outline',   lbl: lang==='tr'?'Seviye':'Level',       val: LVL_LBL[answers.fitnessLevel] ?? '—' },
-    { icon:'body-outline',    lbl: lang==='tr'?'Odak':'Focus',         val: FOCUS_LBL[answers.focusArea] ?? '—' },
+    { icon:'body-outline',    lbl: lang==='tr'?'Odak':'Focus',         val: focusVal },
     { icon:'trophy-outline',  lbl: lang==='tr'?'Hedef':'Goal',         val: GOAL_LBL[answers.goal] ?? '—' },
   ];
+  const extras = [
+    answers.warmup   && (lang==='tr'?'Isınma dahil':'Warm-up included'),
+    answers.cooldown && (lang==='tr'?'Esneme dahil':'Stretching included'),
+  ].filter(Boolean);
   return (
     <View style={s.planCard}>
       <Text style={s.planTitle}>{lang === 'tr' ? 'Plan Özeti' : 'Plan Summary'}</Text>
@@ -282,6 +292,16 @@ function PlanCard({ answers, lang }) {
           </View>
         ))}
       </View>
+      {extras.length > 0 && (
+        <View style={s.planExtras}>
+          {extras.map((e, i) => (
+            <View key={i} style={s.planExtraChip}>
+              <Ionicons name="checkmark" size={12} color={C.lime} />
+              <Text style={s.planExtraTxt}>{e}</Text>
+            </View>
+          ))}
+        </View>
+      )}
       {b && (
         <View style={[s.planBmi, { borderColor: bColor + '44' }]}>
           <Text style={[s.planBmiVal, { color: bColor }]}>BMI {b}</Text>
@@ -291,6 +311,66 @@ function PlanCard({ answers, lang }) {
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+// Güç projeksiyonu — seviyeye göre 12 haftalık tahmini artış (yükselen bar şeridi)
+function StrengthCard({ level, lang }) {
+  const gain = level === 'beginner' ? 35 : level === 'advanced' ? 15 : 25;
+  const bars = Array.from({ length: 8 }, (_, i) => (i + 1) / 8);
+  return (
+    <View style={s.planCard}>
+      <Text style={s.planTitle}>{lang==='tr'?'Güç Projeksiyonu':'Strength Projection'}</Text>
+      <View style={s.strengthRow}>
+        <View style={s.strengthBars}>
+          {bars.map((f, i) => (
+            <View key={i} style={[s.strengthBar, {
+              height: 14 + f * 42,
+              backgroundColor: i === bars.length - 1 ? C.lime : C.teal + 'AA',
+            }]} />
+          ))}
+        </View>
+        <View style={s.strengthInfo}>
+          <Text style={s.strengthPct}>+{gain}%</Text>
+          <Text style={s.strengthLbl}>{lang==='tr'?'ilk 12 haftada\ntahmini güç artışı':'estimated strength gain\nin first 12 weeks'}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// Beslenme hedefleri — Mifflin-St Jeor + hedefe göre kalori & protein
+function NutritionCard({ answers, lang }) {
+  const { gender, weight, height, birthYear, activityLevel, goal } = answers;
+  const age = new Date().getFullYear() - (birthYear || 1995);
+  const bmr = 10 * weight + 6.25 * height - 5 * age + (gender === 'female' ? -161 : 5);
+  const tdee = bmr * (1.3 + 0.125 * (activityLevel ?? 1));               // hareketsiz→aktif
+  const kcal = Math.round((tdee + (goal === 'lose_weight' ? -400 : goal === 'build_muscle' ? 300 : 0)) / 10) * 10;
+  const protein = Math.round(weight * (goal === 'build_muscle' ? 1.8 : goal === 'lose_weight' ? 2.0 : 1.6));
+  const water = Math.round(weight * 0.035 * 10) / 10; // litre
+  const items = [
+    { icon:'flame',          val:`${kcal}`,     unit:'kcal',              lbl: lang==='tr'?'Günlük Kalori':'Daily Calories', col:C.orange },
+    { icon:'egg',            val:`${protein}g`, unit:'',                  lbl: lang==='tr'?'Protein':'Protein',              col:C.lime   },
+    { icon:'water',          val:`${water}L`,   unit:'',                  lbl: lang==='tr'?'Su':'Water',                     col:C.blue   },
+  ];
+  return (
+    <View style={s.planCard}>
+      <Text style={s.planTitle}>{lang==='tr'?'Beslenme Hedeflerin':'Your Nutrition Targets'}</Text>
+      <View style={s.planGrid}>
+        {items.map((it, i) => (
+          <View key={i} style={[s.planItem, { flexBasis: '30%' }]}>
+            <Ionicons name={it.icon} size={20} color={it.col} />
+            <Text style={[s.planVal, { color: it.col }]}>{it.val}</Text>
+            <Text style={s.planLbl}>{it.lbl}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={s.nutriNote}>
+        {lang==='tr'
+          ? 'Hedefine göre hesaplandı — yaklaşık değerlerdir.'
+          : 'Calculated for your goal — approximate values.'}
+      </Text>
     </View>
   );
 }
@@ -352,7 +432,9 @@ export default function AICoachScreen({ navigation }) {
     gender:          null,
     goal:            null,
     motivation:      [],
-    focusArea:       null,
+    focusAreas:      [],   // çoklu odak bölge (full_body diğerlerini dışlar)
+    warmup:          true, // ısınma rutini planına dahil
+    cooldown:        true, // soğuma/esneme dahil
     birthYear:       1995,
     height:          175,
     weight:          75,
@@ -388,7 +470,7 @@ export default function AICoachScreen({ navigation }) {
             ...prev,
             gender:         p.gender ?? prev.gender,
             goal:           p.goal ?? prev.goal,
-            focusArea:      p.focus_area ?? prev.focusArea,
+            focusAreas:     p.focus_area ? [p.focus_area] : prev.focusAreas,
             height:         p.height_cm ?? prev.height,
             weight:         p.weight_kg ?? prev.weight,
             targetWeight:   p.target_weight_kg ?? prev.targetWeight,
@@ -400,6 +482,19 @@ export default function AICoachScreen({ navigation }) {
           }));
           setStepIdx(STEPS.findIndex(s => s.id === 'result'));
         });
+      // Supabase kolonu olmayan tercihleri (çoklu odak, ısınma/soğuma) lokalden yükle
+      AsyncStorage.getItem(`coach_prefs_${data.user.id}`).then(raw => {
+        if (!raw) return;
+        try {
+          const p = JSON.parse(raw);
+          setA(prev => ({
+            ...prev,
+            focusAreas: p.focusAreas?.length ? p.focusAreas : prev.focusAreas,
+            warmup:     p.warmup   ?? prev.warmup,
+            cooldown:   p.cooldown ?? prev.cooldown,
+          }));
+        } catch {}
+      });
     });
   }, []));
 
@@ -410,7 +505,7 @@ export default function AICoachScreen({ navigation }) {
       case 'gender':       return !!a.gender;
       case 'goal':         return !!a.goal;
       case 'motivation':   return a.motivation.length > 0;
-      case 'focus':        return !!a.focusArea;
+      case 'focus':        return a.focusAreas.length > 0;
       case 'birth_year':   return !invalidSteps.birth_year && yearDraft >= YEAR_MIN && yearDraft <= YEAR_MAX;
       case 'height':       return !invalidSteps.height;
       case 'weight':       return !invalidSteps.weight;
@@ -447,7 +542,8 @@ export default function AICoachScreen({ navigation }) {
       id:                userId,
       gender:            a.gender,
       goal:              a.goal,
-      focus_area:        a.focusArea,
+      focus_area:        a.focusAreas[0] ?? null, // Supabase kolonu tekli; birincil odak
+
       height_cm:         a.height,
       weight_kg:         a.weight,
       target_weight_kg:  a.targetWeight,
@@ -461,6 +557,10 @@ export default function AICoachScreen({ navigation }) {
       completed_at:      new Date().toISOString(),
       updated_at:        new Date().toISOString(),
     });
+    // Ek tercihler (Supabase kolonu yok) — lokal, cihazda kalıcı
+    await AsyncStorage.setItem(`coach_prefs_${userId}`, JSON.stringify({
+      focusAreas: a.focusAreas, warmup: a.warmup, cooldown: a.cooldown,
+    })).catch(() => {});
     setHasProfile(true);
   };
 
@@ -568,16 +668,33 @@ export default function AICoachScreen({ navigation }) {
           { k:'legs',      lbl:lang==='tr'?'Bacaklar':'Legs',          icon:'walk-outline'               },
           { k:'back',      lbl:lang==='tr'?'Sırt':'Back',              icon:'accessibility-outline'      },
         ];
+        // Çoklu seçim; "Tüm Vücut" diğerlerini dışlar
+        const toggleFocus = (k) => {
+          setA(prev => {
+            let next;
+            if (k === 'full_body') next = prev.focusAreas.includes('full_body') ? [] : ['full_body'];
+            else {
+              const base = prev.focusAreas.filter(x => x !== 'full_body');
+              next = base.includes(k) ? base.filter(x => x !== k) : [...base, k];
+            }
+            return { ...prev, focusAreas: next };
+          });
+        };
         return (
           <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-            <Text style={s.q}>{lang==='tr'?'Odak bölgeniz?':"What's your focus area?"}</Text>
+            <Text style={s.q}>{lang==='tr'?'Odak bölgeleriniz?':'Your focus areas?'}</Text>
+            <Text style={s.qsub}>{lang==='tr'?'Birden fazla seçebilirsiniz':'Multiple selections allowed'}</Text>
             <View style={s.focusGrid}>
-              {areas.map(a2=>(
-                <TouchableOpacity key={a2.k} style={[s.focusCard, a.focusArea===a2.k&&{borderColor:C.lime,backgroundColor:C.lime+'14'}]} onPress={()=>set('focusArea',a2.k)} activeOpacity={0.8}>
-                  <Ionicons name={a2.icon} size={28} color={a.focusArea===a2.k?C.lime:C.muted} />
-                  <Text style={[s.focusLbl, a.focusArea===a2.k&&{color:C.lime,fontWeight:'800'}]}>{a2.lbl}</Text>
-                </TouchableOpacity>
-              ))}
+              {areas.map(a2=>{
+                const on = a.focusAreas.includes(a2.k);
+                return (
+                  <TouchableOpacity key={a2.k} style={[s.focusCard, on&&{borderColor:C.lime,backgroundColor:C.lime+'14'}]} onPress={()=>toggleFocus(a2.k)} activeOpacity={0.8}>
+                    {on && <Ionicons name="checkmark-circle" size={16} color={C.lime} style={{position:'absolute',top:8,right:8}} />}
+                    <Ionicons name={a2.icon} size={28} color={on?C.lime:C.muted} />
+                    <Text style={[s.focusLbl, on&&{color:C.lime,fontWeight:'800'}]}>{a2.lbl}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
         );
@@ -789,6 +906,40 @@ export default function AICoachScreen({ navigation }) {
         );
       }
 
+      // 12b. Isınma & Soğuma tercihleri — iki büyük toggle kart
+      case 'prefs': {
+        const prefs = [
+          { k:'warmup',   lbl:lang==='tr'?'Isınma Rutini':'Warm-up Routine',      icon:'flame-outline',
+            sub:lang==='tr'?'Her antrenman öncesi ~5 dk hazırlık':'~5 min prep before each workout' },
+          { k:'cooldown', lbl:lang==='tr'?'Soğuma & Esneme':'Cool-down Stretches', icon:'leaf-outline',
+            sub:lang==='tr'?'Antrenman sonrası ~5 dk esneme':'~5 min stretching after workout' },
+        ];
+        return (
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.q}>{lang==='tr'?'Antrenman öncesi & sonrası':'Before & after your workout'}</Text>
+            <Text style={s.qsub}>{lang==='tr'?'Planına dahil edelim mi?':'Include these in your plan?'}</Text>
+            {prefs.map(p => {
+              const on = a[p.k];
+              return (
+                <TouchableOpacity key={p.k} activeOpacity={0.85} onPress={()=>set(p.k, !on)}
+                  style={[s.prefCard, on && { borderColor: C.lime, backgroundColor: C.lime+'10' }]}>
+                  <View style={[s.prefIcon, { backgroundColor: (on?C.lime:C.dim)+'1A' }]}>
+                    <Ionicons name={p.icon} size={24} color={on?C.lime:C.dim} />
+                  </View>
+                  <View style={{ flex:1 }}>
+                    <Text style={[s.prefLbl, on && { color:'#fff' }]}>{p.lbl}</Text>
+                    <Text style={s.prefSub}>{p.sub}</Text>
+                  </View>
+                  <View style={[s.prefTrack, on && { backgroundColor: C.lime }]}>
+                    <View style={[s.prefThumb, on && { alignSelf:'flex-end' }]} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        );
+      }
+
       // 13. Sakatlık/rahatsızlık
       case 'injury': {
         const areas = [
@@ -901,9 +1052,26 @@ export default function AICoachScreen({ navigation }) {
           { k:'intermediate', lbl:lang==='tr'?'Hafif ter dök':'Break a light sweat',  icon:'water-outline',      col:C.lime,  tip:lang==='tr'?'Düzenli spor yapıyorum, biraz zorlanmak istiyorum.':'I exercise regularly, want some challenge.' },
           { k:'advanced',     lbl:lang==='tr'?'Zorlu':'A bit challenging',            icon:'flame-outline',      col:C.orange,tip:lang==='tr'?'💪 Limitlerini zorla! Beraber güçleneceğiz.':'💪 Push your limits! We\'ll witness a stronger you.' },
         ];
+        // Gauge görseli: seçime göre dolan hız göstergesi (Kolay → Yoğun)
+        const lvlIdx = Math.max(0, lvls.findIndex(l => l.k === a.fitnessLevel));
+        const cur = lvls[lvlIdx];
         return (
           <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
             <Text style={s.q}>{lang==='tr'?'Antrenman tercihiniz?':'Choose your preferred workout level'}</Text>
+            <View style={s.actIconWrap}>
+              <LinearGradient colors={[cur.col+'22', cur.col+'06']} style={s.actIconCircle}>
+                <Ionicons name="speedometer-outline" size={48} color={cur.col} />
+              </LinearGradient>
+              <View style={s.gaugeDots}>
+                {lvls.map((lv,i)=>(
+                  <View key={lv.k} style={[s.gaugeDot, i<=lvlIdx && { backgroundColor: cur.col }]} />
+                ))}
+              </View>
+              <View style={s.gaugeLbls}>
+                <Text style={s.sliderLbl}>{lang==='tr'?'Kolay':'Easy'}</Text>
+                <Text style={s.sliderLbl}>{lang==='tr'?'Yoğun':'Intense'}</Text>
+              </View>
+            </View>
             {lvls.map(lv=><OptionRow key={lv.k} label={lv.lbl} sublabel={a.fitnessLevel===lv.k?lv.tip:undefined} icon={lv.icon} selected={a.fitnessLevel===lv.k} onPress={()=>set('fitnessLevel',lv.k)} color={lv.col} />)}
           </ScrollView>
         );
@@ -996,6 +1164,8 @@ export default function AICoachScreen({ navigation }) {
               </Text>
               <ProjectionChart curKg={a.weight} tgtKg={a.targetWeight} days={days} lang={lang} />
               <PlanCard answers={a} lang={lang} />
+              <StrengthCard level={a.fitnessLevel} lang={lang} />
+              <NutritionCard answers={a} lang={lang} />
 
               {/* Şablonlara geç (Egzersizler → Templates) */}
               <TouchableOpacity
@@ -1004,6 +1174,8 @@ export default function AICoachScreen({ navigation }) {
                   initialTab: 2,
                   filterDays: Math.min(a.workoutFreq || 3, 6),
                   filterGoal: GOAL_TO_PLAN[a.goal] ?? null,
+                  // Evde/açık havada çalışanlara ev-dostu şablonları önce göster (filtre değil, sıralama)
+                  sortEnv: (a.workoutPlace === 'home' || a.workoutPlace === 'outdoor' || a.workoutPlace === 'yoga') ? 'home' : null,
                   ts: Date.now(),
                 })}
                 style={{ marginBottom: 12 }}
@@ -1184,6 +1356,33 @@ const s = StyleSheet.create({
   planBmiVal:   { fontSize:28, fontWeight:'900' },
   planBmiLbl:   { fontSize:14, fontWeight:'800' },
   planBmiDesc:  { color:C.muted, fontSize:12, marginTop:2 },
+  planExtras:   { flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:12 },
+  planExtraChip:{ flexDirection:'row', alignItems:'center', gap:5, paddingHorizontal:10, paddingVertical:6, borderRadius:10, borderWidth:1, borderColor:C.lime+'44', backgroundColor:C.lime+'0D' },
+  planExtraTxt: { color:C.text, fontSize:12, fontWeight:'600' },
+
+  // Prefs (ısınma/soğuma) toggle kartları
+  prefCard:  { flexDirection:'row', alignItems:'center', gap:14, borderRadius:18, borderWidth:1.5, borderColor:C.border, backgroundColor:C.s1, padding:18, marginBottom:12 },
+  prefIcon:  { width:48, height:48, borderRadius:14, alignItems:'center', justifyContent:'center' },
+  prefLbl:   { color:C.text, fontSize:16, fontWeight:'800' },
+  prefSub:   { color:C.muted, fontSize:12, marginTop:3, lineHeight:17 },
+  prefTrack: { width:46, height:26, borderRadius:13, backgroundColor:C.s3, padding:3, justifyContent:'center' },
+  prefThumb: { width:20, height:20, borderRadius:10, backgroundColor:'#fff', alignSelf:'flex-start' },
+
+  // Level gauge
+  gaugeDots: { flexDirection:'row', gap:10, marginTop:12 },
+  gaugeDot:  { width:26, height:8, borderRadius:4, backgroundColor:C.s3 },
+  gaugeLbls: { flexDirection:'row', justifyContent:'space-between', alignSelf:'stretch', paddingHorizontal:60, marginTop:6 },
+
+  // Strength projection
+  strengthRow:  { flexDirection:'row', alignItems:'center', gap:18, marginTop:4 },
+  strengthBars: { flexDirection:'row', alignItems:'flex-end', gap:5, flex:1, height:60 },
+  strengthBar:  { flex:1, borderRadius:4 },
+  strengthInfo: { alignItems:'flex-end' },
+  strengthPct:  { color:C.lime, fontSize:30, fontWeight:'900' },
+  strengthLbl:  { color:C.muted, fontSize:11, textAlign:'right', lineHeight:15, marginTop:2 },
+
+  // Nutrition
+  nutriNote: { color:C.dim, fontSize:11, marginTop:10, textAlign:'center' },
 
   // Result
   restartBtn:   { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:6, padding:12, backgroundColor:C.s1, borderRadius:12, borderWidth:1, borderColor:C.border },
