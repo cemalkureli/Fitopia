@@ -178,13 +178,10 @@ function FilterAccordion({ icon, title, value, placeholder, activeColor, hasValu
       activeOpacity={0.85}
       style={[
         fa.header,
-        isOpen && { borderColor: activeColor + '77', backgroundColor: activeColor + '0A' },
-        hasValue && {
-          borderColor: activeColor,
-          backgroundColor: activeColor + '14',
-          shadowColor: activeColor, shadowOpacity: 0.55, shadowRadius: 9, shadowOffset: { width: 0, height: 0 },
-          elevation: 7,
-        },
+        // Keskin renkli kenarlık + transparan zemin — Android'de elevation/gölge
+        // bulanık "sis" halesi çizdiği için glow YOK, cam görünüm korunur.
+        isOpen && { borderColor: activeColor + '77' },
+        hasValue && { borderColor: activeColor, backgroundColor: activeColor + '0D' },
       ]}
     >
       <View style={[fa.iconWrap, { backgroundColor: color + '1F' }]}>
@@ -2097,10 +2094,7 @@ function ExercisesLibrary({ lang }) {
               return (
                 <Animated.View key={chip.id + chip.filterType} entering={FadeInDown.delay(i * 16).duration(200)}>
                   <TouchableOpacity
-                    style={[fa.chip, isActive && {
-                      backgroundColor: chip.color, borderColor: chip.color,
-                      shadowColor: chip.color, shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6,
-                    }]}
+                    style={[fa.chip, isActive && { backgroundColor: chip.color, borderColor: chip.color }]}
                     onPress={() => selectChip(chip, isActive)}
                     activeOpacity={0.75}
                   >
@@ -2128,10 +2122,7 @@ function ExercisesLibrary({ lang }) {
               return (
                 <Animated.View key={dm.key} entering={FadeInDown.delay(d * 30).duration(200)}>
                   <TouchableOpacity
-                    style={[fa.chip, on && {
-                      backgroundColor: dm.color, borderColor: dm.color,
-                      shadowColor: dm.color, shadowOpacity: 0.6, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6,
-                    }]}
+                    style={[fa.chip, on && { backgroundColor: dm.color, borderColor: dm.color }]}
                     onPress={() => { setDiff(isAll || active ? 0 : d); setOpenFilter(null); }}
                     activeOpacity={0.75}
                   >
