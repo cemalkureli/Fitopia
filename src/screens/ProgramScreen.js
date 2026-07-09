@@ -8,16 +8,22 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { C } from '../utils/theme';
-import { MEDIA_URLS } from '../utils/exerciseUrls';
+import { EXERCISES, gifUrl } from '../data/exercises';
 import ExerciseMedia from '../components/ExerciseMedia';
 import { saveWorkoutSession, getAllWorkoutLogs, getActiveProgram, clearActiveProgram } from '../utils/storage';
 import { TRAINING_PLANS } from '../data/trainingPlans';
-import { supabase } from '../lib/supabase';
 import { useToast, ConfirmModal } from '../components/Toast';
 import { useLang } from '../context/LanguageContext';
 import { t, MONTHS_SHORT } from '../utils/i18n';
 
-const MEDIA_MAP = MEDIA_URLS;
+// Statik plan egzersiz adı → GIF: yerel dataset'te ada göre (tam veya içeren) eşle.
+const NAME_INDEX = EXERCISES.map(e => ({ lc: e.name.toLowerCase(), m: e.m }));
+function resolveGif(cleanName) {
+  if (!cleanName) return null;
+  const q = cleanName.toLowerCase();
+  const hit = NAME_INDEX.find(x => x.lc === q) || NAME_INDEX.find(x => x.lc.includes(q) || q.includes(x.lc));
+  return hit ? gifUrl(hit.m) : null;
+}
 
 // TERM_REGEX: RIR, set×rep, Failure, Süperset, Finisher — hepsi badge olarak gösterilir
 const TERM_REGEX = /(RIR\s*\d+|RIR|\d+[×x]\d+(?:-\d+)?|Failure|Süperset|Superset|Finisher)/g;
@@ -147,9 +153,8 @@ function ExerciseRow({ hareket, onLog, lang, onPlay, mediaMap = {} }) {
     .replace(/\s+\d+[×x].+/, '')
     .replace(/\s+(RIR|Failure|Superset|Süperset|Finisher).+/i, '')
     .trim();
-  // DB'den gelen webm_url önce, yoksa MEDIA_MAP fallback
-  const gifSrc = mediaMap[cleanName]
-    ?? (() => { const k = Object.keys(MEDIA_MAP).find(k => name.startsWith(k)); return k ? MEDIA_MAP[k] : null; })();
+  // Önce parent'ın önceden çözdüğü harita, yoksa yerel dataset'ten ada göre GIF
+  const gifSrc = mediaMap[cleanName] ?? resolveGif(cleanName);
 
   const displayName = name.replace(/^\*Finisher:\s*/i, '');
   const isFinisher  = name.startsWith('*');
@@ -228,28 +233,16 @@ export default function ProgramScreen() {
       });
       setOpenCards(next);
 
-      // DB'den webm_url çek — ilike ile fuzzy match
+      // Yerel dataset'ten ada göre GIF haritası kur (Supabase yok)
       const allEx = workouts.flatMap(w => w.exercises ?? []);
       const cleanNames = [...new Set(allEx.map(e => {
         const s = typeof e === 'string' ? e : e.name;
         return s.replace(/\s+\d+[×x].+/, '').replace(/\s+(RIR|Failure|Superset|Süperset|Finisher).+/i, '').trim();
       }).filter(Boolean))];
 
-      if (cleanNames.length > 0) {
-        const orFilter = cleanNames.map(n => `name.ilike.%${n}%`).join(',');
-        const { data } = await supabase.from('exercises')
-          .select('name, webm_url')
-          .or(orFilter);
-
-        const map = {};
-        cleanNames.forEach(cn => {
-          const match = (data || []).find(r =>
-            r.webm_url && r.name.toLowerCase().includes(cn.toLowerCase())
-          );
-          if (match) map[cn] = match.webm_url;
-        });
-        setMediaMap(map);
-      }
+      const map = {};
+      cleanNames.forEach(cn => { const g = resolveGif(cn); if (g) map[cn] = g; });
+      setMediaMap(map);
     });
     getAllWorkoutLogs().then(setWorkoutLogs);
     return () => setOpenCards({});

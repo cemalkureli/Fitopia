@@ -19,6 +19,12 @@ import { useMuscleFilter } from '../context/MuscleFilterContext';
 import { useToast, ConfirmModal } from '../components/Toast';
 import { cacheGet, cacheSet, TTL } from '../utils/cache';
 import { Image as ExpoImage } from 'expo-image';
+import {
+  EXERCISES, filterExercises, decorate, getByName,
+  CATEGORIES, CAT_LABEL, CAT_ICON, CAT_COLOR as EX_CAT_COLOR,
+  MUSCLE_LABEL, MUSCLE_COLOR, EQUIPMENTS, EQUIP_LABEL, EQUIP_ICON, equipGroup,
+  gifUrl, thumbUrl, MEDIA_ATTRIBUTION,
+} from '../data/exercises';
 
 // Workout terminology definitions (shared with ProgramScreen)
 const TERIMLER = {
@@ -37,56 +43,6 @@ const TERIMLER = {
 };
 
 const { width, height } = Dimensions.get('window');
-
-const CAT_KEYS = ['Göğüs','Sırt','Omuz','Kol','Bacak','Core','Kardio','Compound'];
-
-const CAT_COLOR = {
-  'Göğüs':    C.orange, 'Sırt':    C.blue,  'Omuz':    C.purple,
-  'Kol':      C.teal,   'Bacak':   C.green,  'Core':    C.lime,
-  'Kardio':   C.red,    'Compound':C.muted,
-};
-
-const CAT_ICON = {
-  '':         'apps-outline',
-  'Göğüs':   'body-outline',
-  'Sırt':    'accessibility-outline',
-  'Omuz':    'barbell-outline',
-  'Kol':     'fitness-outline',
-  'Bacak':   'walk-outline',
-  'Core':    'radio-button-on-outline',
-  'Kardio':  'heart-outline',
-  'Compound':'flash-outline',
-};
-
-// Unified filter chips: filterType='cat' → .eq('category',id), 'muscle' → .eq('primary_muscle',id)
-const FILTER_CHIPS = [
-  { id: '',                 filterType: 'all',    label_tr: 'Tümü',       label_en: 'All',        icon: 'apps-outline',            color: C.muted   },
-  { id: 'Göğüs',           filterType: 'cat',    label_tr: 'Göğüs',      label_en: 'Chest',      icon: 'body-outline',            color: '#ef4444' },
-  { id: 'Omuz',            filterType: 'cat',    label_tr: 'Omuz',       label_en: 'Shoulder',   icon: 'barbell-outline',         color: '#a855f7' },
-  { id: 'Biceps Brachii',  filterType: 'muscle', label_tr: 'Biseps',     label_en: 'Biceps',     icon: 'fitness-outline',         color: '#06b6d4' },
-  { id: 'Triceps Brachii', filterType: 'muscle', label_tr: 'Triceps',    label_en: 'Triceps',    icon: 'fitness-outline',         color: '#8b5cf6' },
-  { id: 'Kol',             filterType: 'cat',    label_tr: 'Önkol',      label_en: 'Forearms',   icon: 'fitness-outline',         color: '#818cf8' },
-  { id: 'Sırt',            filterType: 'cat',    label_tr: 'Sırt',       label_en: 'Back',       icon: 'accessibility-outline',   color: '#3b82f6' },
-  { id: 'Latissimus Dorsi',filterType: 'muscle', label_tr: 'Latissimus', label_en: 'Lats',       icon: 'accessibility-outline',   color: '#f43f5e' },
-  { id: 'Trapez',          filterType: 'muscle', label_tr: 'Trapez',     label_en: 'Traps',      icon: 'accessibility-outline',   color: '#e879f9' },
-  { id: 'Erector Spinae',  filterType: 'muscle', label_tr: 'Alt Sırt',   label_en: 'Lower Back', icon: 'accessibility-outline',   color: '#a855f7' },
-  { id: 'Core',            filterType: 'cat',    label_tr: 'Core',       label_en: 'Core',       icon: 'radio-button-on-outline', color: '#84cc16' },
-  { id: 'Quadriceps',      filterType: 'muscle', label_tr: 'Kuadriceps', label_en: 'Quads',      icon: 'walk-outline',            color: '#38bdf8' },
-  { id: 'Hamstring',       filterType: 'muscle', label_tr: 'Hamstring',  label_en: 'Hamstrings', icon: 'walk-outline',            color: '#0ea5e9' },
-  { id: 'Gluteus Maximus', filterType: 'muscle', label_tr: 'Gluteus',    label_en: 'Glutes',     icon: 'walk-outline',            color: '#fb923c' },
-  { id: 'Bacak',           filterType: 'cat',    label_tr: 'Baldır',     label_en: 'Calves',     icon: 'walk-outline',            color: '#7dd3fc' },
-  { id: 'Kardio',          filterType: 'cat',    label_tr: 'Kardio',     label_en: 'Cardio',     icon: 'heart-outline',           color: '#ef4444' },
-  { id: 'Compound',        filterType: 'cat',    label_tr: 'Bileşik',    label_en: 'Compound',   icon: 'flash-outline',           color: C.muted   },
-];
-
-const DIFF_META = [
-  { key: 'all',   color: C.muted,  icon: 'options-outline'     },
-  { key: 'diff1', color: C.green,  icon: 'leaf-outline'        },
-  { key: 'diff2', color: C.teal,   icon: 'trending-up-outline' },
-  { key: 'diff3', color: C.lime,   icon: 'flame-outline'       },
-  { key: 'diff4', color: C.orange, icon: 'alert-outline'       },
-  { key: 'diff5', color: C.red,    icon: 'skull-outline'       },
-];
 
 // ─── Yıldız ──────────────────────────────────────────────────────────────────
 function Stars({ value, max = 5, size = 14, onPress }) {
@@ -128,40 +84,29 @@ const eb = StyleSheet.create({
 });
 
 // ─── Egzersiz satırı ─────────────────────────────────────────────────────────
+// item: yerel dataset kaydı (id,name,cat,muscle,target,equip,m,...)
 const ExerciseRow = memo(({ item, onPress, lang }) => {
-  const color    = CAT_COLOR[item.category] ?? C.lime;
-  const catLabel = CATEGORY_LABELS[lang]?.[item.category] ?? item.category;
-  const muscle   = MUSCLE_LABELS[lang]?.[item.primary_muscle] ?? item.primary_muscle;
+  const color    = EX_CAT_COLOR[item.cat] ?? C.lime;
+  const catLabel = CAT_LABEL[item.cat]?.[lang] ?? item.cat;
+  const muscle   = MUSCLE_LABEL[item.muscle]?.[lang] ?? item.target ?? '';
 
   return (
     <TouchableOpacity style={s.exRow} onPress={() => onPress(item)} activeOpacity={0.8}>
-      {item.thumb_url ? (
-        <ExpoImage
-          source={{ uri: item.thumb_url }}
-          style={s.thumb}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={150}
-        />
-      ) : (
-        <LinearGradient colors={[color + '33', color + '11']} style={s.thumb}>
-          <Text style={[s.thumbLetter, { color }]}>{(item.name ?? '?')[0]}</Text>
-        </LinearGradient>
-      )}
+      <ExpoImage
+        source={{ uri: thumbUrl(item.m) }}
+        style={[s.thumb, { backgroundColor: '#fff' }]}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={150}
+      />
       <View style={{ flex: 1 }}>
-        <Text style={s.exName} numberOfLines={1}>{item.name}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-          <View style={[s.badge, { backgroundColor: color + '18' }]}>
+        <Text style={s.exName} numberOfLines={2}>{item.name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+          <View style={[s.badge, { backgroundColor: color + '22' }]}>
             <Text style={[s.badgeTxt, { color }]}>{catLabel}</Text>
           </View>
-          <Text style={s.muscleTxt}>{muscle}</Text>
+          {muscle ? <Text style={s.muscleTxt}>{muscle}</Text> : null}
         </View>
-        {(item.avg_rating ?? 0) > 0 && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
-            <Stars value={item.avg_rating} size={11} />
-            <Text style={{ color: C.dim, fontSize: 10 }}>({item.vote_count})</Text>
-          </View>
-        )}
       </View>
       <Ionicons name="chevron-forward" size={14} color={C.dim} />
     </TouchableOpacity>
@@ -211,201 +156,74 @@ const fa = StyleSheet.create({
 });
 
 // ─── Detay bottom sheet ───────────────────────────────────────────────────────
-function ExerciseDetail({ item, visible, onClose, onRated, onUpdateSelected, lang }) {
-  const [userRating,    setUserRating]    = useState(0);
-  const [submitting,    setSubmitting]    = useState(false);
-  const [submitted,     setSubmitted]     = useState(false);
-  const [liveAvg,       setLiveAvg]       = useState(0);
-  const [liveVotes,     setLiveVotes]     = useState(0);
-  const [activeMuscle,  setActiveMuscle]  = useState(null);
-  const color = CAT_COLOR[item?.category] ?? C.lime;
-  const DIFF  = [t('diff1',lang), t('diff2',lang), t('diff3',lang), t('diff4',lang), t('diff5',lang)];
-
-  const refreshSummary = async (exerciseId) => {
-    const { data: s } = await supabase
-      .from('exercise_rating_summary')
-      .select('avg_rating, vote_count')
-      .eq('exercise_id', exerciseId)
-      .maybeSingle();
-    const avg   = s ? (Number(s.avg_rating) || 0) : 0;
-    const votes = s ? (s.vote_count || 0) : 0;
-    setLiveAvg(avg);
-    setLiveVotes(votes);
-    onUpdateSelected?.(avg, votes);
-  };
-
-  useEffect(() => {
-    if (!visible || !item) return;
-    setUserRating(0); setSubmitted(false); setActiveMuscle(null); setLiveAvg(0); setLiveVotes(0);
-    refreshSummary(item.id);
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data?.user) return;
-      supabase.from('exercise_ratings').select('rating')
-        .eq('exercise_id', item.id).eq('user_id', data.user.id).single()
-        .then(({ data: r }) => { if (r) { setUserRating(r.rating); setSubmitted(true); } });
-    });
-  }, [visible, item?.id]);
-
-  const handleRate = async (rating) => {
-    if (rating === userRating) return; // aynı yıldıza tekrar basınca bir şey yapma
-    const wasFirstTime = !submitted;
-    setUserRating(rating); setSubmitting(true);
-    try {
-      const { data: ud } = await supabase.auth.getUser();
-      if (!ud?.user) return;
-      await supabase.from('exercise_ratings')
-        .upsert({ exercise_id: item.id, user_id: ud.user.id, rating }, { onConflict: 'exercise_id,user_id' });
-      // XP sadece ilk oyda verilir
-      if (wasFirstTime) {
-        await supabase.rpc('increment_xp', { uid: ud.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
-      }
-      await refreshSummary(item.id);
-      setSubmitted(true); onRated?.();
-    } catch {}
-    setSubmitting(false);
-  };
-
+// item: yerel dataset kaydı. GIF (© Gym Visual) + adım adım talimat + kaslar.
+function ExerciseDetail({ item, visible, onClose, lang }) {
   if (!item) return null;
-  const catLabel = CATEGORY_LABELS[lang]?.[item.category] ?? item.category;
+  const d        = decorate(item, lang);
+  const color    = d.catColor;
+  const steps    = d.steps.length ? d.steps : (d.instr ? [d.instr] : []);
+  const equip    = EQUIP_LABEL[equipGroup(item.equip)]?.[lang] ?? item.equip;
+  const muscles  = [d.muscleLabel, ...(item.secondary || [])].filter(Boolean);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={det.container}>
-        {/* Overlay */}
         <TouchableOpacity style={det.overlay} activeOpacity={1} onPress={onClose} />
-
-        {/* Sheet */}
         <View style={det.sheet}>
           <View style={det.dragBar} />
 
-          {/* Video — ScrollView dışında, sabit kalır */}
+          {/* GIF — ScrollView dışında sabit */}
           <View style={[det.videoWrap, { borderColor: color + '44' }]}>
-            {item.webm_url ? (
-              <ExerciseMedia source={item.webm_url} style={{ flex: 1 }} />
-            ) : (
-              <LinearGradient colors={[color+'22', color+'08']} style={{ flex:1, alignItems:'center', justifyContent:'center' }}>
-                <Ionicons name="barbell-outline" size={56} color={color} />
-              </LinearGradient>
-            )}
+            <ExpoImage
+              source={{ uri: d.gif }}
+              style={{ flex: 1, backgroundColor: '#fff' }}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={150}
+            />
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
             <View style={{ padding: 20 }}>
-              {/* Başlık */}
               <Text style={det.name}>{item.name}</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                <View style={[s.badge, { backgroundColor: color + '18' }]}>
-                  <Text style={[s.badgeTxt, { color }]}>{catLabel}</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <View style={[s.badge, { backgroundColor: color + '22' }]}>
+                  <Text style={[s.badgeTxt, { color }]}>{d.catLabel}</Text>
                 </View>
                 <View style={[s.badge, { backgroundColor: C.s2 }]}>
-                  <Text style={[s.badgeTxt, { color: C.muted }]}>{DIFF[(item.difficulty ?? 3) - 1]}</Text>
+                  <Text style={[s.badgeTxt, { color: C.muted }]}>{equip}</Text>
                 </View>
               </View>
 
-              {/* Detaylar */}
-              {(lang === 'en' ? (item.instructions_en || item.instructions) : item.instructions) ? (
+              {/* Kaslar */}
+              <Text style={det.sectionTitle}>{t('muscleGroups', lang)}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {muscles.map((m, i) => (
+                  <View key={i} style={[det.muscleTag, i === 0 && { backgroundColor: color + '22', borderColor: color }]}>
+                    <Text style={[det.muscleTxt, i === 0 && { color }]}>{m}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Adım adım talimat */}
+              {steps.length > 0 && (
                 <>
                   <Text style={det.sectionTitle}>{t('instructions', lang)}</Text>
-                  <Text style={det.instrTxt}>{lang === 'en' ? (item.instructions_en || item.instructions) : item.instructions}</Text>
+                  {steps.map((st, i) => (
+                    <View key={i} style={det.stepRow}>
+                      <View style={[det.stepNum, { backgroundColor: color + '22' }]}>
+                        <Text style={[det.stepNumTxt, { color }]}>{i + 1}</Text>
+                      </View>
+                      <Text style={det.stepTxt}>{st}</Text>
+                    </View>
+                  ))}
                 </>
-              ) : null}
-
-              {/* Kaslar — tıklanabilir */}
-              <Text style={det.sectionTitle}>{t('muscleGroups', lang)}</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-                {[item.primary_muscle, ...(item.secondary_muscles || [])].filter(Boolean).map((m, i) => {
-                  const isPrimary = i === 0;
-                  const isActive  = activeMuscle === m;
-                  const label     = MUSCLE_LABELS[lang]?.[m] ?? m;
-                  const score     = item.muscle_activations?.[m];
-                  return (
-                    <TouchableOpacity
-                      key={m}
-                      onPress={() => setActiveMuscle(isActive ? null : m)}
-                      style={[
-                        det.muscleTag,
-                        isPrimary && { backgroundColor: C.teal+'22', borderColor: C.teal },
-                        isActive  && { backgroundColor: color+'33', borderColor: color },
-                      ]}
-                    >
-                      <Text style={[det.muscleTxt, isPrimary && { color: C.teal }, isActive && { color }]}>
-                        {label}{score ? ` · ${score}/5` : ''}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Seçili kas aktivasyon barı */}
-              {activeMuscle && item.muscle_activations?.[activeMuscle] != null && (
-                <View style={det.activationBox}>
-                  <Text style={[det.activationTitle, { color }]}>
-                    {MUSCLE_LABELS[lang]?.[activeMuscle] ?? activeMuscle}
-                  </Text>
-                  <EffBar
-                    value={item.muscle_activations[activeMuscle]}
-                    label={t('activation', lang)}
-                    color={color}
-                  />
-                  <Text style={det.activationNote}>
-                    {lang === 'tr'
-                      ? `${t('inThisExercise', lang)} ${MUSCLE_LABELS.tr[activeMuscle] ?? activeMuscle} ${item.muscle_activations[activeMuscle] >= 4 ? t('actsPrimary', lang) : t('actsSecondary', lang)}.`
-                      : `${MUSCLE_LABELS.en[activeMuscle] ?? activeMuscle} ${item.muscle_activations[activeMuscle] >= 4 ? t('actsPrimary', lang) : t('actsSecondary', lang)} ${t('inThisExercise', lang)}`
-                    }
-                  </Text>
-                </View>
               )}
 
-              {/* Etki — per-muscle activation */}
-              <Text style={det.sectionTitle}>{t('effectiveness', lang)}</Text>
-              {item.muscle_activations && Object.keys(item.muscle_activations).length > 0
-                ? [item.primary_muscle, ...(item.secondary_muscles || [])].filter(Boolean).map(m => {
-                    const val = item.muscle_activations?.[m];
-                    if (val == null) return null;
-                    const isPrimary = m === item.primary_muscle;
-                    const barColor  = isPrimary ? color : C.teal;
-                    return (
-                      <EffBar
-                        key={m}
-                        value={val}
-                        label={MUSCLE_LABELS[lang]?.[m] ?? m}
-                        color={barColor}
-                      />
-                    );
-                  })
-                : <EffBar value={item.effectiveness ?? 3} label={t('generalEffect', lang)} color={color} />
-              }
-              <EffBar value={item.difficulty ?? 3} label={t('difficulty', lang)} color={C.orange} />
+              {/* Medya atıf — Gym Visual (lisans gereği) */}
+              <Text style={det.attribution}>{MEDIA_ATTRIBUTION}</Text>
 
-              {/* Topluluk puanı */}
-              <Text style={det.sectionTitle}>{t('communityRating', lang)}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <Stars value={liveAvg} size={20} />
-                {liveVotes > 0 && (
-                  <Text style={{ color: C.dim, fontSize: 12 }}>
-                    {t('avg', lang)} {Number(liveAvg).toFixed(1)} · {liveVotes} {t('votes', lang)}
-                  </Text>
-                )}
-              </View>
-
-              {/* Kullanıcı oyu */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={det.sectionTitle}>{t('yourRating', lang)}</Text>
-                {submitted && <Text style={{ color: C.teal, fontSize: 11 }}>{t('xpEarned', lang)}</Text>}
-              </View>
-              {submitting ? (
-                <ActivityIndicator color={C.lime} style={{ alignSelf: 'flex-start' }} />
-              ) : (
-                <Stars value={userRating} size={30} onPress={handleRate} />
-              )}
-              {submitted && (
-                <Text style={{ color: C.dim, fontSize: 11, marginTop: 4 }}>
-                  {t('ratingChangeable', lang)}
-                </Text>
-              )}
-
-              {/* Kapat */}
-              <TouchableOpacity onPress={onClose} style={[det.closeBtn, { borderColor: color + '50', marginTop: 20 }]}>
+              <TouchableOpacity onPress={onClose} style={[det.closeBtn, { borderColor: color + '50', marginTop: 16 }]}>
                 <Text style={{ color, fontWeight: '700', fontSize: 14 }}>{t('close', lang)}</Text>
               </TouchableOpacity>
             </View>
@@ -421,16 +239,17 @@ const det = StyleSheet.create({
   overlay:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)' },
   sheet:      { backgroundColor: C.s1, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: height * 0.92, borderWidth: 1, borderColor: C.border },
   dragBar:    { width: 36, height: 4, backgroundColor: C.s3, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 2 },
-  videoWrap:  { height: 220, borderWidth: 1, overflow: 'hidden', backgroundColor: C.s2 },
+  videoWrap:  { height: 260, borderWidth: 1, overflow: 'hidden', backgroundColor: '#fff' },
   name:       { color: C.text, fontSize: 20, fontWeight: '900' },
-  sectionTitle:{ color: C.text, fontSize: 13, fontWeight: '800', marginTop: 16, marginBottom: 8 },
-  instrTxt:   { color: C.muted, fontSize: 13, lineHeight: 20 },
-  muscleTag:     { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: C.border, backgroundColor: C.s2 },
-  muscleTxt:     { color: C.muted, fontSize: 12, fontWeight: '600' },
-  activationBox: { backgroundColor: C.s2, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, marginTop: 8, marginBottom: 4 },
-  activationTitle:{ fontSize: 13, fontWeight: '800', marginBottom: 8 },
-  activationNote: { color: C.muted, fontSize: 11, marginTop: 4, lineHeight: 16 },
-  closeBtn:      { borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  sectionTitle:{ color: C.text, fontSize: 13, fontWeight: '800', marginTop: 18, marginBottom: 10 },
+  muscleTag:  { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: C.border, backgroundColor: C.s2 },
+  muscleTxt:  { color: C.muted, fontSize: 12, fontWeight: '600' },
+  stepRow:    { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'flex-start' },
+  stepNum:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  stepNumTxt: { fontSize: 12, fontWeight: '900' },
+  stepTxt:    { flex: 1, color: C.muted, fontSize: 13.5, lineHeight: 20 },
+  attribution:{ color: C.dim, fontSize: 10.5, marginTop: 18, textAlign: 'center' },
+  closeBtn:   { borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
 });
 
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
@@ -511,10 +330,10 @@ function WorkoutsTab({ lang }) {
   const [quickGen,   setQuickGen]   = useState(false);
 
   const QUICK_FOCUS_CATS = {
-    full_body: ['Göğüs','Sırt','Omuz','Kol','Bacak','Core'],
-    upper:     ['Göğüs','Sırt','Omuz','Kol'],
-    lower:     ['Bacak'],
-    core:      ['Core'],
+    full_body: ['chest','back','shoulders','arms','legs','core'],
+    upper:     ['chest','back','shoulders','arms'],
+    lower:     ['legs'],
+    core:      ['core'],
   };
 
   const generateQuick = async () => {
@@ -522,8 +341,7 @@ function WorkoutsTab({ lang }) {
     setQuickGen(true);
     try {
       const cats = QUICK_FOCUS_CATS[quickFocus];
-      const { data } = await supabase.from('exercises').select('name, category').in('category', cats).limit(300);
-      const pool = data || [];
+      const pool = EXERCISES.filter(e => cats.includes(e.cat)).map(e => ({ name: e.name, category: e.cat }));
       // Süreye göre egzersiz sayısı: ~6 dk/egzersiz (3 set + dinlenme)
       const n = Math.max(3, Math.min(8, Math.round(quickDur / 6)));
       // Kategori dengesi: her kategoriden sırayla rastgele seç
@@ -636,8 +454,8 @@ function WorkoutsTab({ lang }) {
 
   const loadPicker = async () => {
     setLoadingPicker(true);
-    const { data } = await supabase.from('exercises').select('id, name, category, primary_muscle').order('name');
-    setAllEx(data || []);
+    // Yerel dataset — isme göre sıralı
+    setAllEx([...EXERCISES].sort((a, b) => a.name.localeCompare(b.name)));
     setLoadingPicker(false);
   };
 
@@ -1925,131 +1743,42 @@ const TAB_BAR_H = StyleSheet.create({
   tabTxtAct: { color: C.text, fontWeight: '800' },
 });
 
-// ─── ExercisesScreen (exercises-only tab) ─────────────────────────────────────
+// ─── ExercisesLibrary (yerel dataset — Supabase yok) ──────────────────────────
 function ExercisesLibrary({ lang }) {
   const { muscleFilter, clearMuscleFilter } = useMuscleFilter();
 
-  const [exercises, setExercises] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [loadMore,  setLoadMore]  = useState(false);
-  const [hasMore,   setHasMore]   = useState(true);
-  const [search,    setSearch]    = useState('');
-  const [cat,       setCat]       = useState('');
-  const [muscle,    setMuscle]    = useState(''); // primary_muscle filter
-  const [diff,      setDiff]      = useState(0);
-  const [selected,  setSelected]  = useState(null);
-  const offsetRef   = useRef(0);
-  const searchTimer = useRef(null);
+  const [search, setSearch] = useState('');
+  const [cat,    setCat]    = useState('');
+  const [muscle, setMuscle] = useState('');
+  const [equip,  setEquip]  = useState('');
+  const [page,   setPage]   = useState(1);
+  const [openFilter, setOpenFilter] = useState(null); // null | 'cat' | 'muscle' | 'equip'
+  const [selected, setSelected] = useState(null);
 
-  // Apply filter from mascot zone tap (one-time, then clear)
+  // BodyMap → Egzersizler köprüsü (bir kez uygula, sonra temizle)
   useFocusEffect(useCallback(() => {
-    if (muscleFilter) {
-      if (muscleFilter.filterType === 'muscle') {
-        setMuscle(muscleFilter.value);
-        setCat('');
-      } else {
-        setCat(muscleFilter.value ?? muscleFilter.cat ?? '');
-        setMuscle('');
-      }
-      clearMuscleFilter();
-    }
+    if (!muscleFilter) return;
+    if (muscleFilter.filterType === 'muscle') { setMuscle(muscleFilter.value); setCat(''); }
+    else { setCat(muscleFilter.value ?? ''); setMuscle(''); }
+    setEquip(''); setPage(1);
+    clearMuscleFilter();
   }, [muscleFilter]));
 
-  const fetchExercises = useCallback(async (reset = false) => {
-    const offset = reset ? 0 : offsetRef.current;
-    if (!reset) { setLoadMore(true); }
+  const all      = filterExercises({ search, cat, muscle, equip });
+  const visible  = all.slice(0, page * PAGE);
+  const hasMore  = visible.length < all.length;
 
-    // Cache key includes all filter params
-    const cacheKey = `exercises_${cat}_${muscle}_${diff}_${search.trim()}_${offset}`;
-
-    // Try cache first on reset (instant show)
-    if (reset) {
-      const cached = await cacheGet(cacheKey);
-      if (cached) {
-        setExercises(cached.data);
-        offsetRef.current = cached.data.length;
-        setHasMore(cached.data.length === PAGE);
-        setLoading(false);
-        if (!cached.stale) return; // Fresh cache — no network needed
-        // Stale: continue to fetch in background without spinner
-      }
-    }
-
-    let q = supabase.from('exercises')
-      .select('id,slug,name,name_tr,category,primary_muscle,secondary_muscles,difficulty,effectiveness,muscle_activations,instructions,instructions_en,webm_url,thumb_url')
-      .range(offset, offset + PAGE - 1).order('name');
-    if (cat)           q = q.eq('category', cat);
-    if (muscle)        q = q.eq('primary_muscle', muscle);
-    if (diff > 0)      q = q.eq('difficulty', diff);
-    if (search.trim()) q = q.ilike('name', `%${search.trim()}%`);
-
-    const { data, error } = await q;
-    if (error) { setLoading(false); setLoadMore(false); return; }
-
-    const seen = new Set();
-    const unique = (data || []).filter(ex => { if (seen.has(ex.slug)) return false; seen.add(ex.slug); return true; });
-
-    // Batch fetch ratings with caching
-    if (unique.length > 0) {
-      const ids = unique.map(e => e.id);
-      const ratingsKey = `ratings_${ids.join(',')}`;
-      let rm = {};
-      const cachedRatings = await cacheGet(ratingsKey);
-      if (cachedRatings && !cachedRatings.stale) {
-        rm = cachedRatings.data;
-      } else {
-        const { data: ratings } = await supabase
-          .from('exercise_rating_summary')
-          .select('exercise_id,avg_rating,vote_count')
-          .in('exercise_id', ids);
-        (ratings || []).forEach(r => { rm[r.exercise_id] = r; });
-        await cacheSet(ratingsKey, rm, TTL.RATINGS);
-      }
-      unique.forEach(ex => { ex.avg_rating = rm[ex.id]?.avg_rating ?? 0; ex.vote_count = rm[ex.id]?.vote_count ?? 0; });
-    }
-
-    // Cache this page
-    if (reset) {
-      await cacheSet(cacheKey, unique, TTL.EXERCISES);
-      setExercises(unique);
-      offsetRef.current = unique.length;
-    } else {
-      setExercises(prev => { const ex = new Set(prev.map(e => e.slug)); return [...prev, ...unique.filter(e => !ex.has(e.slug))]; });
-      offsetRef.current += unique.length;
-    }
-    setHasMore(unique.length === PAGE);
-    setLoading(false); setLoadMore(false);
-  }, [cat, muscle, diff, search]);
-
-  useEffect(() => {
-    setLoading(true); offsetRef.current = 0;
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => fetchExercises(true), search ? 400 : 0);
-    return () => clearTimeout(searchTimer.current);
-  }, [cat, muscle, diff, search]);
+  useEffect(() => { setPage(1); }, [search, cat, muscle, equip]);
 
   const renderItem = useCallback(({ item }) => (
     <ExerciseRow item={item} onPress={setSelected} lang={lang} />
   ), [lang]);
 
-  // Açılır filtre panelleri: null | 'muscle' | 'diff'
-  const [openFilter, setOpenFilter] = useState(null);
+  const catActive    = cat    ? { label: CAT_LABEL[cat]?.[lang] ?? cat, color: EX_CAT_COLOR[cat] } : null;
+  const muscleActive = muscle ? { label: MUSCLE_LABEL[muscle]?.[lang] ?? muscle, color: MUSCLE_COLOR[muscle] } : null;
+  const equipActive  = equip  ? { label: EQUIP_LABEL[equip]?.[lang] ?? equip, color: C.lime } : null;
 
-  // Seçili kas/kategori çipi (başlıkta değer + renk için)
-  const activeChip = cat
-    ? FILTER_CHIPS.find(c => c.filterType === 'cat' && c.id === cat)
-    : muscle
-    ? FILTER_CHIPS.find(c => c.filterType === 'muscle' && c.id === muscle)
-    : null;
-
-  const selectChip = (chip, isActive) => {
-    if (chip.filterType === 'all') { setCat(''); setMuscle(''); }
-    else if (chip.filterType === 'cat') { setCat(isActive ? '' : chip.id); setMuscle(''); }
-    else { setMuscle(isActive ? '' : chip.id); setCat(''); }
-    setOpenFilter(null); // seçim sonrası panel kapanır
-  };
-
-  const renderFooter = useCallback(() => loadMore ? <ActivityIndicator color={C.teal} style={{ margin: 16 }} /> : null, [loadMore]);
+  const allLbl = lang === 'tr' ? 'Tümü' : 'All';
 
   return (
     <View style={s.fill}>
@@ -2058,50 +1787,33 @@ function ExercisesLibrary({ lang }) {
         <TextInput style={s.searchInput} placeholder={t('searchPlaceholder', lang)} placeholderTextColor={C.dim} value={search} onChangeText={setSearch} />
         {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Ionicons name="close-circle" size={18} color={C.dim} /></TouchableOpacity>}
       </View>
-      {/* Açılır filtre başlıkları — aktifken renkli parlama */}
+
+      {/* Açılır filtreler: Kategori · Kas · Ekipman */}
       <View style={fa.row}>
-        <FilterAccordion
-          icon="body-outline"
-          title={t('muscleGroups', lang)}
-          value={activeChip ? (lang === 'tr' ? activeChip.label_tr : activeChip.label_en) : ''}
-          placeholder={lang === 'tr' ? 'Tümü' : 'All'}
-          activeColor={activeChip?.color ?? C.lime}
-          hasValue={!!activeChip}
-          isOpen={openFilter === 'muscle'}
-          onToggle={() => setOpenFilter(o => (o === 'muscle' ? null : 'muscle'))}
-        />
-        <FilterAccordion
-          icon="speedometer-outline"
-          title={t('difficulty', lang)}
-          value={diff > 0 ? t(DIFF_META[diff].key, lang) : ''}
-          placeholder={lang === 'tr' ? 'Tümü' : 'All'}
-          activeColor={diff > 0 ? DIFF_META[diff].color : C.lime}
-          hasValue={diff > 0}
-          isOpen={openFilter === 'diff'}
-          onToggle={() => setOpenFilter(o => (o === 'diff' ? null : 'diff'))}
-        />
+        <FilterAccordion icon="grid-outline" title={t('category', lang)} value={catActive?.label} placeholder={allLbl}
+          activeColor={catActive?.color ?? C.lime} hasValue={!!cat} isOpen={openFilter === 'cat'}
+          onToggle={() => setOpenFilter(o => (o === 'cat' ? null : 'cat'))} />
+        <FilterAccordion icon="body-outline" title={t('muscleGroups', lang)} value={muscleActive?.label} placeholder={allLbl}
+          activeColor={muscleActive?.color ?? C.lime} hasValue={!!muscle} isOpen={openFilter === 'muscle'}
+          onToggle={() => setOpenFilter(o => (o === 'muscle' ? null : 'muscle'))} />
+      </View>
+      <View style={[fa.row, { marginBottom: 6 }]}>
+        <FilterAccordion icon="barbell-outline" title={t('equipment', lang)} value={equipActive?.label} placeholder={allLbl}
+          activeColor={C.lime} hasValue={!!equip} isOpen={openFilter === 'equip'}
+          onToggle={() => setOpenFilter(o => (o === 'equip' ? null : 'equip'))} />
       </View>
 
-      {/* Kas grubu paneli — kademeli chip animasyonu + seçimde glow */}
-      {openFilter === 'muscle' && (
-        <Animated.View entering={FadeInDown.duration(220)} style={fa.panel}>
-          <LinearGradient colors={['rgba(232,244,74,0.05)', 'rgba(255,255,255,0.012)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      {openFilter === 'cat' && (
+        <Animated.View entering={FadeInDown.duration(200)} style={fa.panel}>
           <View style={fa.grid}>
-            {FILTER_CHIPS.map((chip, i) => {
-              const isActive = chip.filterType === 'all'
-                ? (cat === '' && muscle === '')
-                : chip.filterType === 'cat' ? cat === chip.id : muscle === chip.id;
+            {CATEGORIES.map((c, i) => {
+              const on = cat === c; const col = EX_CAT_COLOR[c];
               return (
-                <Animated.View key={chip.id + chip.filterType} entering={FadeInDown.delay(i * 16).duration(200)}>
-                  <TouchableOpacity
-                    style={[fa.chip, isActive && { backgroundColor: chip.color, borderColor: chip.color }]}
-                    onPress={() => selectChip(chip, isActive)}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons name={chip.icon} size={13} color={isActive ? '#0a0c0f' : chip.color} />
-                    <Text style={[fa.chipTxt, isActive && { color: '#0a0c0f', fontWeight: '900' }]}>
-                      {lang === 'tr' ? chip.label_tr : chip.label_en}
-                    </Text>
+                <Animated.View key={c} entering={FadeInDown.delay(i * 16).duration(180)}>
+                  <TouchableOpacity style={[fa.chip, on && { backgroundColor: col, borderColor: col }]}
+                    onPress={() => { setCat(on ? '' : c); setOpenFilter(null); }} activeOpacity={0.75}>
+                    <Ionicons name={CAT_ICON[c]} size={13} color={on ? '#0a0c0f' : col} />
+                    <Text style={[fa.chipTxt, on && { color: '#0a0c0f', fontWeight: '900' }]}>{CAT_LABEL[c]?.[lang]}</Text>
                   </TouchableOpacity>
                 </Animated.View>
               );
@@ -2110,24 +1822,16 @@ function ExercisesLibrary({ lang }) {
         </Animated.View>
       )}
 
-      {/* Zorluk paneli */}
-      {openFilter === 'diff' && (
-        <Animated.View entering={FadeInDown.duration(220)} style={fa.panel}>
-          <LinearGradient colors={['rgba(232,244,74,0.05)', 'rgba(255,255,255,0.012)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      {openFilter === 'muscle' && (
+        <Animated.View entering={FadeInDown.duration(200)} style={fa.panel}>
           <View style={fa.grid}>
-            {DIFF_META.map((dm, d) => {
-              const active = diff === d && d > 0;
-              const isAll = d === 0;
-              const on = isAll ? diff === 0 : active;
+            {Object.keys(MUSCLE_LABEL).map((mk, i) => {
+              const on = muscle === mk; const col = MUSCLE_COLOR[mk] ?? C.lime;
               return (
-                <Animated.View key={dm.key} entering={FadeInDown.delay(d * 30).duration(200)}>
-                  <TouchableOpacity
-                    style={[fa.chip, on && { backgroundColor: dm.color, borderColor: dm.color }]}
-                    onPress={() => { setDiff(isAll || active ? 0 : d); setOpenFilter(null); }}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons name={dm.icon} size={13} color={on ? '#0a0c0f' : dm.color} />
-                    <Text style={[fa.chipTxt, on && { color: '#0a0c0f', fontWeight: '900' }]}>{t(dm.key, lang)}</Text>
+                <Animated.View key={mk} entering={FadeInDown.delay(i * 14).duration(180)}>
+                  <TouchableOpacity style={[fa.chip, on && { backgroundColor: col, borderColor: col }]}
+                    onPress={() => { setMuscle(on ? '' : mk); setOpenFilter(null); }} activeOpacity={0.75}>
+                    <Text style={[fa.chipTxt, on && { color: '#0a0c0f', fontWeight: '900' }]}>{MUSCLE_LABEL[mk]?.[lang]}</Text>
                   </TouchableOpacity>
                 </Animated.View>
               );
@@ -2135,16 +1839,45 @@ function ExercisesLibrary({ lang }) {
           </View>
         </Animated.View>
       )}
-      <Text style={s.countTxt}>{loading ? '...' : `${exercises.length}+ ${t('exercises', lang)}`}</Text>
-      {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={C.lime} size="large" />
-          <Text style={{ color: C.muted, marginTop: 12, fontSize: 13 }}>{t('loading', lang)}</Text>
-        </View>
-      ) : (
-        <FlatList data={exercises} keyExtractor={item => item.slug ?? item.id} renderItem={renderItem} contentContainerStyle={s.list} showsVerticalScrollIndicator={false} style={{ flex: 1 }} onEndReached={() => { if (!loadMore && hasMore) fetchExercises(false); }} onEndReachedThreshold={0.3} ListFooterComponent={renderFooter} initialNumToRender={12} maxToRenderPerBatch={10} windowSize={5} removeClippedSubviews={Platform.OS === 'android'} />
+
+      {openFilter === 'equip' && (
+        <Animated.View entering={FadeInDown.duration(200)} style={fa.panel}>
+          <View style={fa.grid}>
+            {EQUIPMENTS.map((eq, i) => {
+              const on = equip === eq;
+              return (
+                <Animated.View key={eq} entering={FadeInDown.delay(i * 16).duration(180)}>
+                  <TouchableOpacity style={[fa.chip, on && { backgroundColor: C.lime, borderColor: C.lime }]}
+                    onPress={() => { setEquip(on ? '' : eq); setOpenFilter(null); }} activeOpacity={0.75}>
+                    <Ionicons name={EQUIP_ICON[eq]} size={13} color={on ? '#0a0c0f' : C.lime} />
+                    <Text style={[fa.chipTxt, on && { color: '#0a0c0f', fontWeight: '900' }]}>{EQUIP_LABEL[eq]?.[lang]}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+          </View>
+        </Animated.View>
       )}
-      <ExerciseDetail item={selected} visible={!!selected} onClose={() => setSelected(null)} onRated={() => fetchExercises(true)} onUpdateSelected={(avg, votes) => setSelected(prev => prev ? { ...prev, avg_rating: avg, vote_count: votes } : prev)} lang={lang} />
+
+      <Text style={s.countTxt}>{all.length} {t('exercises', lang)}</Text>
+
+      <FlatList
+        data={visible}
+        keyExtractor={item => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={s.list}
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        onEndReached={() => { if (hasMore) setPage(p => p + 1); }}
+        onEndReachedThreshold={0.4}
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+        ListEmptyComponent={<Text style={{ color: C.dim, textAlign: 'center', marginTop: 40 }}>{t('noData', lang)}</Text>}
+      />
+
+      <ExerciseDetail item={selected} visible={!!selected} onClose={() => setSelected(null)} lang={lang} />
     </View>
   );
 }

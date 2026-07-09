@@ -14,10 +14,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedRN, { FadeIn, FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { Image as ExpoImage } from 'expo-image';
 import { C, F } from '../utils/theme';
-import { supabase } from '../lib/supabase';
 import { useLang } from '../context/LanguageContext';
 import { getCardLikes, getCardDislikes, decideCard, removeCard, resetCards } from '../utils/storage';
+import { EXERCISES, thumbUrl, CAT_LABEL, CAT_COLOR, MUSCLE_LABEL } from '../data/exercises';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SW * 0.28;
@@ -34,11 +35,13 @@ function muscleLabel(m, lang) { return MUSCLE_LABELS[lang]?.[m] ?? m ?? ''; }
 
 // ─── Tek kart (görsel) ────────────────────────────────────────────────────────
 function CardFace({ ex, lang }) {
-  const accent = C.lime;
+  const accent   = CAT_COLOR[ex.cat] ?? C.lime;
+  const catLabel = CAT_LABEL[ex.cat]?.[lang] ?? ex.cat ?? '—';
+  const muscle   = MUSCLE_LABEL[ex.muscle]?.[lang] ?? ex.target ?? '';
   return (
     <View style={s.cardInner}>
-      {ex.thumb_url ? (
-        <Image source={{ uri: ex.thumb_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      {ex.m ? (
+        <ExpoImage source={{ uri: thumbUrl(ex.m) }} style={[StyleSheet.absoluteFill, { backgroundColor: '#fff' }]} contentFit="cover" cachePolicy="memory-disk" transition={150} />
       ) : (
         <LinearGradient colors={[accent + '22', '#0a0f1e']} style={StyleSheet.absoluteFill} />
       )}
@@ -50,16 +53,18 @@ function CardFace({ ex, lang }) {
       />
       <View style={s.cardBody}>
         <View style={s.cardChipRow}>
-          <View style={[s.cardChip, { borderColor: accent + '66' }]}>
+          <View style={[s.cardChip, { borderColor: accent + '88' }]}>
             <Ionicons name="barbell-outline" size={13} color={accent} />
-            <Text style={[s.cardChipTxt, { color: accent }]}>{ex.category ?? '—'}</Text>
+            <Text style={[s.cardChipTxt, { color: accent }]}>{catLabel}</Text>
           </View>
         </View>
         <Text style={s.cardName} numberOfLines={2}>{ex.name}</Text>
-        <View style={s.cardMetaRow}>
-          <Ionicons name="body-outline" size={15} color={C.muted} />
-          <Text style={s.cardMeta}>{muscleLabel(ex.primary_muscle, lang)}</Text>
-        </View>
+        {muscle ? (
+          <View style={s.cardMetaRow}>
+            <Ionicons name="body-outline" size={15} color={C.muted} />
+            <Text style={s.cardMeta}>{muscle}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -240,8 +245,8 @@ function CardList({ items, kind, onRemove, lang }) {
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       {items.map((ex, i) => (
         <AnimatedRN.View key={ex.name} entering={FadeInDown.delay(i * 30).duration(260)} style={s.listRow}>
-          {ex.thumb_url ? (
-            <Image source={{ uri: ex.thumb_url }} style={s.listThumb} />
+          {ex.m ? (
+            <ExpoImage source={{ uri: thumbUrl(ex.m) }} style={[s.listThumb, { backgroundColor: '#fff' }]} contentFit="cover" cachePolicy="memory-disk" transition={150} />
           ) : (
             <View style={[s.listThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: C.s2 }]}>
               <Text style={{ color: accent, fontFamily: F.extrabold, fontSize: 18 }}>{ex.name?.[0] ?? '?'}</Text>
@@ -249,7 +254,7 @@ function CardList({ items, kind, onRemove, lang }) {
           )}
           <View style={{ flex: 1 }}>
             <Text style={s.listName} numberOfLines={1}>{ex.name}</Text>
-            <Text style={s.listMeta}>{ex.category ?? ''} · {muscleLabel(ex.primary_muscle, lang)}</Text>
+            <Text style={s.listMeta}>{(CAT_LABEL[ex.cat]?.[lang] ?? ex.cat ?? '')}{ex.muscle ? ' · ' + (MUSCLE_LABEL[ex.muscle]?.[lang] ?? '') : ''}</Text>
           </View>
           <View style={[s.listBadge, { backgroundColor: accent + '1A', borderColor: accent + '44' }]}>
             <Ionicons name={kind === 'like' ? 'heart' : 'heart-dislike'} size={14} color={accent} />
@@ -281,15 +286,12 @@ export default function CardGameScreen() {
   const startGame = async () => {
     setStarted(true);
     setLoading(true);
-    const [{ data }, L, D] = await Promise.all([
-      supabase.from('exercises').select('id, name, category, primary_muscle, secondary_muscles, thumb_url').limit(80),
-      getCardLikes(), getCardDislikes(),
-    ]);
+    const [L, D] = await Promise.all([getCardLikes(), getCardDislikes()]);
     const decided = new Set([...L, ...D].map(x => x.name));
-    const pool = (data || []).filter(e => !decided.has(e.name));
-    // karıştır
+    // Yerel dataset — karar verilmemişleri karıştır, 40 kart al
+    const pool = EXERCISES.filter(e => !decided.has(e.name));
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-    setDeck(pool.slice(0, 40));
+    setDeck(pool.slice(0, 40).map(e => ({ name: e.name, cat: e.cat, muscle: e.muscle, target: e.target, m: e.m })));
     setLoading(false);
   };
 

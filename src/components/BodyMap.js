@@ -13,29 +13,22 @@ import Body from 'react-native-body-highlighter';
 import { C } from '../utils/theme';
 import { useMuscleFilter } from '../context/MuscleFilterContext';
 import { useLang } from '../context/LanguageContext';
+import { BODY_SLUG_FILTER, MUSCLE_LABEL, MUSCLE_COLOR } from '../data/exercises';
 
-// Paket slug'ı → Egzersizler filtresi + etiket + vurgu rengi
-const MUSCLE_INFO = {
-  chest:       { tr: 'Göğüs',      en: 'Chest',      filterType: 'cat',    value: 'Göğüs',            color: '#ef4444' },
-  deltoids:    { tr: 'Omuz',       en: 'Shoulders',  filterType: 'cat',    value: 'Omuz',             color: '#f97316' },
-  biceps:      { tr: 'Biseps',     en: 'Biceps',     filterType: 'muscle', value: 'Biceps Brachii',   color: '#06b6d4' },
-  triceps:     { tr: 'Triseps',    en: 'Triceps',    filterType: 'muscle', value: 'Triceps Brachii',  color: '#8b5cf6' },
-  forearm:     { tr: 'Önkol',      en: 'Forearms',   filterType: 'cat',    value: 'Kol',              color: '#818cf8' },
-  abs:         { tr: 'Karın',      en: 'Abs',        filterType: 'muscle', value: 'Rectus Abdominis', color: '#4ade80' },
-  obliques:    { tr: 'Yan Karın',  en: 'Obliques',   filterType: 'cat',    value: 'Core',             color: '#84cc16' },
-  quadriceps:  { tr: 'Kuadriseps', en: 'Quads',      filterType: 'muscle', value: 'Quadriceps',       color: '#38bdf8' },
-  adductors:   { tr: 'İç Bacak',   en: 'Adductors',  filterType: 'cat',    value: 'Bacak',            color: '#0ea5e9' },
-  calves:      { tr: 'Baldır',     en: 'Calves',     filterType: 'cat',    value: 'Bacak',            color: '#7dd3fc' },
-  tibialis:    { tr: 'Kaval',      en: 'Tibialis',   filterType: 'cat',    value: 'Bacak',            color: '#67e8f9' },
-  trapezius:   { tr: 'Trapez',     en: 'Traps',      filterType: 'muscle', value: 'Trapez',           color: '#e879f9' },
-  'upper-back':{ tr: 'Sırt',       en: 'Upper Back', filterType: 'cat',    value: 'Sırt',             color: '#f43f5e' },
-  'lower-back':{ tr: 'Alt Sırt',   en: 'Lower Back', filterType: 'muscle', value: 'Erector Spinae',   color: '#a855f7' },
-  gluteal:     { tr: 'Kalça',      en: 'Glutes',     filterType: 'muscle', value: 'Gluteus Maximus',  color: '#fb923c' },
-  hamstring:   { tr: 'Hamstring',  en: 'Hamstrings', filterType: 'muscle', value: 'Hamstring',        color: '#0ea5e9' },
-};
+// react-native-body-highlighter slug → Egzersizler filtresi + etiket + renk.
+// Kaynak: data/exercises.js BODY_SLUG_FILTER (kind: 'cat'|'muscle', value).
+const MUSCLE_INFO = Object.fromEntries(
+  Object.entries(BODY_SLUG_FILTER).map(([slug, f]) => [slug, {
+    filterType: f.kind,
+    value:      f.value,
+    color:      MUSCLE_COLOR[slug] ?? C.lime,
+    tr:         MUSCLE_LABEL[slug]?.tr ?? slug,
+    en:         MUSCLE_LABEL[slug]?.en ?? slug,
+  }])
+);
 
 // Kas olmayan bölgeler — dokunma kapalı (silüet olarak çizilir)
-const DISABLED = ['head', 'hair', 'neck', 'hands', 'feet', 'ankles', 'knees'];
+const DISABLED = ['head', 'hair', 'neck', 'hands', 'feet', 'ankles', 'knees', 'tibialis'];
 
 const SW = Dimensions.get('window').width;
 

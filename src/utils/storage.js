@@ -264,7 +264,7 @@ export async function toggleFavorite(exerciseName) {
 }
 
 // ─── Card game (swipe likes / dislikes) ───────────────────────────────────────
-// Her kayıt bir egzersiz objesi: { name, category, primary_muscle, thumb_url }
+// Her kayıt bir egzersiz objesi: { name, cat, muscle, target, m }
 const KEY_CARD_LIKES    = 'fitopia_card_likes';
 const KEY_CARD_DISLIKES = 'fitopia_card_dislikes';
 
@@ -281,7 +281,7 @@ export async function decideCard(ex, decision) {
   const [likes, dislikes] = await Promise.all([getCardLikes(), getCardDislikes()]);
   const strip = (arr) => arr.filter(x => x.name !== ex.name);
   let L = strip(likes), D = strip(dislikes);
-  const entry = { name: ex.name, category: ex.category, primary_muscle: ex.primary_muscle, thumb_url: ex.thumb_url ?? null };
+  const entry = { name: ex.name, cat: ex.cat, muscle: ex.muscle, target: ex.target ?? null, m: ex.m ?? null };
   if (decision === 'like') L = [entry, ...L]; else D = [entry, ...D];
   await Promise.all([
     AsyncStorage.setItem(KEY_CARD_LIKES, JSON.stringify(L)),
