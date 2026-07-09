@@ -13,7 +13,7 @@ import { saveWorkoutSession, getAllWorkoutLogs, deleteWorkoutSession, deleteAllE
 import CardGameScreen from './CardGameScreen';
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
-import MascotFlipCard from '../components/MascotFlipCard';
+import BodyMap from '../components/BodyMap';
 import { useToast, ConfirmModal } from '../components/Toast';
 import { t, MONTHS_SHORT, DAYS_SHORT } from '../utils/i18n';
 import { supabase } from '../lib/supabase';
@@ -456,7 +456,7 @@ function GeneralTab({ workoutLogs, lang, weightUnit, lengthUnit }) {
         {/* Mascot — shows only when gender is set */}
         <View style={g.mascotWrap}>
           {gender ? (
-            <MascotFlipCard key={gender} gender={gender} />
+            <BodyMap key={gender} gender={gender} />
           ) : (
             <AnimatedRN.View entering={FadeIn.duration(400)} style={g.noGenderCard}>
               <Ionicons name="person-circle-outline" size={48} color={C.dim} />
