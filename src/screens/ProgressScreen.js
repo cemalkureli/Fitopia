@@ -10,7 +10,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { C } from '../utils/theme';
 import { saveWorkoutSession, getAllWorkoutLogs, deleteWorkoutSession, deleteAllExerciseSessions, getActiveProgram } from '../utils/storage';
-import CardGameScreen from './CardGameScreen';
 import { useLang } from '../context/LanguageContext';
 import { useUnits, fmtWeight } from '../context/UnitsContext';
 import BodyMap from '../components/BodyMap';
@@ -702,7 +701,6 @@ export default function ProgressScreen() {
     { label: t('tabGeneral', lang),     icon: 'stats-chart-outline' },
     { label: t('tabProgressive', lang), icon: 'trending-up-outline' },
     { label: t('tabMeasurement', lang), icon: 'body-outline' },
-    { label: lang === 'tr' ? 'Kartlar' : 'Cards', icon: 'albums-outline' },
   ];
 
   return (
@@ -769,8 +767,6 @@ export default function ProgressScreen() {
         <MeasurementTab lang={lang} weightUnit={weightUnit} lengthUnit={lengthUnit} />
       )}
 
-      {/* Tab 3 — Egzersiz Kartları (swipe oyunu) */}
-      {activeTab === 3 && <CardGameScreen />}
 
       {/* Log Modal */}
       {logModal && (

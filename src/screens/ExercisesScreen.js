@@ -23,7 +23,7 @@ import {
   EXERCISES, filterExercises, decorate, getByName,
   CATEGORIES, CAT_LABEL, CAT_ICON, CAT_COLOR as EX_CAT_COLOR,
   MUSCLE_LABEL, MUSCLE_COLOR, EQUIPMENTS, EQUIP_LABEL, EQUIP_ICON, equipGroup,
-  gifUrl, thumbUrl, MEDIA_ATTRIBUTION,
+  gifUrl, thumbUrl,
 } from '../data/exercises';
 
 // Workout terminology definitions (shared with ProgramScreen)
@@ -85,10 +85,12 @@ const eb = StyleSheet.create({
 
 // ─── Egzersiz satırı ─────────────────────────────────────────────────────────
 // item: yerel dataset kaydı (id,name,cat,muscle,target,equip,m,...)
-const ExerciseRow = memo(({ item, onPress, lang }) => {
+const ExerciseRow = memo(({ item, onPress, lang, rating }) => {
   const color    = EX_CAT_COLOR[item.cat] ?? C.lime;
   const catLabel = CAT_LABEL[item.cat]?.[lang] ?? item.cat;
   const muscle   = MUSCLE_LABEL[item.muscle]?.[lang] ?? item.target ?? '';
+  const avg      = rating?.avg ?? 0;
+  const votes    = rating?.count ?? 0;
 
   return (
     <TouchableOpacity style={s.exRow} onPress={() => onPress(item)} activeOpacity={0.8}>
@@ -107,6 +109,12 @@ const ExerciseRow = memo(({ item, onPress, lang }) => {
           </View>
           {muscle ? <Text style={s.muscleTxt}>{muscle}</Text> : null}
         </View>
+        {votes > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+            <Stars value={avg} size={11} />
+            <Text style={{ color: C.dim, fontSize: 10 }}>({votes})</Text>
+          </View>
+        )}
       </View>
       <Ionicons name="chevron-forward" size={14} color={C.dim} />
     </TouchableOpacity>
@@ -156,14 +164,61 @@ const fa = StyleSheet.create({
 });
 
 // ─── Detay bottom sheet ───────────────────────────────────────────────────────
-// item: yerel dataset kaydı. GIF (© Gym Visual) + adım adım talimat + kaslar.
-function ExerciseDetail({ item, visible, onClose, lang }) {
+// item: yerel dataset kaydı. GIF + adım adım talimat + kaslar + topluluk puanı.
+function ExerciseDetail({ item, visible, onClose, onRated, lang }) {
+  const [userRating, setUserRating] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted,  setSubmitted]  = useState(false);
+  const [avg,   setAvg]   = useState(0);
+  const [votes, setVotes] = useState(0);
+
+  // Topluluk puanları — ex_ratings (yerel egzersiz anahtarı = item.id ile)
+  useEffect(() => {
+    if (!visible || !item) return;
+    setUserRating(0); setSubmitted(false); setAvg(0); setVotes(0);
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from('ex_ratings').select('rating, user_id').eq('exercise_key', item.id);
+      if (cancelled) return;
+      const rows = data || [];
+      setVotes(rows.length);
+      setAvg(rows.length ? rows.reduce((a, r) => a + r.rating, 0) / rows.length : 0);
+      const { data: ud } = await supabase.auth.getUser();
+      const mine = ud?.user && rows.find(r => r.user_id === ud.user.id);
+      if (mine && !cancelled) { setUserRating(mine.rating); setSubmitted(true); }
+    })();
+    return () => { cancelled = true; };
+  }, [visible, item?.id]);
+
   if (!item) return null;
   const d        = decorate(item, lang);
   const color    = d.catColor;
   const steps    = d.steps.length ? d.steps : (d.instr ? [d.instr] : []);
   const equip    = EQUIP_LABEL[equipGroup(item.equip)]?.[lang] ?? item.equip;
   const muscles  = [d.muscleLabel, ...(item.secondary || [])].filter(Boolean);
+
+  const handleRate = async (rating) => {
+    if (rating === userRating) return;
+    const wasFirst = !submitted;
+    setUserRating(rating); setSubmitting(true);
+    try {
+      const { data: ud } = await supabase.auth.getUser();
+      if (!ud?.user) return;
+      await supabase.from('ex_ratings').upsert(
+        { exercise_key: item.id, user_id: ud.user.id, rating },
+        { onConflict: 'exercise_key,user_id' }
+      );
+      if (wasFirst) await supabase.rpc('increment_xp', { uid: ud.user.id, amount: 5, rating_inc: 1 }).catch(() => {});
+      // özet yenile
+      const { data } = await supabase.from('ex_ratings').select('rating').eq('exercise_key', item.id);
+      const rows = data || [];
+      setVotes(rows.length);
+      setAvg(rows.length ? rows.reduce((a, r) => a + r.rating, 0) / rows.length : 0);
+      setSubmitted(true);
+      onRated?.(item.id);
+    } catch {}
+    setSubmitting(false);
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -220,10 +275,30 @@ function ExerciseDetail({ item, visible, onClose, lang }) {
                 </>
               )}
 
-              {/* Medya atıf — Gym Visual (lisans gereği) */}
-              <Text style={det.attribution}>{MEDIA_ATTRIBUTION}</Text>
+              {/* Topluluk puanı */}
+              <Text style={det.sectionTitle}>{t('communityRating', lang)}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Stars value={avg} size={20} />
+                {votes > 0 && (
+                  <Text style={{ color: C.dim, fontSize: 12 }}>
+                    {t('avg', lang)} {avg.toFixed(1)} · {votes} {t('votes', lang)}
+                  </Text>
+                )}
+              </View>
 
-              <TouchableOpacity onPress={onClose} style={[det.closeBtn, { borderColor: color + '50', marginTop: 16 }]}>
+              {/* Senin puanın */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+                <Text style={[det.sectionTitle, { marginTop: 0 }]}>{t('yourRating', lang)}</Text>
+                {submitted && <Text style={{ color: C.teal, fontSize: 11 }}>{t('xpEarned', lang)}</Text>}
+              </View>
+              {submitting
+                ? <ActivityIndicator color={C.lime} style={{ alignSelf: 'flex-start' }} />
+                : <Stars value={userRating} size={30} onPress={handleRate} />}
+              {submitted && (
+                <Text style={{ color: C.dim, fontSize: 11, marginTop: 4 }}>{t('ratingChangeable', lang)}</Text>
+              )}
+
+              <TouchableOpacity onPress={onClose} style={[det.closeBtn, { borderColor: color + '50', marginTop: 20 }]}>
                 <Text style={{ color, fontWeight: '700', fontSize: 14 }}>{t('close', lang)}</Text>
               </TouchableOpacity>
             </View>
@@ -248,7 +323,6 @@ const det = StyleSheet.create({
   stepNum:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   stepNumTxt: { fontSize: 12, fontWeight: '900' },
   stepTxt:    { flex: 1, color: C.muted, fontSize: 13.5, lineHeight: 20 },
-  attribution:{ color: C.dim, fontSize: 10.5, marginTop: 18, textAlign: 'center' },
   closeBtn:   { borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
 });
 
@@ -1754,6 +1828,20 @@ function ExercisesLibrary({ lang }) {
   const [page,   setPage]   = useState(1);
   const [openFilter, setOpenFilter] = useState(null); // null | 'cat' | 'muscle' | 'equip'
   const [selected, setSelected] = useState(null);
+  const [ratings, setRatings] = useState({}); // { exercise_key: { avg, count } }
+
+  // Topluluk puan özetlerini bir kez çek (ex_ratings küçük); satırlara dağıt.
+  const loadRatings = useCallback(async () => {
+    const { data } = await supabase.from('ex_ratings').select('exercise_key, rating');
+    const map = {};
+    (data || []).forEach(r => {
+      const m = map[r.exercise_key] || (map[r.exercise_key] = { sum: 0, count: 0 });
+      m.sum += r.rating; m.count += 1;
+    });
+    Object.keys(map).forEach(k => { map[k] = { avg: map[k].sum / map[k].count, count: map[k].count }; });
+    setRatings(map);
+  }, []);
+  useFocusEffect(useCallback(() => { loadRatings(); }, [loadRatings]));
 
   // BodyMap → Egzersizler köprüsü (bir kez uygula, sonra temizle)
   useFocusEffect(useCallback(() => {
@@ -1771,8 +1859,8 @@ function ExercisesLibrary({ lang }) {
   useEffect(() => { setPage(1); }, [search, cat, muscle, equip]);
 
   const renderItem = useCallback(({ item }) => (
-    <ExerciseRow item={item} onPress={setSelected} lang={lang} />
-  ), [lang]);
+    <ExerciseRow item={item} onPress={setSelected} lang={lang} rating={ratings[item.id]} />
+  ), [lang, ratings]);
 
   const catActive    = cat    ? { label: CAT_LABEL[cat]?.[lang] ?? cat, color: EX_CAT_COLOR[cat] } : null;
   const muscleActive = muscle ? { label: MUSCLE_LABEL[muscle]?.[lang] ?? muscle, color: MUSCLE_COLOR[muscle] } : null;
@@ -1877,7 +1965,7 @@ function ExercisesLibrary({ lang }) {
         ListEmptyComponent={<Text style={{ color: C.dim, textAlign: 'center', marginTop: 40 }}>{t('noData', lang)}</Text>}
       />
 
-      <ExerciseDetail item={selected} visible={!!selected} onClose={() => setSelected(null)} lang={lang} />
+      <ExerciseDetail item={selected} visible={!!selected} onClose={() => setSelected(null)} onRated={loadRatings} lang={lang} />
     </View>
   );
 }

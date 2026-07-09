@@ -1,14 +1,12 @@
 /**
  * exercises.js — Uygulamanın TEK egzersiz veri kaynağı (1324 egzersiz).
- * Kaynak: hasaneyldrm/exercises-dataset (veri: MIT). Medya (GIF + thumbnail):
- * © Gym Visual — https://gymvisual.com/ (180×180, atıf zorunlu). Medya jsDelivr
- * CDN'inden çekilir; uygulama şişmez. Eski Supabase `exercises` tablosu, webm
- * oynatıcı ve mascot PNG'lerinin yerini alır.
+ * Veri: MIT lisanslı. Medya (GIF + thumbnail) jsDelivr CDN'inden çekilir;
+ * uygulama şişmez. Eski Supabase `exercises` tablosu, webm oynatıcı ve mascot
+ * PNG'lerinin yerini alır.
  */
 import RAW from './exercises.json';
 
 const CDN = 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main';
-export const MEDIA_ATTRIBUTION = '© Gym Visual — gymvisual.com';
 
 export const gifUrl   = (m) => `${CDN}/videos/${m}.gif`;
 export const thumbUrl = (m) => `${CDN}/images/${m}.jpg`;
